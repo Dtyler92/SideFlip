@@ -2,7 +2,7 @@
 // Trial = 7 days from account creation, no card required
 
 export const MONTHLY_PRICE = 5.99
-export const ANNUAL_PRICE = 39
+export const ANNUAL_PRICE = 59
 export const ANNUAL_MONTHLY_EQUIV = (ANNUAL_PRICE / 12).toFixed(2)
 export const SAVINGS_PCT = Math.round((1 - ANNUAL_PRICE / (MONTHLY_PRICE * 12)) * 100)
 export const TRIAL_DAYS = 7

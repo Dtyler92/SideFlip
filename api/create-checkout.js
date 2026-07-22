@@ -21,6 +21,7 @@ export default async function handler(req, res) {
         trial_period_days: 7,
         metadata: { userId }
       },
+      allow_promotion_codes: true,
       payment_method_collection: 'always',
       metadata: { userId },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?subscribed=true`,
