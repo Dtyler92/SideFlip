@@ -21,6 +21,7 @@ export function isTrialActive(createdAt) {
 
 export function isSubscribed(profile) {
   if (!profile) return false
+  if (!profile.subscription_id) return false // no real Stripe subscription
   if (profile.subscription_status === 'active') return true
   if (profile.subscription_status === 'trialing') return true
   return false
