@@ -1,10 +1,32 @@
 import { Routes, Route } from 'react-router-dom'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { hasAccess, isTrialActive } from './billing'
+import AuthScreen from './pages/AuthScreen'
+import Paywall from './pages/Paywall'
 import Home from './pages/Home'
 import NewProject from './pages/NewProject'
 import ProjectDetail from './pages/ProjectDetail'
 import SellProject from './pages/SellProject'
 
-export default function App() {
+function AppRoutes() {
+  const { user, profile, loading } = useAuth()
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ fontFamily: 'var(--font-heading)', fontSize: 32, letterSpacing: '-0.02em' }}>
+        <span style={{ color: 'var(--text)' }}>Side</span>
+        <span style={{ color: 'var(--accent)' }}>Flip</span>
+      </div>
+    </div>
+  )
+
+  // Not logged in
+  if (!user) return <AuthScreen />
+
+  // Logged in but no access (trial expired, no subscription)
+  if (profile && !hasAccess(profile)) return <Paywall trialExpired={!isTrialActive(profile.created_at)} />
+
+  // Full access
   return (
     <Routes>
       <Route path="/" element={<Home />} />
@@ -12,5 +34,13 @@ export default function App() {
       <Route path="/project/:id" element={<ProjectDetail />} />
       <Route path="/project/:id/sell" element={<SellProject />} />
     </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   )
 }
