@@ -99,10 +99,10 @@ export default function NewProject() {
           {/* ── Category-specific identifiers ── */}
           {(fields.hasVin || fields.hasHull) && (
             <div className="form-group">
-              <label>{fields.hasVin ? 'VIN Number' : 'Hull Number'}</label>
+              <label>{fields.hasHull ? 'Hull Number' : 'VIN Number'}</label>
               <input
                 type="text"
-                placeholder={fields.hasVin ? 'e.g. 1HGCM82633A123456' : 'e.g. ABC12345D102'}
+                placeholder={fields.hasHull ? 'e.g. ABC12345D102' : 'e.g. 1HGCM82633A123456'}
                 value={fields.hasVin ? form.vin : form.hullNumber}
                 onChange={e => set(fields.hasVin ? 'vin' : 'hullNumber', e.target.value)}
               />
