@@ -111,3 +111,12 @@ export function categoryIcon(value) {
 export function expenseIcon(value) {
   return EXPENSE_CATEGORIES.find(c => c.value === value)?.icon || '📦'
 }
+
+// Which extra fields to show per category
+export function getExtraFields(category) {
+  const hasEngine = ['car', 'mower', 'boat'].includes(category)
+  const hasVin    = ['car'].includes(category)
+  const hasHull   = ['boat'].includes(category)
+  const hasModel  = ['car', 'mower', 'boat', 'electronics', 'tool'].includes(category)
+  return { hasEngine, hasVin, hasHull, hasModel }
+}

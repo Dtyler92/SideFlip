@@ -481,7 +481,5 @@ body {
 .stat-value { font-size: 15px; font-weight: 700; color: var(--text); }
 .stat-value.accent { color: var(--accent); }
 .stat-value.big {
-  font-family: var(--font-heading);
-  font-size: 28px;
-  letter-spacing: -0.02em;
+  font-size: 22px;
 }
