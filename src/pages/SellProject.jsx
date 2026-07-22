@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getProject, updateProject, getTotalInvested, getProfit, getROI, fmt } from '../store'
+import { getProject, updateProject, getTotalInvested, fmt } from '../store'
 
 export default function SellProject() {
   const { id } = useParams()
@@ -12,7 +12,9 @@ export default function SellProject() {
 
   const totalInvested = getTotalInvested(project)
   const preview = salePrice ? Number(salePrice) - totalInvested : null
-  const previewROI = salePrice && totalInvested ? (((Number(salePrice) - totalInvested) / totalInvested) * 100).toFixed(1) : null
+  const previewROI = salePrice && totalInvested
+    ? (((Number(salePrice) - totalInvested) / totalInvested) * 100).toFixed(1)
+    : null
 
   function handleSell(e) {
     e.preventDefault()
@@ -33,12 +35,13 @@ export default function SellProject() {
       </div>
 
       <div className="page">
+        {/* Project summary */}
         <div className="card" style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Project</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{project.title}</div>
-          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Total invested</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{fmt(totalInvested)}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 6 }}>Project</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>{project.title}</div>
+          <div className="stat-row" style={{ paddingTop: 0 }}>
+            <span className="stat-label">Total Invested</span>
+            <span className="stat-value accent">{fmt(totalInvested)}</span>
           </div>
         </div>
 
@@ -52,28 +55,25 @@ export default function SellProject() {
               value={salePrice}
               onChange={e => setSalePrice(e.target.value)}
               autoFocus
-              style={{ fontSize: 28, fontWeight: 700, textAlign: 'center', padding: '18px' }}
+              style={{ fontSize: 32, fontWeight: 700, textAlign: 'center', padding: '20px', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
             />
           </div>
 
-          {salePrice && (
+          {/* Live preview */}
+          {salePrice && preview !== null && (
             <div className="profit-result">
-              <div className="label">{preview >= 0 ? '🎉 Profit' : '📉 Loss'}</div>
+              <div className="label">{preview >= 0 ? 'Profit' : 'Loss'}</div>
               <div className={`amount ${preview >= 0 ? 'profit' : 'loss'}`}>
                 {preview >= 0 ? '+' : ''}{fmt(preview)}
               </div>
               {previewROI && (
-                <div className="roi">{previewROI}% ROI</div>
+                <div className="roi">{preview >= 0 ? '📈' : '📉'} {previewROI}% ROI</div>
               )}
             </div>
           )}
 
-          <button type="submit" className="btn btn-green" style={{ marginTop: 8 }}>
-            💰 Confirm Sale
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
-            Cancel
-          </button>
+          <button type="submit" className="btn btn-green">Confirm Sale →</button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancel</button>
         </form>
       </div>
     </>

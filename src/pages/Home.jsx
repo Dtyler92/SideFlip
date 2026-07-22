@@ -17,22 +17,25 @@ export default function Home() {
   return (
     <>
       <div className="page-header">
-        <h1>FlipLedger</h1>
-        <span style={{ fontSize: 22 }}>📒</span>
+        <div className="wordmark" style={{ flex: 1 }}>
+          <span className="wordmark-side">Side</span>
+          <span className="wordmark-flip">Flip</span>
+        </div>
+        <span style={{ fontSize: 20 }}>📒</span>
       </div>
 
       <div className="summary-bar">
         <div className="summary-item">
           <div className="summary-label">Active</div>
-          <div className="summary-value orange">{active.length}</div>
+          <div className="summary-value accent">{active.length}</div>
         </div>
         <div className="summary-item">
-          <div className="summary-label">Invested</div>
-          <div className="summary-value orange">{fmt(totalInvested)}</div>
+          <div className="summary-label">In Projects</div>
+          <div className="summary-value accent">{fmt(totalInvested)}</div>
         </div>
         <div className="summary-item">
-          <div className="summary-label">Profit</div>
-          <div className={`summary-value ${totalProfit >= 0 ? 'green' : ''}`}>{fmt(totalProfit)}</div>
+          <div className="summary-label">Total Profit</div>
+          <div className={`summary-value ${totalProfit >= 0 ? 'green' : 'accent'}`}>{fmt(totalProfit)}</div>
         </div>
       </div>
 
@@ -53,26 +56,30 @@ export default function Home() {
             <p>{tab === 'active' ? 'Tap + to add your first project' : 'Mark a project as sold to see it here'}</p>
           </div>
         ) : (
-          shown.map(p => (
-            <div key={p.id} className={`project-card ${p.status === 'sold' ? 'sold' : ''}`} onClick={() => navigate(`/project/${p.id}`)}>
-              {p.photo
-                ? <img src={p.photo} alt={p.title} className="project-img" />
-                : <div className="project-img-placeholder">{categoryIcon(p.category)}</div>
-              }
-              <div className="project-info">
-                <div className="project-category">{p.category}</div>
-                <div className="project-title">{p.title}</div>
-                <div className="project-meta">
-                  <span className="invested">{fmt(getTotalInvested(p))} in</span>
-                  {p.status === 'sold' && (
-                    <span className="sold-badge">
-                      {getProfit(p) >= 0 ? `+${fmt(getProfit(p))}` : fmt(getProfit(p))}
-                    </span>
-                  )}
+          shown.map(p => {
+            const profit = getProfit(p)
+            return (
+              <div key={p.id} className={`project-card ${p.status === 'sold' ? 'sold' : ''}`} onClick={() => navigate(`/project/${p.id}`)}>
+                {p.photo
+                  ? <img src={p.photo} alt={p.title} className="project-img" />
+                  : <div className="project-img-placeholder">{categoryIcon(p.category)}</div>
+                }
+                <div className="project-info">
+                  <div className="project-category">{p.category}</div>
+                  <div className="project-title">{p.title}</div>
+                  <div className="project-meta">
+                    <span className="invested">{fmt(getTotalInvested(p))} in</span>
+                    {p.status === 'sold' && profit !== null && (
+                      <span className={`sold-badge ${profit < 0 ? 'loss' : ''}`}>
+                        {profit >= 0 ? '+' : ''}{fmt(profit)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', paddingRight: 14, color: '#D4CDC1', fontSize: 18 }}>›</div>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 

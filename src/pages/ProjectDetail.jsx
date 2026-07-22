@@ -16,9 +16,10 @@ export default function ProjectDetail() {
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [expense, setExpense] = useState({ description: '', amount: '', category: 'parts' })
 
-  if (!project) return <div className="page"><p style={{padding:40,color:'var(--muted)'}}>Project not found.</p></div>
+  if (!project) return <div className="page" style={{paddingTop:40}}><p style={{color:'var(--muted)'}}>Project not found.</p></div>
 
   const totalInvested = getTotalInvested(project)
+  const partsTotal = project.expenses.reduce((s, e) => s + Number(e.amount), 0)
 
   function handleAddExpense(e) {
     e.preventDefault()
@@ -50,44 +51,48 @@ export default function ProjectDetail() {
 
       {/* Hero photo */}
       {project.photo && (
-        <img src={project.photo} alt={project.title} style={{ width: '100%', maxHeight: 220, objectFit: 'cover' }} />
+        <img src={project.photo} alt={project.title}
+          style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderBottom: '1px solid var(--border)' }} />
       )}
 
-      <div className="page">
-        {/* Status badge */}
+      <div className="page" style={{ paddingTop: 16 }}>
+
+        {/* Category + status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <span style={{ fontSize: 28 }}>{categoryIcon(project.category)}</span>
+          <span style={{ fontSize: 26 }}>{categoryIcon(project.category)}</span>
           <div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{project.category}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{project.category}</div>
             {project.status === 'sold' && <span className="sold-badge">SOLD</span>}
           </div>
         </div>
 
-        {/* Cost summary */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 2 }}>Purchase Price</div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{fmt(project.purchasePrice)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 2 }}>Parts & Costs</div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>
-                {fmt(project.expenses.reduce((s, e) => s + Number(e.amount), 0))}
-              </div>
-            </div>
+        {/* Cost summary card */}
+        <div className="card">
+          <div className="stat-row">
+            <span className="stat-label">Purchase Price</span>
+            <span className="stat-value">{fmt(project.purchasePrice)}</span>
           </div>
-          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 2 }}>Total Invested</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{fmt(totalInvested)}</div>
+          <div className="stat-row">
+            <span className="stat-label">Parts & Costs</span>
+            <span className="stat-value">{fmt(partsTotal)}</span>
           </div>
+          <div className="stat-row">
+            <span className="stat-label">Total Invested</span>
+            <span className="stat-value accent big">{fmt(totalInvested)}</span>
+          </div>
+          {project.status === 'sold' && (
+            <div className="stat-row">
+              <span className="stat-label">Sold For</span>
+              <span className="stat-value" style={{ color: 'var(--green)', fontFamily: 'var(--font-heading)', fontSize: 22 }}>{fmt(project.salePrice)}</span>
+            </div>
+          )}
         </div>
 
         {/* Notes */}
         {project.notes && (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>Notes</div>
-            <div style={{ fontSize: 14, lineHeight: 1.5 }}>{project.notes}</div>
+          <div className="card">
+            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 6 }}>Notes</div>
+            <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--body)' }}>{project.notes}</div>
           </div>
         )}
 
@@ -96,22 +101,22 @@ export default function ProjectDetail() {
         <div className="card">
           {project.expenses.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 14 }}>
-              No expenses yet — tap "Add Expense" below
+              No expenses yet
             </div>
           ) : (
             project.expenses.map(e => (
-              <div key={e.id} className="expense-row" onClick={() => handleDeleteExpense(e.id)}>
+              <div key={e.id} className="expense-row" onClick={() => handleDeleteExpense(e.id)} style={{ cursor: 'pointer' }}>
                 <div className="expense-icon">{expenseIcon(e.category)}</div>
                 <div className="expense-desc">
                   <div className="desc">{e.description}</div>
                   <div className="cat">{e.category}</div>
                 </div>
-                <div className="expense-amount">−{fmt(e.amount)}</div>
+                <div className="expense-amount">{fmt(e.amount)}</div>
               </div>
             ))
           )}
         </div>
-        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 16 }}>Tap an expense to remove it</p>
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: -8, marginBottom: 20 }}>Tap an expense to remove it</p>
 
         {/* Actions */}
         {project.status === 'active' && (
@@ -120,14 +125,8 @@ export default function ProjectDetail() {
             <button className="btn btn-green" onClick={() => navigate(`/project/${id}/sell`)}>💰 Mark as Sold</button>
           </>
         )}
-        {project.status === 'sold' && (
-          <div className="card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sold for</div>
-            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--green)' }}>{fmt(project.salePrice)}</div>
-          </div>
-        )}
 
-        <button className="btn btn-danger" style={{ marginTop: 24 }} onClick={handleDeleteProject}>🗑 Delete Project</button>
+        <button className="btn btn-danger" style={{ marginTop: 24 }} onClick={handleDeleteProject}>Delete Project</button>
       </div>
 
       {/* Add Expense Sheet */}
@@ -135,7 +134,7 @@ export default function ProjectDetail() {
         <div className="modal-overlay" onClick={() => setShowAddExpense(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <h2 style={{ marginBottom: 20, fontSize: 18 }}>Add Expense</h2>
+            <div className="modal-title">Add Expense</div>
             <form onSubmit={handleAddExpense}>
               <div className="form-group">
                 <label>Category</label>
