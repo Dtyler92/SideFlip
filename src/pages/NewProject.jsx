@@ -25,7 +25,7 @@ function PhotoPicker({ photo, onChange }) {
           zIndex: 2, pointerEvents: 'none'
         }}>✏️ Change Photo</div>
       )}
-      <input type="file" accept="image/*" capture="environment" onChange={handleFile} />
+      <input type="file" accept="image/*" onChange={handleFile} />
     </div>
   )
 }

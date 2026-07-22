@@ -32,7 +32,7 @@ function PhotoPicker({ photo, onChange }) {
         display: 'flex', alignItems: 'center', gap: 5
       }}>
         ✏️ {photo ? 'Change' : 'Add Photo'}
-        <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
       </label>
     </div>
   )
