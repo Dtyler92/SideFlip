@@ -21,9 +21,10 @@ export default async function handler(req, res) {
         trial_period_days: 7,
         metadata: { userId }
       },
+      payment_method_collection: 'always',
       metadata: { userId },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip-seven.vercel.app'}/?subscribed=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip-seven.vercel.app'}/?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?subscribed=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?canceled=true`,
     })
 
     res.json({ url: session.url })
