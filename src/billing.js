@@ -29,6 +29,5 @@ export function isSubscribed(profile) {
 export function hasAccess(profile) {
   if (!profile) return false
   if (isSubscribed(profile)) return true
-  if (isTrialActive(profile.created_at)) return true
   return false
 }

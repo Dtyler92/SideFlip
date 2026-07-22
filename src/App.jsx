@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { hasAccess, isTrialActive } from './billing'
+import { isSubscribed } from './billing'
 import AuthScreen from './pages/AuthScreen'
 import Paywall from './pages/Paywall'
 import Home from './pages/Home'
@@ -23,8 +23,8 @@ function AppRoutes() {
   // Not logged in
   if (!user) return <AuthScreen />
 
-  // Logged in but no access (trial expired, no subscription)
-  if (profile && !hasAccess(profile)) return <Paywall trialExpired={!isTrialActive(profile.created_at)} />
+  // Logged in but no active subscription — always show paywall
+  if (!profile || !isSubscribed(profile)) return <Paywall trialExpired={true} />
 
   // Full access
   return (
