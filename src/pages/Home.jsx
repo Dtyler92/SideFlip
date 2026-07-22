@@ -21,7 +21,6 @@ export default function Home() {
           <span className="wordmark-side">Side</span>
           <span className="wordmark-flip">Flip</span>
         </div>
-        <span style={{ fontSize: 20 }}>📒</span>
       </div>
 
       <div className="summary-bar">
