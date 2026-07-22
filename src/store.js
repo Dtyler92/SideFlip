@@ -85,7 +85,7 @@ export function fmt(num) {
 }
 
 export const CATEGORIES = [
-  { value: 'mower', label: '🌿 Lawn Mower' },
+  { value: 'mower', label: '🚜 Lawn Mower' },
   { value: 'watch', label: '⌚ Watch' },
   { value: 'car', label: '🚗 Car' },
   { value: 'boat', label: '⛵ Boat' },

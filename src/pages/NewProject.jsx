@@ -122,7 +122,7 @@ export default function NewProject() {
               <div className="form-group">
                 <label>Serial #</label>
                 <input
-                  type="text" placeholder="e.g. MAGA-1234567"
+                  type="text" placeholder="e.g. SN-1234567"
                   value={form.serialNumber}
                   onChange={e => set('serialNumber', e.target.value)}
                 />
