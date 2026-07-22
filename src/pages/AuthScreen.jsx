@@ -133,7 +133,7 @@ export default function AuthScreen() {
           {loading
             ? 'Please wait...'
             : mode === 'signup'
-              ? `Start Free Trial → Enter Card`
+              : `Start Free Trial →`}
               : 'Sign In →'}
         </button>
       </form>
