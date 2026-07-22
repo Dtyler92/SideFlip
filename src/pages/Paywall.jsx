@@ -49,12 +49,10 @@ export default function Paywall({ trialExpired }) {
       </div>
 
       <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 8, textAlign: 'center' }}>
-        {trialExpired ? 'Your free trial has ended' : `${TRIAL_DAYS}-Day Free Trial`}
+        Get full access to SideFlip
       </div>
       <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 32, textAlign: 'center', lineHeight: 1.6 }}>
-        {trialExpired
-          ? 'Subscribe to keep tracking your flips and accessing your data.'
-          : 'Choose a plan to continue after your trial. Cancel anytime.'}
+        Start your 7-day free trial. Cancel before day 7 and you won't be charged.
       </div>
 
       {/* Plan selector */}
