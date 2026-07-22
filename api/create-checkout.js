@@ -22,6 +22,7 @@ export default async function handler(req, res) {
       },
       allow_promotion_codes: true,
       payment_method_collection: 'always',
+      automatic_tax: { enabled: false },
       metadata: { userId },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?subscribed=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?canceled=true`,
