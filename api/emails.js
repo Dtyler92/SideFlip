@@ -63,7 +63,37 @@ export async function sendTrialReminderEmail(email) {
   })
 }
 
-// ── Payment failed ────────────────────────────────────────────
+// ── Win-back — canceled during free trial ─────────────────────
+export async function sendTrialCanceledEmail(email) {
+  return resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: 'Sorry to see you go — SideFlip',
+    html: `
+      <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;background:#FAFAF7;padding:40px 24px;">
+        <div style="font-size:36px;font-weight:800;letter-spacing:-0.02em;margin-bottom:8px;">
+          <span style="color:#1A1917;">Side</span><span style="color:#C8402F;">Flip</span>
+        </div>
+        <h1 style="font-size:22px;color:#1A1917;margin:24px 0 12px;">You canceled — no hard feelings 👋</h1>
+        <p style="color:#5C5850;font-size:15px;line-height:1.7;margin-bottom:16px;">
+          Your trial has been canceled and you won't be charged a thing.
+        </p>
+        <p style="color:#5C5850;font-size:15px;line-height:1.7;margin-bottom:24px;">
+          If you ever want to come back and start tracking your flips, your account is still here. Just sign in and pick a plan — takes 30 seconds.
+        </p>
+        <a href="${APP_URL}" style="display:inline-block;background:#C8402F;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:700;font-size:15px;">
+          Come Back Anytime →
+        </a>
+        <hr style="border:none;border-top:1px solid #E8E4DE;margin:36px 0;" />
+        <p style="color:#8C8880;font-size:13px;line-height:1.6;">
+          Was there something we could've done better? Just reply — I read every email.<br/>
+          — Tyler, SideFlip
+        </p>
+      </div>
+    `
+  })
+}
+
 export async function sendPaymentFailedEmail(email) {
   return resend.emails.send({
     from: FROM,

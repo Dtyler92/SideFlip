@@ -9,6 +9,8 @@ import Home from './pages/Home'
 import NewProject from './pages/NewProject'
 import ProjectDetail from './pages/ProjectDetail'
 import SellProject from './pages/SellProject'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 
 function AppRoutes() {
   const { user, profile, loading, refreshProfile } = useAuth()
@@ -39,6 +41,10 @@ function AppRoutes() {
 
     return () => clearInterval(interval)
   }, [searchParams.get('subscribed'), user])
+
+  // Public routes — no auth needed
+  if (window.location.pathname === '/privacy') return <PrivacyPolicy />
+  if (window.location.pathname === '/terms') return <TermsOfService />
 
   if (loading || polling) return (
     <div style={{

@@ -181,6 +181,11 @@ export default function AuthScreen() {
           </>
         )}
       </div>
+      <div style={{ marginTop: 32, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
+        <a href="/privacy" style={{ color: 'var(--muted)' }}>Privacy Policy</a>
+        {' · '}
+        <a href="/terms" style={{ color: 'var(--muted)' }}>Terms of Service</a>
+      </div>
     </div>
   )
 }

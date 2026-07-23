@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
-import { sendWelcomeEmail, sendPaymentFailedEmail } from './emails.js'
+import { sendWelcomeEmail, sendPaymentFailedEmail, sendTrialCanceledEmail } from './emails.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const supabase = createClient(
@@ -50,12 +50,12 @@ export default async function handler(req, res) {
           id: userId,
           subscription_status: sub.status,
           subscription_id: sub.id,
+          stripe_customer_id: sub.customer,
           current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
         }, { onConflict: 'id' })
         if (error) console.error('Supabase upsert error:', error)
         else {
           console.log('Profile updated:', userId, sub.status)
-          // Send welcome email on first activation
           if (event.type === 'customer.subscription.created' && sub.customer_email) {
             await sendWelcomeEmail(sub.customer_email).catch(e => console.error('Welcome email error:', e))
           }
@@ -63,12 +63,17 @@ export default async function handler(req, res) {
         break
       }
       case 'customer.subscription.deleted': {
+        // Only send win-back if they canceled while still in trial
+        const wasTrialing = sub.status === 'trialing' || sub.trial_end > Math.floor(Date.now() / 1000)
         const { error } = await supabase.from('profiles').upsert({
           id: userId,
           subscription_status: 'canceled',
           subscription_id: null,
         }, { onConflict: 'id' })
         if (error) console.error('Supabase delete error:', error)
+        if (wasTrialing && sub.customer_email) {
+          await sendTrialCanceledEmail(sub.customer_email).catch(e => console.error('Win-back email error:', e))
+        }
         break
       }
       case 'invoice.payment_failed': {

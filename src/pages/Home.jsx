@@ -5,8 +5,9 @@ import { useData } from '../context/DataContext'
 import { signOut } from '../supabase'
 import { getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
 
-function AccountMenu({ user }) {
+function AccountMenu({ user, profile }) {
   const [open, setOpen] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -16,6 +17,25 @@ function AccountMenu({ user }) {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  async function handleManageSub() {
+    setPortalLoading(true)
+    setOpen(false)
+    try {
+      const res = await fetch('/api/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: profile?.stripe_customer_id })
+      })
+      const { url, error } = await res.json()
+      if (error) throw new Error(error)
+      window.location.href = url
+    } catch (err) {
+      alert('Could not open billing portal: ' + err.message)
+    } finally {
+      setPortalLoading(false)
+    }
+  }
 
   const initial = user?.email?.[0]?.toUpperCase() || '?'
 
@@ -27,7 +47,7 @@ function AccountMenu({ user }) {
         fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(200,64,47,0.25)'
       }}>
-        {initial}
+        {portalLoading ? '…' : initial}
       </button>
       {open && (
         <div style={{
@@ -39,7 +59,7 @@ function AccountMenu({ user }) {
             <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, marginBottom: 3 }}>Signed in as</div>
             <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, wordBreak: 'break-all' }}>{user?.email}</div>
           </div>
-          <button onClick={() => { setOpen(false); alert('Manage your subscription at sideflip.org') }} style={menuItem}>
+          <button onClick={handleManageSub} style={menuItem}>
             <span>💳</span> Manage Subscription
           </button>
           <button onClick={() => { setOpen(false); window.location.href = 'mailto:tyler@tourbillionenergy.com' }} style={menuItem}>
@@ -64,7 +84,7 @@ const menuItem = {
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { projects, loading, migrating } = useData()
   const [tab, setTab] = useState('active')
 
@@ -90,7 +110,7 @@ export default function Home() {
           <span className="wordmark-side">Side</span>
           <span className="wordmark-flip">Flip</span>
         </div>
-        <AccountMenu user={user} />
+        <AccountMenu user={user} profile={profile} />
       </div>
 
       <div className="summary-bar">
