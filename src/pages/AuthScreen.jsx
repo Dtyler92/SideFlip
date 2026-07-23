@@ -44,10 +44,11 @@ export default function AuthScreen() {
           : import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID
 
         const userId = data?.user?.id
+        const ref = sessionStorage.getItem('sf_ref')
         const res = await fetch('/api/create-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId, userId, email })
+          body: JSON.stringify({ priceId, userId, email, ref })
         })
         const { url, error: stripeErr } = await res.json()
         if (stripeErr) throw new Error(stripeErr)

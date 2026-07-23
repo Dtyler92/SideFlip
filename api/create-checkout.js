@@ -5,13 +5,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { priceId, userId, email } = req.body
-
-  if (!priceId || !userId || !email) {
-    return res.status(400).json({ error: 'Missing required fields' })
-  }
+  const { priceId, userId, email, ref } = req.body
+  if (!priceId || !userId) return res.status(400).json({ error: 'Missing required fields' })
 
   try {
+    // Auto-apply coupon if referral code present
+    let discounts = undefined
+    if (ref) {
+      try {
+        const coupons = await stripe.coupons.list({ limit: 100 })
+        const match = coupons.data.find(c => c.name?.toUpperCase() === ref.toUpperCase() && c.valid)
+        if (match) discounts = [{ coupon: match.id }]
+      } catch {}
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: email,
@@ -20,7 +27,8 @@ export default async function handler(req, res) {
         trial_period_days: 7,
         metadata: { userId }
       },
-      allow_promotion_codes: true,
+      allow_promotion_codes: !discounts,
+      ...(discounts && { discounts }),
       payment_method_collection: 'always',
       managed_payments: { enabled: false },
       metadata: { userId },
@@ -30,7 +38,7 @@ export default async function handler(req, res) {
 
     res.json({ url: session.url })
   } catch (err) {
-    console.error('Stripe error:', err)
+    console.error('Checkout error:', err.message)
     res.status(500).json({ error: err.message })
   }
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { DataProvider } from './context/DataContext'
 import { isSubscribed } from './billing'
+import { captureReferral } from './pwa'
 import AuthScreen from './pages/AuthScreen'
 import Paywall from './pages/Paywall'
 import Home from './pages/Home'
@@ -11,11 +12,16 @@ import ProjectDetail from './pages/ProjectDetail'
 import SellProject from './pages/SellProject'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import InstallBanner from './components/InstallBanner'
 
 function AppRoutes() {
   const { user, profile, loading, refreshProfile } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [polling, setPolling] = useState(false)
+  const [showInstall, setShowInstall] = useState(false)
+
+  // Capture referral code on landing
+  useEffect(() => { captureReferral() }, [])
 
   // When Stripe redirects back with ?subscribed=true, poll until webhook fires
   useEffect(() => {
@@ -28,10 +34,11 @@ function AppRoutes() {
       await refreshProfile()
       const fresh = await import('./supabase').then(m => m.getProfile(user.id))
       if (fresh?.subscription_status === 'active' || fresh?.subscription_status === 'trialing') {
-        clearInterval(interval)
-        setPolling(false)
-        setSearchParams({})
-      }
+          clearInterval(interval)
+          setPolling(false)
+          setSearchParams({})
+          setShowInstall(true) // prompt install after successful payment
+        }
       if (attempts >= 15) { // give up after 30s
         clearInterval(interval)
         setPolling(false)
@@ -72,6 +79,7 @@ function AppRoutes() {
   // Full access — subscribed
   return (
     <DataProvider>
+      {showInstall && <InstallBanner onDismiss={() => setShowInstall(false)} />}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/new" element={<NewProject />} />
