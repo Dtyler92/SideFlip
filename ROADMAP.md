@@ -41,11 +41,20 @@
 - **Effort:** ~1 day
 
 ### 4. App Store Submission
-- Apple App Store ($99/yr developer account)
-- Google Play ($25 one-time)
-- PWA already works on mobile — just needs store packaging
-- Massive discoverability boost
-- **Effort:** ~1–2 days
+- **Login-only** — no sign up, no pricing, no Subscribe button inside the app
+- Sign up happens at sideflip.org (avoids Apple's 30% IAP cut — how Spotify/Netflix do it)
+- Add line under login: "New user? Visit sideflip.org to create an account"
+- Apple App Store ($99/yr developer account) + Google Play ($25 one-time)
+- PWA already works on mobile — just needs store packaging (Capacitor)
+- **Effort:** ~2 days
+
+### 5. Influencer Referral Links (Auto-Discount)
+- Unique URL per influencer: `sideflip.org/?ref=TOMSREFURB`
+- Landing page auto-applies their discount code at Stripe checkout
+- No code for the user to remember or type
+- Track clicks + conversions per influencer in dashboard
+- Stripe Connect handles automatic 30% rev share payout
+- **Effort:** ~1 day
 
 ---
 
