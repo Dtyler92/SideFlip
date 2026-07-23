@@ -22,25 +22,18 @@
 
 ## 🔜 Next Up (V1.1) — Priority Order
 
-### 1. Stripe Connect — Influencer Revenue Share
-- Affiliates earn 30% of year-1 revenue from their code
-- Automatic payment splitting via Stripe Connect
-- Influencer dashboard showing their subscriber count + earnings
-- One code per influencer, tracked in Stripe
-- **Effort:** ~1 day
-
-### 2. Email Branding (noreply@sideflip.org)
+### 1. Email Branding (noreply@sideflip.org)
 - Set up Resend.com for transactional email
 - Branded confirmation, welcome, and trial-ending emails
 - "Your trial ends in 2 days" reminder email (big conversion driver)
 - **Effort:** ~3 hours
 
-### 3. Data Sync to Cloud
+### 2. Data Sync to Cloud
 - Currently data lives in localStorage (device only)
 - Move projects + expenses to Supabase so data follows the user across devices
 - **Effort:** ~1 day
 
-### 4. App Store Submission
+### 3. App Store Submission (iOS + Android)
 - **Login-only** — no sign up, no pricing, no Subscribe button inside the app
 - Sign up happens at sideflip.org (avoids Apple's 30% IAP cut — how Spotify/Netflix do it)
 - Add line under login: "New user? Visit sideflip.org to create an account"
@@ -48,7 +41,7 @@
 - PWA already works on mobile — just needs store packaging (Capacitor)
 - **Effort:** ~2 days
 
-### 5. Influencer Referral Links (Auto-Discount)
+### 4. Influencer Referral Links (Auto-Discount)
 - Unique URL per influencer: `sideflip.org/?ref=TOMSREFURB`
 - Landing page auto-applies their discount code at Stripe checkout
 - No code for the user to remember or type
