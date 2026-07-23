@@ -1,24 +1,21 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { title, category, purchasePrice, expenses, totalInvested, notes, salePrice } = req.body
+  const { title, category, expenses, notes } = req.body
   if (!title) return res.status(400).json({ error: 'Missing project info' })
 
-  const expenseList = expenses?.length
-    ? expenses.map(e => `${e.description}: $${e.amount}`).join(', ')
-    : 'none'
+  const workDone = expenses?.length
+    ? expenses.map(e => e.description).join(', ')
+    : 'none listed'
 
-  const prompt = `Write a Facebook Marketplace listing for this item. Make it sound natural, honest, and appealing to local buyers. Be specific about condition and what's been fixed.
+  const prompt = `Write a Facebook Marketplace listing for this item. Sound natural and honest. Do NOT mention purchase price, parts costs, or reasons for selling.
 
 Item: ${title}
 Category: ${category}
-Paid: $${purchasePrice}
-Work/parts done: ${expenseList}
-Total invested: $${Number(totalInvested).toFixed(2)}
+Work/parts done: ${workDone}
 ${notes ? `Seller notes: ${notes}` : ''}
-${salePrice ? `Asking price: $${salePrice}` : ''}
 
-Write a complete listing with a bold title line and description. Keep under 180 words. Suggest a fair asking price if none provided. End with "DM for more info or to schedule pickup."`
+Write just a title line and description. Under 150 words. Describe condition and what's been done to it. Do not include a price — the seller will add that. End with "DM for more info or to schedule pickup."`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -30,7 +27,7 @@ Write a complete listing with a bold title line and description. Keep under 180 
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: 512,
+        max_tokens: 400,
         messages: [{ role: 'user', content: prompt }],
       })
     })
