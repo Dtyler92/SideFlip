@@ -4,60 +4,70 @@ import { createClient } from '@supabase/supabase-js'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // service role for server-side writes
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// Tell Vercel to give us the raw body as a Buffer
 export const config = { api: { bodyParser: false } }
 
-async function getRawBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = []
-    req.on('data', c => chunks.push(c))
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
-  })
+async function buffer(readable) {
+  const chunks = []
+  for await (const chunk of readable) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+  }
+  return Buffer.concat(chunks)
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const sig = req.headers['stripe-signature']
-  const rawBody = await getRawBody(req)
-
   let event
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET)
+    const buf = await buffer(req)
+    const sig = req.headers['stripe-signature']
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
+    console.error('Webhook signature error:', err.message)
     return res.status(400).send(`Webhook error: ${err.message}`)
   }
 
-  const userId = event.data.object?.metadata?.userId
+  const sub = event.data.object
+  const userId = sub?.metadata?.userId
 
-  switch (event.type) {
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
-      const sub = event.data.object
-      if (userId) {
-        await supabase.from('profiles').upsert({
+  console.log('Webhook event:', event.type, 'userId:', userId, 'subId:', sub?.id)
+
+  if (!userId) {
+    console.error('No userId in metadata')
+    return res.status(200).json({ received: true, warning: 'no userId' })
+  }
+
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const { error } = await supabase.from('profiles').upsert({
           id: userId,
           subscription_status: sub.status,
           subscription_id: sub.id,
           current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
         }, { onConflict: 'id' })
+        if (error) console.error('Supabase upsert error:', error)
+        else console.log('Profile updated:', userId, sub.status)
+        break
       }
-      break
-    }
-    case 'customer.subscription.deleted': {
-      if (userId) {
-        await supabase.from('profiles').upsert({
+      case 'customer.subscription.deleted': {
+        const { error } = await supabase.from('profiles').upsert({
           id: userId,
           subscription_status: 'canceled',
           subscription_id: null,
         }, { onConflict: 'id' })
+        if (error) console.error('Supabase delete error:', error)
+        break
       }
-      break
     }
+  } catch (err) {
+    console.error('Handler error:', err.message)
   }
 
-  res.json({ received: true })
+  res.status(200).json({ received: true })
 }
