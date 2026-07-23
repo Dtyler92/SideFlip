@@ -167,19 +167,18 @@ export default function ProjectDetail() {
           )}
         </div>
 
-        {/* Identifiers card — only if any relevant fields exist for this category */}
+        {/* Identifiers card */}
         {(fields.hasModel || fields.hasEngine || fields.hasVin || fields.hasHull) && (
           <>
             <div className="section-title">Details</div>
             <div className="card">
-              {fields.hasVin && <InfoRow label="VIN" value={p.vin} />}
-              {fields.hasHull && <InfoRow label="Hull #" value={p.hullNumber} />}
-              {fields.hasModel && <InfoRow label="Model #" value={p.modelNumber} />}
-              {fields.hasModel && <InfoRow label="Serial #" value={p.serialNumber} />}
-              {fields.hasEngine && <InfoRow label="Engine Model" value={p.engineModel} />}
-              {fields.hasEngine && <InfoRow label="Engine Serial" value={p.engineSerial} />}
-              {/* Show placeholder if nothing filled in */}
-              {!p.vin && !p.hullNumber && !p.modelNumber && !p.serialNumber && !p.engineModel && !p.engineSerial && (
+              {fields.hasVin && <InfoRow label="VIN" value={project.vin} />}
+              {fields.hasHull && <InfoRow label="Hull #" value={project.hullNumber} />}
+              {fields.hasModel && <InfoRow label="Model #" value={project.modelNumber} />}
+              {fields.hasModel && <InfoRow label="Serial #" value={project.serialNumber} />}
+              {fields.hasEngine && <InfoRow label="Engine Model" value={project.engineModel} />}
+              {fields.hasEngine && <InfoRow label="Engine Serial" value={project.engineSerial} />}
+              {!project.vin && !project.hullNumber && !project.modelNumber && !project.serialNumber && !project.engineModel && !project.engineSerial && (
                 <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>No identifiers recorded yet.</div>
               )}
             </div>
@@ -191,57 +190,54 @@ export default function ProjectDetail() {
           <span>Notes</span>
           {!editingNotes && (
             <button onClick={startEditNotes} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {p.notes ? 'Edit' : '+ Add'}
+              {project.notes ? 'Edit' : '+ Add'}
             </button>
           )}
         </div>
         <div className="card">
           {editingNotes ? (
             <>
-              <textarea
-                autoFocus
-                value={notesVal}
-                onChange={e => setNotesVal(e.target.value)}
+              <textarea autoFocus value={notesVal} onChange={e => setNotesVal(e.target.value)}
                 placeholder="What's the plan? Condition notes, to-do list..."
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--body)', fontFamily: 'var(--font)', resize: 'none', minHeight: 100 }}
-              />
+                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--body)', fontFamily: 'var(--font)', resize: 'none', minHeight: 100 }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button className="btn btn-primary" style={{ flex: 1, padding: '10px' }} onClick={saveNotes}>Save</button>
                 <button className="btn btn-secondary" style={{ flex: 1, padding: '10px' }} onClick={() => setEditingNotes(false)}>Cancel</button>
               </div>
             </>
           ) : (
-            <div
-              onClick={startEditNotes}
-              style={{ fontSize: 14, lineHeight: 1.6, color: p.notes ? 'var(--body)' : 'var(--muted)', cursor: 'pointer', minHeight: 36 }}
-            >
-              {p.notes || 'Tap to add notes...'}
+            <div onClick={startEditNotes} style={{ fontSize: 14, lineHeight: 1.6, color: project.notes ? 'var(--body)' : 'var(--muted)', cursor: 'pointer', minHeight: 36 }}>
+              {project.notes || 'Tap to add notes...'}
             </div>
           )}
         </div>
 
         {/* Expenses */}
-        <div className="section-title">Expenses ({p.expenses.length})</div>
+        <div className="section-title">Expenses ({project.expenses.length})</div>
         <div className="card">
-          {p.expenses.length === 0 ? (
+          {project.expenses.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 14 }}>No expenses yet</div>
           ) : (
-            p.expenses.map(e => (
-              <div key={e.id} className="expense-row" onClick={() => handleDeleteExpense(e.id)} style={{ cursor: 'pointer' }}>
+            project.expenses.map(e => (
+              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div className="expense-icon">{expenseIcon(e.category)}</div>
-                <div className="expense-desc">
+                <div className="expense-desc" style={{ flex: 1 }}>
                   <div className="desc">{e.description}</div>
                   <div className="cat">{e.category}</div>
                 </div>
                 <div className="expense-amount">{fmt(e.amount)}</div>
+                <button
+                  onClick={() => handleDeleteExpense(e.id)}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', padding: '4px 6px', lineHeight: 1 }}
+                  title="Remove expense"
+                >🗑</button>
               </div>
             ))
           )}
         </div>
-        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: -8, marginBottom: 20 }}>Tap an expense to remove it</p>
 
         {/* Actions */}
-        {p.status === 'active' && (
+        {project.status === 'active' && (
           <>
             <button className="btn btn-secondary" onClick={() => setShowAddExpense(true)}>+ Add Expense</button>
             <button className="btn btn-green" onClick={() => navigate(`/project/${id}/sell`)}>💰 Mark as Sold</button>

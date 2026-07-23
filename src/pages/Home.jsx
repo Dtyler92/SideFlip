@@ -87,10 +87,14 @@ export default function Home() {
   const { user, profile } = useAuth()
   const { projects, loading, migrating } = useData()
   const [tab, setTab] = useState('active')
+  const [search, setSearch] = useState('')
 
   const active = projects.filter(p => p.status === 'active')
   const sold = projects.filter(p => p.status === 'sold')
-  const shown = tab === 'active' ? active : sold
+  const all = tab === 'active' ? active : sold
+  const shown = search
+    ? all.filter(p => p.title.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
+    : all
   const totalInvested = active.reduce((s, p) => s + getTotalInvested(p), 0)
   const totalProfit = sold.reduce((s, p) => s + (getProfit(p) || 0), 0)
 
@@ -133,6 +137,23 @@ export default function Home() {
           <button className={`tab ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>Active ({active.length})</button>
           <button className={`tab ${tab === 'sold' ? 'active' : ''}`} onClick={() => setTab('sold')}>Sold ({sold.length})</button>
         </div>
+
+        {/* Search */}
+        {all.length > 4 && (
+          <div style={{ margin: '0 0 16px', position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search projects…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: 10, border: '1px solid var(--border)', background: '#fff', fontSize: 14, fontFamily: 'var(--font)', boxSizing: 'border-box', outline: 'none' }}
+            />
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 15, pointerEvents: 'none' }}>🔍</span>
+            {search && (
+              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            )}
+          </div>
+        )}
 
         {shown.length === 0 ? (
           <div className="empty">
