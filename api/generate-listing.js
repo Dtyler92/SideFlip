@@ -13,35 +13,36 @@ export default async function handler(req, res) {
 Item: ${title}
 Category: ${category}
 Paid: $${purchasePrice}
-Work/parts: ${expenseList}
+Work/parts done: ${expenseList}
 Total invested: $${Number(totalInvested).toFixed(2)}
 ${notes ? `Seller notes: ${notes}` : ''}
 ${salePrice ? `Asking price: $${salePrice}` : ''}
 
-Write a complete listing with a title line and description. Keep under 180 words. Suggest a fair asking price if none provided. End with "DM for more info or to schedule pickup."`
+Write a complete listing with a bold title line and description. Keep under 180 words. Suggest a fair asking price if none provided. End with "DM for more info or to schedule pickup."`
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'claude-haiku-4-5',
+        max_tokens: 512,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 450,
-        temperature: 0.7,
       })
     })
 
     if (!response.ok) {
       const err = await response.json()
-      throw new Error(err.error?.message || 'OpenAI error')
+      throw new Error(err.error?.message || 'Claude API error')
     }
 
     const data = await response.json()
-    const listing = data.choices?.[0]?.message?.content?.trim()
+    const listing = data.content?.[0]?.text?.trim()
+    if (!listing) throw new Error('No listing generated')
     res.json({ listing })
   } catch (err) {
     console.error('Listing gen error:', err.message)
