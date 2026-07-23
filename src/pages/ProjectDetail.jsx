@@ -7,22 +7,16 @@ import {
 import { getProject, updateProject, addExpense, deleteExpense, deleteProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { uploadPhoto, deletePhoto } from '../supabase'
 
-function PhotoPicker({ photo, onChange }) {
-  function handleFile(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => onChange(ev.target.result)
-    reader.readAsDataURL(file)
-  }
+function PhotoPicker({ photo, onFile, uploading }) {
   return (
     <div style={{ position: 'relative' }}>
       {photo
         ? <img src={photo} alt="project" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderBottom: '1px solid var(--border)', display: 'block' }} />
         : <div style={{ width: '100%', height: 140, background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6, color: 'var(--muted)', fontSize: 13 }}>
             <span style={{ fontSize: 28 }}>📷</span>
-            <span>Tap to add a photo</span>
+            <span>{uploading ? 'Uploading…' : 'Tap to add a photo'}</span>
           </div>
       }
       {/* Edit overlay button */}
@@ -33,8 +27,8 @@ function PhotoPicker({ photo, onChange }) {
         cursor: 'pointer', backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', gap: 5
       }}>
-        ✏️ {photo ? 'Change' : 'Add Photo'}
-        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+        {uploading ? '⏳ Uploading…' : `✏️ ${photo ? 'Change' : 'Add Photo'}`}
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
       </label>
     </div>
   )
@@ -57,6 +51,7 @@ export default function ProjectDetail() {
   const { refresh: refreshList } = useData()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesVal, setNotesVal] = useState('')
@@ -79,9 +74,20 @@ export default function ProjectDetail() {
   const totalInvested = getTotalInvested(project)
   const partsTotal = project.expenses.reduce((s, e) => s + Number(e.amount), 0)
 
-  async function handlePhotoChange(dataUrl) {
-    await updateProject(user.id, id, { photo: dataUrl })
-    load()
+  async function handlePhotoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoUploading(true)
+    try {
+      if (project.photo) await deletePhoto(project.photo)
+      const url = await uploadPhoto(user.id, file)
+      await updateProject(user.id, id, { photo: url })
+      load()
+    } catch (err) {
+      alert('Photo upload failed: ' + err.message)
+    } finally {
+      setPhotoUploading(false)
+    }
   }
 
   async function handleAddExpense(e) {
@@ -121,7 +127,7 @@ export default function ProjectDetail() {
   return (
     <>
       {/* Photo with edit overlay */}
-      <PhotoPicker photo={p.photo} onChange={handlePhotoChange} />
+      <PhotoPicker photo={project.photo} onFile={handlePhotoChange} uploading={photoUploading} />
 
       <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>
         <button className="back-btn" onClick={() => navigate('/')}>‹</button>

@@ -4,23 +4,18 @@ import { CATEGORIES, getExtraFields } from '../store'
 import { createProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { uploadPhoto } from '../supabase'
 
-function PhotoPicker({ photo, onChange }) {
-  function handleFile(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => onChange(ev.target.result)
-    reader.readAsDataURL(file)
-  }
+function PhotoPicker({ photo, onFile, uploading }) {
   return (
     <div className="photo-upload">
       {photo && <img src={photo} alt="preview" />}
-      {!photo && <>
+      {!photo && !uploading && <>
         <span className="photo-upload-icon">📷</span>
         <span>Tap to add a photo</span>
       </>}
-      {photo && (
+      {uploading && <span style={{ fontSize: 13, color: 'var(--muted)' }}>Uploading…</span>}
+      {photo && !uploading && (
         <div style={{
           position: 'absolute', bottom: 8, right: 8,
           background: 'rgba(13,13,11,0.6)', color: '#fff',
@@ -28,7 +23,7 @@ function PhotoPicker({ photo, onChange }) {
           zIndex: 2, pointerEvents: 'none'
         }}>✏️ Change Photo</div>
       )}
-      <input type="file" accept="image/*" onChange={handleFile} />
+      <input type="file" accept="image/*" onChange={onFile} />
     </div>
   )
 }
@@ -38,6 +33,7 @@ export default function NewProject() {
   const { user } = useAuth()
   const { refresh } = useData()
   const [photo, setPhoto] = useState(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     title: '', category: 'mower', purchasePrice: '', notes: '',
@@ -48,6 +44,20 @@ export default function NewProject() {
 
   const fields = getExtraFields(form.category)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handlePhotoFile(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setPhotoUploading(true)
+    try {
+      const url = await uploadPhoto(user.id, file)
+      setPhoto(url)
+    } catch (err) {
+      alert('Photo upload failed: ' + err.message)
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -77,7 +87,7 @@ export default function NewProject() {
           {/* Photo */}
           <div className="form-group">
             <label>Photo (optional)</label>
-            <PhotoPicker photo={photo} onChange={setPhoto} />
+            <PhotoPicker photo={photo} onFile={handlePhotoFile} uploading={photoUploading} />
           </div>
 
           {/* Title */}
