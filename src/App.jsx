@@ -1,6 +1,7 @@
 import { Routes, Route, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { DataProvider } from './context/DataContext'
 import { isSubscribed } from './billing'
 import AuthScreen from './pages/AuthScreen'
 import Paywall from './pages/Paywall'
@@ -64,12 +65,14 @@ function AppRoutes() {
 
   // Full access — subscribed
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/new" element={<NewProject />} />
-      <Route path="/project/:id" element={<ProjectDetail />} />
-      <Route path="/project/:id/sell" element={<SellProject />} />
-    </Routes>
+    <DataProvider>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/new" element={<NewProject />} />
+        <Route path="/project/:id" element={<ProjectDetail />} />
+        <Route path="/project/:id/sell" element={<SellProject />} />
+      </Routes>
+    </DataProvider>
   )
 }
 

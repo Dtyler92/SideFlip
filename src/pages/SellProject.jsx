@@ -1,12 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getProject, updateProject, getTotalInvested, fmt } from '../store'
+import { getTotalInvested, fmt } from '../store'
+import { getProject, updateProject } from '../db'
+import { useAuth } from '../context/AuthContext'
+import { useData } from '../context/DataContext'
 
 export default function SellProject() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const project = getProject(id)
+  const { user } = useAuth()
+  const { refresh } = useData()
+  const [project, setProject] = useState(null)
   const [salePrice, setSalePrice] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    getProject(user.id, id).then(setProject).catch(() => setProject(null))
+  }, [id])
 
   if (!project) return null
 
@@ -16,15 +26,23 @@ export default function SellProject() {
     ? (((Number(salePrice) - totalInvested) / totalInvested) * 100).toFixed(1)
     : null
 
-  function handleSell(e) {
+  async function handleSell(e) {
     e.preventDefault()
     if (!salePrice || Number(salePrice) < 0) return alert('Enter a valid sale price')
-    updateProject(id, {
-      status: 'sold',
-      salePrice: Number(salePrice),
-      soldAt: new Date().toISOString()
-    })
-    navigate(`/project/${id}`)
+    setSaving(true)
+    try {
+      await updateProject(user.id, id, {
+        status: 'sold',
+        salePrice: Number(salePrice),
+        soldAt: new Date().toISOString()
+      })
+      await refresh()
+      navigate(`/project/${id}`)
+    } catch (err) {
+      alert('Failed to save: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -35,7 +53,6 @@ export default function SellProject() {
       </div>
 
       <div className="page">
-        {/* Project summary */}
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 6 }}>Project</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>{project.title}</div>
@@ -49,17 +66,13 @@ export default function SellProject() {
           <div className="form-group">
             <label>Sale Price</label>
             <input
-              type="number"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={salePrice}
-              onChange={e => setSalePrice(e.target.value)}
+              type="number" inputMode="decimal" placeholder="0.00"
+              value={salePrice} onChange={e => setSalePrice(e.target.value)}
               autoFocus
               style={{ fontSize: 32, fontWeight: 700, textAlign: 'center', padding: '20px', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
             />
           </div>
 
-          {/* Live preview */}
           {salePrice && preview !== null && (
             <div className="profit-result">
               <div className="label">{preview >= 0 ? 'Profit' : 'Loss'}</div>
@@ -72,7 +85,7 @@ export default function SellProject() {
             </div>
           )}
 
-          <button type="submit" className="btn btn-green">Confirm Sale →</button>
+          <button type="submit" className="btn btn-green" disabled={saving}>{saving ? 'Saving…' : 'Confirm Sale →'}</button>
           <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancel</button>
         </form>
       </div>

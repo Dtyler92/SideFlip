@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createProject, CATEGORIES, getExtraFields } from '../store'
+import { CATEGORIES, getExtraFields } from '../store'
+import { createProject } from '../db'
+import { useAuth } from '../context/AuthContext'
+import { useData } from '../context/DataContext'
 
 function PhotoPicker({ photo, onChange }) {
   function handleFile(e) {
@@ -32,10 +35,12 @@ function PhotoPicker({ photo, onChange }) {
 
 export default function NewProject() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { refresh } = useData()
   const [photo, setPhoto] = useState(null)
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     title: '', category: 'mower', purchasePrice: '', notes: '',
-    // identifiers
     modelNumber: '', serialNumber: '',
     engineModel: '', engineSerial: '',
     vin: '', hullNumber: '',
@@ -44,11 +49,19 @@ export default function NewProject() {
   const fields = getExtraFields(form.category)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (!form.title.trim()) return alert('Give your project a name')
-    createProject({ ...form, photo })
-    navigate('/')
+    setSaving(true)
+    try {
+      await createProject(user.id, { ...form, photo })
+      await refresh()
+      navigate('/')
+    } catch (err) {
+      alert('Failed to save: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -161,7 +174,7 @@ export default function NewProject() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary">Create Project →</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create Project →'}</button>
         </form>
       </div>
     </>

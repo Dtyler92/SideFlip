@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  getProject, updateProject, addExpense, deleteExpense, deleteProject,
   getTotalInvested, fmt, categoryIcon, expenseIcon,
   EXPENSE_CATEGORIES, getExtraFields
 } from '../store'
+import { getProject, updateProject, addExpense, deleteExpense, deleteProject } from '../db'
+import { useAuth } from '../context/AuthContext'
+import { useData } from '../context/DataContext'
 
 function PhotoPicker({ photo, onChange }) {
   function handleFile(e) {
@@ -51,44 +53,56 @@ function InfoRow({ label, value }) {
 export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [tick, setTick] = useState(0)
-  const refresh = () => setTick(n => n + 1)
-
-  const project = getProject(id)
+  const { user } = useAuth()
+  const { refresh: refreshList } = useData()
+  const [project, setProject] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesVal, setNotesVal] = useState('')
   const [expense, setExpense] = useState({ description: '', amount: '', category: 'parts' })
 
+  async function load() {
+    try {
+      const p = await getProject(user.id, id)
+      setProject(p)
+    } catch { setProject(null) }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [id])
+
+  if (loading) return <div className="page" style={{ paddingTop: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
   if (!project) return <div className="page" style={{ paddingTop: 40 }}><p style={{ color: 'var(--muted)' }}>Project not found.</p></div>
 
   const fields = getExtraFields(project.category)
   const totalInvested = getTotalInvested(project)
   const partsTotal = project.expenses.reduce((s, e) => s + Number(e.amount), 0)
 
-  function handlePhotoChange(dataUrl) {
-    updateProject(id, { photo: dataUrl })
-    refresh()
+  async function handlePhotoChange(dataUrl) {
+    await updateProject(user.id, id, { photo: dataUrl })
+    load()
   }
 
-  function handleAddExpense(e) {
+  async function handleAddExpense(e) {
     e.preventDefault()
     if (!expense.description.trim() || !expense.amount) return alert('Fill in description and amount')
-    addExpense(id, expense)
+    await addExpense(user.id, id, expense)
     setExpense({ description: '', amount: '', category: 'parts' })
     setShowAddExpense(false)
-    refresh()
+    load()
   }
 
-  function handleDeleteExpense(expId) {
+  async function handleDeleteExpense(expId) {
     if (!confirm('Remove this expense?')) return
-    deleteExpense(id, expId)
-    refresh()
+    await deleteExpense(user.id, expId)
+    load()
   }
 
-  function handleDeleteProject() {
+  async function handleDeleteProject() {
     if (!confirm(`Delete "${project.title}"? This cannot be undone.`)) return
-    deleteProject(id)
+    await deleteProject(user.id, id)
+    await refreshList()
     navigate('/')
   }
 
@@ -97,14 +111,12 @@ export default function ProjectDetail() {
     setEditingNotes(true)
   }
 
-  function saveNotes() {
-    updateProject(id, { notes: notesVal })
+  async function saveNotes() {
+    await updateProject(user.id, id, { notes: notesVal })
     setEditingNotes(false)
-    refresh()
+    load()
   }
 
-  // Re-read after refresh
-  const p = getProject(id)
 
   return (
     <>
