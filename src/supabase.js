@@ -30,6 +30,11 @@ export function onAuthChange(callback) {
   })
 }
 
+export async function resetPassword(email) {
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://sideflip.org'
+  })
+}
 // ── Profile / subscription helpers ───────────────────────────
 
 export async function getProfile(userId) {

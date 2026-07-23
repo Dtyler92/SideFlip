@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { signIn, signUp } from '../supabase'
+import { signIn, signUp, resetPassword } from '../supabase'
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState('signup')
+  const [mode, setMode] = useState('signup') // signup | signin | forgot
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -25,6 +25,16 @@ export default function AuthScreen() {
 
     setLoading(true)
     try {
+      if (mode === 'forgot') {
+        const { error: err } = await resetPassword(email)
+        if (err) throw err
+        setError('')
+        alert(`Password reset email sent to ${email}. Check your inbox!`)
+        setMode('signin')
+        setLoading(false)
+        return
+      }
+
       if (mode === 'signup') {
         const { data, error: err } = await signUp(email, password)
         if (err) throw err
@@ -103,7 +113,7 @@ export default function AuthScreen() {
             </button>
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
-            Card required · Cancel before day 7 and you won't be charged
+            7-day free trial included
           </div>
         </div>
       )}
@@ -123,13 +133,15 @@ export default function AuthScreen() {
             onChange={e => setEmail(e.target.value)} required />
         </div>
 
-        <div className="form-group">
-          <label>Password</label>
-          <input type="password"
-            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            placeholder={mode === 'signup' ? 'Choose a password (6+ chars)' : 'Your password'}
-            value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-        </div>
+        {mode !== 'forgot' && (
+          <div className="form-group">
+            <label>Password</label>
+            <input type="password"
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              placeholder={mode === 'signup' ? 'Choose a password (6+ chars)' : 'Your password'}
+              value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+          </div>
+        )}
 
         {mode === 'signup' && (
           <div className="form-group">
@@ -142,7 +154,7 @@ export default function AuthScreen() {
         )}
 
         <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? 'Please wait...' : mode === 'signup' ? 'Start Free Trial' : 'Sign In →'}
+          {loading ? 'Please wait...' : mode === 'signup' ? 'Start Free Trial' : mode === 'forgot' ? 'Send Reset Email' : 'Sign In →'}
         </button>
       </form>
 
@@ -151,19 +163,29 @@ export default function AuthScreen() {
         {mode === 'signup' ? (
           <>Already have an account?{' '}
             <button onClick={() => { setMode('signin'); setError('') }}
-              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font)' }}>
-              Sign in
-            </button>
+              style={linkStyle}>Sign in</button>
+          </>
+        ) : mode === 'forgot' ? (
+          <>
+            <button onClick={() => { setMode('signin'); setError('') }}
+              style={linkStyle}>← Back to sign in</button>
           </>
         ) : (
-          <>Don't have an account?{' '}
+          <>
+            <button onClick={() => { setMode('forgot'); setError('') }}
+              style={{ ...linkStyle, color: 'var(--muted)', fontWeight: 500 }}>Forgot password?</button>
+            <span style={{ margin: '0 10px' }}>·</span>
+            Don't have an account?{' '}
             <button onClick={() => { setMode('signup'); setError('') }}
-              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font)' }}>
-              Start free trial
-            </button>
+              style={linkStyle}>Start free trial</button>
           </>
         )}
       </div>
     </div>
   )
+}
+
+const linkStyle = {
+  background: 'none', border: 'none', color: 'var(--accent)',
+  fontWeight: 700, cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font)'
 }
