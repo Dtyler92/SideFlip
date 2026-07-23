@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { sendWelcomeEmail, sendPaymentFailedEmail } from './emails.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const supabase = createClient(
@@ -52,7 +53,13 @@ export default async function handler(req, res) {
           current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
         }, { onConflict: 'id' })
         if (error) console.error('Supabase upsert error:', error)
-        else console.log('Profile updated:', userId, sub.status)
+        else {
+          console.log('Profile updated:', userId, sub.status)
+          // Send welcome email on first activation
+          if (event.type === 'customer.subscription.created' && sub.customer_email) {
+            await sendWelcomeEmail(sub.customer_email).catch(e => console.error('Welcome email error:', e))
+          }
+        }
         break
       }
       case 'customer.subscription.deleted': {
@@ -62,6 +69,13 @@ export default async function handler(req, res) {
           subscription_id: null,
         }, { onConflict: 'id' })
         if (error) console.error('Supabase delete error:', error)
+        break
+      }
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object
+        if (invoice.customer_email) {
+          await sendPaymentFailedEmail(invoice.customer_email).catch(e => console.error('Payment failed email error:', e))
+        }
         break
       }
     }
