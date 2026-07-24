@@ -1,8 +1,11 @@
 // Subscription status helpers
 // Trial = 7 days from account creation, no card required
 
-export const MONTHLY_PRICE = 8.99
-export const ANNUAL_PRICE = 59
+export const MONTHLY_PRICE = 7.99
+export const ANNUAL_PRICE = 49
+
+export const STRIPE_MONTHLY_LINK = 'https://buy.stripe.com/9B67sK9v9gAe9Qif97f3a01'
+export const STRIPE_ANNUAL_LINK = 'https://buy.stripe.com/00w6oG8r5fwae6ye53f3a00'
 export const ANNUAL_MONTHLY_EQUIV = (ANNUAL_PRICE / 12).toFixed(2)
 export const SAVINGS_PCT = Math.round((1 - ANNUAL_PRICE / (MONTHLY_PRICE * 12)) * 100)
 export const TRIAL_DAYS = 7
