@@ -1,15 +1,32 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { signOut } from '../supabase'
-import { MONTHLY_PRICE, ANNUAL_PRICE, ANNUAL_MONTHLY_EQUIV, SAVINGS_PCT, STRIPE_MONTHLY_LINK, STRIPE_ANNUAL_LINK } from '../billing'
+import { MONTHLY_PRICE, ANNUAL_PRICE, ANNUAL_MONTHLY_EQUIV, SAVINGS_PCT } from '../billing'
 
 export default function Paywall({ trialExpired }) {
   const { user } = useAuth()
   const [selected, setSelected] = useState('annual')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubscribe() {
-    const link = selected === 'annual' ? STRIPE_ANNUAL_LINK : STRIPE_MONTHLY_LINK
-    window.location.href = link
+  async function handleSubscribe() {
+    setLoading(true)
+    const priceId = selected === 'annual'
+      ? import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID
+      : import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID
+
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, userId: user.id, email: user.email })
+      })
+      const { url } = await res.json()
+      window.location.href = url
+    } catch (err) {
+      alert('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -119,9 +136,10 @@ export default function Paywall({ trialExpired }) {
       <button
         className="btn btn-primary"
         onClick={handleSubscribe}
+        disabled={loading}
         style={{ marginBottom: 12 }}
       >
-        {`Start with ${selected === 'annual' ? 'Annual' : 'Monthly'} Plan →`}
+        {loading ? 'Redirecting...' : `Start with ${selected === 'annual' ? 'Annual' : 'Monthly'} Plan →`}
       </button>
 
       <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginBottom: 20 }}>
