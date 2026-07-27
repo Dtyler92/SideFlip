@@ -131,17 +131,17 @@ export default function ProjectDetail() {
 
       <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>
         <button className="back-btn" onClick={() => navigate('/')}>‹</button>
-        <h1>{p.title}</h1>
+        <h1>{project.title}</h1>
       </div>
 
       <div className="page">
 
         {/* Category + status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <span style={{ fontSize: 26 }}>{categoryIcon(p.category)}</span>
+          <span style={{ fontSize: 26 }}>{categoryIcon(project.category)}</span>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{p.category}</div>
-            {p.status === 'sold' && <span className="sold-badge">SOLD</span>}
+            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{project.category}</div>
+            {project.status === 'sold' && <span className="sold-badge">SOLD</span>}
           </div>
         </div>
 
@@ -149,7 +149,7 @@ export default function ProjectDetail() {
         <div className="card">
           <div className="stat-row">
             <span className="stat-label">Purchase Price</span>
-            <span className="stat-value">{fmt(p.purchasePrice)}</span>
+            <span className="stat-value">{fmt(project.purchasePrice)}</span>
           </div>
           <div className="stat-row">
             <span className="stat-label">Parts & Costs</span>
@@ -159,10 +159,10 @@ export default function ProjectDetail() {
             <span className="stat-label">Total Invested</span>
             <span className="stat-value accent" style={{ fontSize: 22, fontWeight: 700 }}>{fmt(totalInvested)}</span>
           </div>
-          {p.status === 'sold' && (
+          {project.status === 'sold' && (
             <div className="stat-row">
               <span className="stat-label">Sold For</span>
-              <span className="stat-value" style={{ color: 'var(--green)', fontSize: 20, fontWeight: 700 }}>{fmt(p.salePrice)}</span>
+              <span className="stat-value" style={{ color: 'var(--green)', fontSize: 20, fontWeight: 700 }}>{fmt(project.salePrice)}</span>
             </div>
           )}
         </div>
