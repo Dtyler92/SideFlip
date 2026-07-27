@@ -73,11 +73,7 @@ export default function Analytics() {
             <StatCard label="Total Profit" value={fmt(totalProfit)} color={totalProfit >= 0 ? GREEN : ACCENT} sub={roi ? `${roi}% ROI` : null} />
           </div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            <StatCard label="Avg Profit / Flip" value={fmt(avgProfit)} color={avgProfit >= 0 ? GREEN : ACCENT} />
             <StatCard label="Win Rate" value={`${winRate}%`} color={GREEN} sub={`${sold.filter(p => (getProfit(p)||0) > 0).length} of ${sold.length} sold`} />
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            <StatCard label="Total Revenue" value={fmt(totalRevenue)} />
             <StatCard label="Capital Active" value={fmt(totalInvestedActive)} sub={`across ${active.length} projects`} />
           </div>
           {avgDays !== null && (
@@ -85,6 +81,41 @@ export default function Analytics() {
               <StatCard label="Avg Days to Sell" value={`${avgDays}d`} />
               <StatCard label="Fastest Sell" value={withDays.length > 0 ? `${Math.min(...withDays.map(p => p.days))}d` : '—'} />
             </div>
+          )}
+
+          {/* Summary list */}
+          {projects.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '8px 0 10px' }}>Summary</div>
+              <div className="card" style={{ marginBottom: 16 }}>
+                <div className="stat-row">
+                  <span className="stat-label">Total Projects</span>
+                  <span className="stat-value">{projects.length}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Active Projects</span>
+                  <span className="stat-value">{active.length}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Sold Projects</span>
+                  <span className="stat-value">{sold.length}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Capital Deployed</span>
+                  <span className="stat-value" style={{ color: 'var(--accent)', fontWeight: 700 }}>{fmt(totalInvestedActive)}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Total Profit</span>
+                  <span className="stat-value" style={{ color: totalProfit >= 0 ? GREEN : ACCENT, fontWeight: 700 }}>{totalProfit >= 0 ? '+' : ''}{fmt(totalProfit)}</span>
+                </div>
+                {sold.length > 0 && (
+                  <div className="stat-row" style={{ borderBottom: 'none' }}>
+                    <span className="stat-label">Return on Investment</span>
+                    <span className="stat-value" style={{ color: GREEN, fontWeight: 700 }}>{roi}%</span>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           {catEntries.length > 0 && (

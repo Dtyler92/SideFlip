@@ -196,71 +196,7 @@ export default function Home() {
               </div>
             )
           })
-        )}
-
-        {/* Analytics */}
-        {(active.length > 0 || sold.length > 0) && (
-          <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '28px 0 12px' }}>Analytics</div>
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div className="stat-row">
-                <span className="stat-label">Total Projects</span>
-                <span className="stat-value">{projects.length}</span>
-              </div>
-              <div className="stat-row">
-                <span className="stat-label">Active Projects</span>
-                <span className="stat-value">{active.length}</span>
-              </div>
-              <div className="stat-row">
-                <span className="stat-label">Sold Projects</span>
-                <span className="stat-value">{sold.length}</span>
-              </div>
-              <div className="stat-row">
-                <span className="stat-label">Capital Deployed</span>
-                <span className="stat-value accent">{fmt(totalInvested)}</span>
-              </div>
-              <div className="stat-row">
-                <span className="stat-label">Total Profit</span>
-                <span className="stat-value" style={{ color: totalProfit >= 0 ? 'var(--green)' : 'var(--accent)', fontWeight: 700 }}>
-                  {totalProfit >= 0 ? '+' : ''}{fmt(totalProfit)}
-                </span>
-              </div>
-              {sold.length > 0 && (
-                <div className="stat-row">
-                  <span className="stat-label">Avg Profit / Flip</span>
-                  <span className="stat-value" style={{ color: 'var(--green)', fontWeight: 700 }}>{fmt(totalProfit / sold.length)}</span>
-                </div>
-              )}
-              {sold.length > 0 && (
-                <div className="stat-row" style={{ borderBottom: 'none' }}>
-                  <span className="stat-label">Return on Investment</span>
-                  <span className="stat-value" style={{ color: 'var(--green)', fontWeight: 700 }}>{roi}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Category breakdown */}
-            {catBreakdown.length > 0 && (
-              <>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '4px 0 12px' }}>Profit by Category</div>
-                <div className="card" style={{ marginBottom: 32 }}>
-                  {catBreakdown.map(([cat, data], i) => (
-                    <div key={cat} className="stat-row" style={{ borderBottom: i === catBreakdown.length - 1 ? 'none' : undefined }}>
-                      <span className="stat-label">{categoryIcon(cat)} {cat}</span>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className="stat-value" style={{ color: data.profit >= 0 ? 'var(--green)' : 'var(--accent)', fontWeight: 700 }}>
-                          {data.profit >= 0 ? '+' : ''}{fmt(data.profit)}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{data.count} sold</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
+        )}\n      </div>
       <button className="fab" onClick={() => navigate('/new')}>+</button>
     </>
   )
