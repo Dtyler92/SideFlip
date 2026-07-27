@@ -196,8 +196,9 @@ export default function Home() {
               </div>
             )
           })
-        )}\n      </div>
-      <button className="fab" onClick={() => navigate('/new')}>+</button>
+        )}
+      </div>
+      <button className="fab" onClick={() => navigate('/new')} style={{ bottom: 80 }}>+</button>
     </>
   )
 }
