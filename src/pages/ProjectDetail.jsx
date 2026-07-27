@@ -130,7 +130,10 @@ export default function ProjectDetail() {
       <PhotoPicker photo={project.photo} onFile={handlePhotoChange} uploading={photoUploading} />
 
       <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>
-        <button className="back-btn" onClick={() => navigate('/')}>‹</button>
+        <button className="back-btn" onClick={() => navigate('/')}
+          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4, padding: '0 4px' }}>
+          ← Back
+        </button>
         <h1>{project.title}</h1>
       </div>
 
