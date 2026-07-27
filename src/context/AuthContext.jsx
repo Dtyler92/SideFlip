@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, onAuthChange, getProfile } from '../supabase'
+import { supabase, onAuthChange, getProfile, signOut as supabaseSignOut } from '../supabase'
 
 const AuthContext = createContext(null)
 
@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, refreshProfile, signOut: supabaseSignOut }}>
       {children}
     </AuthContext.Provider>
   )

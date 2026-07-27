@@ -10,9 +10,13 @@ import Home from './pages/Home'
 import NewProject from './pages/NewProject'
 import ProjectDetail from './pages/ProjectDetail'
 import SellProject from './pages/SellProject'
+import Calculator from './pages/Calculator'
+import Analytics from './pages/Analytics'
+import Settings from './pages/Settings'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import InstallBanner from './components/InstallBanner'
+import BottomNav from './components/BottomNav'
 
 function AppRoutes() {
   const { user, profile, loading, refreshProfile } = useAuth()
@@ -85,7 +89,11 @@ function AppRoutes() {
         <Route path="/new" element={<NewProject />} />
         <Route path="/project/:id" element={<ProjectDetail />} />
         <Route path="/project/:id/sell" element={<SellProject />} />
+        <Route path="/calculator" element={<Calculator />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
+      <BottomNav />
     </DataProvider>
   )
 }
