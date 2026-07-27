@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/((?!api|privacy|terms|assets|_next).*)", "destination": "/index.html" }
+  ]
+}
