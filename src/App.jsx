@@ -53,7 +53,7 @@ function AppRoutes() {
   if (window.location.pathname === '/privacy') return <PrivacyPolicy />
   if (window.location.pathname === '/terms') return <TermsOfService />
 
-  if (loading || polling) return (
+  if (loading || polling || (user && !profile)) return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', gap: 16

@@ -19,9 +19,14 @@ export function AuthProvider({ children }) {
 
     // Listen for changes
     const { data: { subscription } } = onAuthChange(async (u) => {
-      setUser(u)
-      if (u) await loadProfile(u.id)
-      else { setProfile(null); setLoading(false) }
+      if (u) {
+        setUser(u)
+        await loadProfile(u.id)
+      } else {
+        setUser(null)
+        setProfile(null)
+        setLoading(false)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
