@@ -97,7 +97,9 @@ export default function AuthScreen() {
                 color: plan === 'annual' ? '#fff' : 'var(--muted)',
                 boxShadow: plan === 'annual' ? '0 2px 8px rgba(200,64,47,0.25)' : 'none'
               }}>
-              Annual <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>· Best Value</span>
+              Annual
+              <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}> · $49/yr</span>
+              <span style={{ display: 'block', fontSize: 10, fontWeight: 600, color: plan === 'annual' ? 'rgba(255,255,255,0.85)' : 'var(--accent)', marginTop: 1 }}>Save 49%</span>
             </button>
             <button
               type="button"
@@ -111,6 +113,7 @@ export default function AuthScreen() {
                 boxShadow: plan === 'monthly' ? 'var(--shadow)' : 'none'
               }}>
               Monthly
+              <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.75 }}> · $7.99/mo</span>
             </button>
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
