@@ -79,16 +79,16 @@ export default function Settings() {
         {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
       </button>
 
-      <button className="btn btn-secondary" onClick={handleManageSub} disabled={portalLoading} style={{ marginBottom: 12 }}>
-        {portalLoading ? 'Loading…' : '💳 Manage Subscription'}
-      </button>
-
       <button className="btn btn-secondary" onClick={() => { if (confirm('Sign out?')) signOut() }} style={{ marginBottom: 24 }}>
         🚪 Sign Out
       </button>
 
       <div style={{ textAlign: 'center', marginTop: 8 }}>
         <a href="/terms" style={{ color: 'var(--muted)', fontSize: 12 }}>Terms of Service</a>
+        <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
+        <button onClick={handleManageSub} disabled={portalLoading} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
+          {portalLoading ? 'Loading…' : 'Manage Subscription'}
+        </button>
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
         <a href="/privacy" style={{ color: 'var(--muted)', fontSize: 12 }}>Privacy Policy</a>
       </div>
