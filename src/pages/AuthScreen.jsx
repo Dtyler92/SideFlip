@@ -82,9 +82,6 @@ export default function AuthScreen() {
       {/* Plan toggle — signup only, no prices */}
       {mode === 'signup' && (
         <div style={{ width: '100%', marginBottom: 24 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center', marginBottom: 10 }}>
-            Choose your plan — 7-day free trial
-          </div>
           <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 3 }}>
             <button
               type="button"
