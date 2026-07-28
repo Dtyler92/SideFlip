@@ -33,13 +33,18 @@ export default function Settings() {
   async function handleManageSub() {
     setPortalLoading(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Please sign in again.')
+
       const res = await fetch('/api/create-portal-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: profile?.stripe_customer_id })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       })
       const { url, error } = await res.json()
-      if (error) throw new Error(error)
+      if (!res.ok || error) throw new Error(error || 'Could not open the billing portal.')
       window.location.href = url
     } catch (err) {
       alert('Could not open billing portal: ' + err.message)
