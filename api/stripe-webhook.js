@@ -1,6 +1,12 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
-import { sendWelcomeEmail, sendPaymentFailedEmail, sendTrialCanceledEmail } from './emails.js'
+import {
+  sendWelcomeEmail,
+  sendTrialEndingEmail,
+  sendCancellationScheduledEmail,
+  sendTrialCanceledEmail,
+  sendPaymentFailedEmail,
+} from './emails.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const supabase = createClient(
@@ -8,7 +14,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// Tell Vercel to give us the raw body as a Buffer
 export const config = { api: { bodyParser: false } }
 
 async function buffer(readable) {
@@ -19,74 +24,159 @@ async function buffer(readable) {
   return Buffer.concat(chunks)
 }
 
+async function getCustomerEmail(object) {
+  if (object?.customer_email) return object.customer_email
+  if (!object?.customer) return null
+
+  try {
+    const customer = typeof object.customer === 'string'
+      ? await stripe.customers.retrieve(object.customer)
+      : object.customer
+    return customer && !customer.deleted ? customer.email : null
+  } catch (error) {
+    console.error('Customer email lookup error:', error.message)
+    return null
+  }
+}
+
+function subscriptionDetails(subscription) {
+  const price = subscription?.items?.data?.[0]?.price
+  return {
+    unitAmount: price?.unit_amount,
+    currency: price?.currency || 'usd',
+    interval: price?.recurring?.interval,
+    trialEnd: subscription?.trial_end,
+    accessEnd: subscription?.current_period_end || subscription?.trial_end,
+  }
+}
+
+async function updateProfileFromSubscription(subscription) {
+  const userId = subscription?.metadata?.userId
+  if (!userId) {
+    console.error('Subscription has no Supabase userId metadata:', subscription?.id)
+    return false
+  }
+
+  const update = {
+    id: userId,
+    subscription_status: subscription.status,
+    subscription_id: subscription.id,
+    stripe_customer_id: typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id,
+  }
+  if (subscription.current_period_end) {
+    update.current_period_end = new Date(subscription.current_period_end * 1000).toISOString()
+  }
+
+  const { error } = await supabase.from('profiles').upsert(update, { onConflict: 'id' })
+  if (error) {
+    console.error('Supabase subscription update error:', error)
+    return false
+  }
+  return true
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   let event
   try {
     const buf = await buffer(req)
-    const sig = req.headers['stripe-signature']
-    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
-  } catch (err) {
-    console.error('Webhook signature error:', err.message)
-    return res.status(400).send(`Webhook error: ${err.message}`)
+    const signature = req.headers['stripe-signature']
+    event = stripe.webhooks.constructEvent(buf, signature, process.env.STRIPE_WEBHOOK_SECRET)
+  } catch (error) {
+    console.error('Webhook signature error:', error.message)
+    return res.status(400).send(`Webhook error: ${error.message}`)
   }
 
-  const sub = event.data.object
-  const userId = sub?.metadata?.userId
-
-  console.log('Webhook event:', event.type, 'userId:', userId, 'subId:', sub?.id)
-
-  if (!userId) {
-    console.error('No userId in metadata')
-    return res.status(200).json({ received: true, warning: 'no userId' })
-  }
+  console.log('Webhook event:', event.type, 'eventId:', event.id)
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object
+        const userId = session.metadata?.userId || session.client_reference_id
+        if (userId) {
+          const update = {
+            stripe_customer_id: typeof session.customer === 'string'
+              ? session.customer
+              : session.customer?.id,
+          }
+          if (typeof session.subscription === 'string') update.subscription_id = session.subscription
+          const { error } = await supabase.from('profiles').update(update).eq('id', userId)
+          if (error) console.error('Checkout profile update error:', error)
+        }
+        break
+      }
+
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        const { error } = await supabase.from('profiles').upsert({
-          id: userId,
-          subscription_status: sub.status,
-          subscription_id: sub.id,
-          stripe_customer_id: sub.customer,
-          current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-        }, { onConflict: 'id' })
-        if (error) console.error('Supabase upsert error:', error)
-        else {
-          console.log('Profile updated:', userId, sub.status)
-          if (event.type === 'customer.subscription.created' && sub.customer_email) {
-            await sendWelcomeEmail(sub.customer_email).catch(e => console.error('Welcome email error:', e))
+        const subscription = event.data.object
+        await updateProfileFromSubscription(subscription)
+        const email = await getCustomerEmail(subscription)
+
+        if (event.type === 'customer.subscription.created' && email) {
+          await sendWelcomeEmail(email, subscriptionDetails(subscription))
+            .catch(error => console.error('Welcome email error:', error))
+        }
+
+        const cancellationJustScheduled = subscription.cancel_at_period_end
+          && event.data.previous_attributes?.cancel_at_period_end === false
+        if (cancellationJustScheduled && email) {
+          await sendCancellationScheduledEmail(email, subscriptionDetails(subscription))
+            .catch(error => console.error('Cancellation email error:', error))
+        }
+        break
+      }
+
+      case 'customer.subscription.trial_will_end': {
+        const subscription = event.data.object
+        const email = await getCustomerEmail(subscription)
+        if (email) {
+          await sendTrialEndingEmail(email, subscriptionDetails(subscription))
+            .catch(error => console.error('Trial reminder email error:', error))
+        }
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object
+        const userId = subscription.metadata?.userId
+        if (userId) {
+          const { error } = await supabase.from('profiles').update({
+            subscription_status: 'canceled',
+            subscription_id: null,
+          }).eq('id', userId)
+          if (error) console.error('Supabase cancellation update error:', error)
+        }
+
+        const wasTrialing = subscription.status === 'trialing'
+          || (subscription.trial_end && subscription.trial_end > Math.floor(Date.now() / 1000))
+        if (wasTrialing) {
+          const email = await getCustomerEmail(subscription)
+          if (email) {
+            await sendTrialCanceledEmail(email)
+              .catch(error => console.error('Trial cancellation email error:', error))
           }
         }
         break
       }
-      case 'customer.subscription.deleted': {
-        // Only send win-back if they canceled while still in trial
-        const wasTrialing = sub.status === 'trialing' || sub.trial_end > Math.floor(Date.now() / 1000)
-        const { error } = await supabase.from('profiles').upsert({
-          id: userId,
-          subscription_status: 'canceled',
-          subscription_id: null,
-        }, { onConflict: 'id' })
-        if (error) console.error('Supabase delete error:', error)
-        if (wasTrialing && sub.customer_email) {
-          await sendTrialCanceledEmail(sub.customer_email).catch(e => console.error('Win-back email error:', e))
-        }
-        break
-      }
+
       case 'invoice.payment_failed': {
         const invoice = event.data.object
-        if (invoice.customer_email) {
-          await sendPaymentFailedEmail(invoice.customer_email).catch(e => console.error('Payment failed email error:', e))
+        const email = await getCustomerEmail(invoice)
+        if (email) {
+          await sendPaymentFailedEmail(email)
+            .catch(error => console.error('Payment failed email error:', error))
         }
         break
       }
     }
-  } catch (err) {
-    console.error('Handler error:', err.message)
+  } catch (error) {
+    console.error('Webhook handler error:', error.message)
+    return res.status(500).json({ received: true, error: 'Handler failed' })
   }
 
-  res.status(200).json({ received: true })
+  return res.status(200).json({ received: true })
 }

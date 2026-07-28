@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { signIn, signUp, resetPassword } from '../supabase'
+import { supabase, signIn, signUp, resetPassword } from '../supabase'
 
 export default function AuthScreen() {
   const [mode, setMode] = useState('signup') // signup | signin | forgot
@@ -7,6 +7,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [plan, setPlan] = useState('annual')
+  const [billingConsent, setBillingConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -20,6 +21,10 @@ export default function AuthScreen() {
     }
     if (mode === 'signup' && password.length < 6) {
       setError('Password must be at least 6 characters')
+      return
+    }
+    if (mode === 'signup' && !billingConsent) {
+      setError('Please agree to the subscription and renewal terms')
       return
     }
 
@@ -39,19 +44,21 @@ export default function AuthScreen() {
         const { data, error: err } = await signUp(email, password)
         if (err) throw err
 
-        const priceId = plan === 'annual'
-          ? import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID
-          : import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID
+        const accessToken = data?.session?.access_token
+          || (await supabase.auth.getSession()).data.session?.access_token
+        if (!accessToken) throw new Error('Please verify your email, then sign in to start your trial.')
 
-        const userId = data?.user?.id
         const ref = sessionStorage.getItem('sf_ref')
         const res = await fetch('/api/create-checkout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId, userId, email, ref })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ plan, ref, billingConsent })
         })
         const { url, error: stripeErr } = await res.json()
-        if (stripeErr) throw new Error(stripeErr)
+        if (!res.ok || stripeErr) throw new Error(stripeErr || 'Could not start checkout.')
         window.location.href = url
 
       } else {
@@ -114,7 +121,14 @@ export default function AuthScreen() {
             </button>
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
-            7-day free trial included
+            <strong style={{ color: 'var(--text)' }}>
+              {plan === 'annual'
+                ? '7-day free trial, then $49 charged annually.'
+                : '7-day free trial, then $7.99 charged monthly.'}
+            </strong>
+            <span style={{ display: 'block', marginTop: 3 }}>
+              Renews automatically until canceled. Cancel before the trial ends to avoid being charged.
+            </span>
           </div>
         </div>
       )}
@@ -145,13 +159,30 @@ export default function AuthScreen() {
         )}
 
         {mode === 'signup' && (
-          <div className="form-group">
-            <label>Confirm Password</label>
-            <input type="password" autoComplete="new-password"
-              placeholder="Re-enter your password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)} required />
-          </div>
+          <>
+            <div className="form-group">
+              <label>Confirm Password</label>
+              <input type="password" autoComplete="new-password"
+                placeholder="Re-enter your password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)} required />
+            </div>
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, margin: '4px 0 16px',
+              color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={billingConsent}
+                onChange={e => setBillingConsent(e.target.checked)}
+                required
+                style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: 'var(--accent)' }}
+              />
+              <span>
+                I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price after my 7-day trial and at each renewal until I cancel. I can cancel anytime through Settings.
+              </span>
+            </label>
+          </>
         )}
 
         <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -1,29 +1,35 @@
 import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { signOut } from '../supabase'
+import { supabase, signOut } from '../supabase'
 import { MONTHLY_PRICE, ANNUAL_PRICE, ANNUAL_MONTHLY_EQUIV, SAVINGS_PCT } from '../billing'
 
 export default function Paywall({ trialExpired }) {
-  const { user } = useAuth()
   const [selected, setSelected] = useState('annual')
   const [loading, setLoading] = useState(false)
+  const [billingConsent, setBillingConsent] = useState(false)
 
   async function handleSubscribe() {
+    if (!billingConsent) {
+      alert('Please agree to the subscription and renewal terms.')
+      return
+    }
     setLoading(true)
-    const priceId = selected === 'annual'
-      ? import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID
-      : import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Please sign in again.')
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId, userId: user.id, email: user.email })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan: selected, billingConsent })
       })
-      const { url } = await res.json()
+      const { url, error } = await res.json()
+      if (!res.ok || error) throw new Error(error || 'Could not start checkout.')
       window.location.href = url
-    } catch (err) {
-      alert('Something went wrong. Please try again.')
+    } catch (error) {
+      alert(error.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -142,9 +148,29 @@ export default function Paywall({ trialExpired }) {
         {loading ? 'Redirecting...' : `Start with ${selected === 'annual' ? 'Annual' : 'Monthly'} Plan →`}
       </button>
 
-      <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginBottom: 20 }}>
-        Secure payment via Stripe · Cancel anytime
+      <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5, marginBottom: 12 }}>
+        <strong style={{ color: 'var(--text)' }}>
+          {selected === 'annual'
+            ? '7-day free trial, then $49 charged annually.'
+            : '7-day free trial, then $7.99 charged monthly.'}
+        </strong><br />
+        Renews automatically until canceled. Cancel before the trial ends to avoid being charged.
       </div>
+
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%',
+        color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 20, cursor: 'pointer'
+      }}>
+        <input
+          type="checkbox"
+          checked={billingConsent}
+          onChange={e => setBillingConsent(e.target.checked)}
+          style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: 'var(--accent)' }}
+        />
+        <span>
+          I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price after my trial and at each renewal until I cancel. I can cancel anytime through Settings.
+        </span>
+      </label>
 
       <button
         onClick={signOut}
