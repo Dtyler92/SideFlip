@@ -59,7 +59,7 @@ function AccountMenu({ user, profile }) {
             <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, marginBottom: 3 }}>Signed in as</div>
             <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, wordBreak: 'break-all' }}>{user?.email}</div>
           </div>
-          <button onClick={() => { setOpen(false); window.location.href = 'mailto:tyler@tourbillionenergy.com' }} style={menuItem}>
+          <button onClick={() => { setOpen(false); window.location.href = '/support' }} style={menuItem}>
             <span>💬</span> Help & Support
           </button>
           <div style={{ height: 1, background: 'var(--border)' }} />

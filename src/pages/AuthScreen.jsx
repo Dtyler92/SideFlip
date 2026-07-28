@@ -186,6 +186,8 @@ export default function AuthScreen() {
         <a href="/privacy" style={{ color: 'var(--muted)' }}>Privacy Policy</a>
         {' · '}
         <a href="/terms" style={{ color: 'var(--muted)' }}>Terms of Service</a>
+        {' · '}
+        <a href="/support" style={{ color: 'var(--muted)' }}>Support</a>
       </div>
     </div>
   )

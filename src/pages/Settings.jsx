@@ -91,6 +91,8 @@ export default function Settings() {
       <div style={{ textAlign: 'center', marginTop: 8 }}>
         <a href="/terms" style={{ color: 'var(--muted)', fontSize: 12 }}>Terms of Service</a>
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
+        <a href="/support" style={{ color: 'var(--muted)', fontSize: 12 }}>Support</a>
+        <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
         <button onClick={handleManageSub} disabled={portalLoading} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
           {portalLoading ? 'Loading…' : 'Manage Subscription'}
         </button>
