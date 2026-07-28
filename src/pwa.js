@@ -12,10 +12,6 @@ export function captureReferral() {
   }
 }
 
-export function getReferral() {
-  return sessionStorage.getItem('sf_ref') || null
-}
-
 // PWA install prompt hook
 export function useInstallPrompt() {
   const [prompt, setPrompt] = useState(null)

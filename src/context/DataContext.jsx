@@ -30,8 +30,7 @@ export function DataProvider({ children }) {
       if (!alreadyMigrated()) {
         setMigrating(true)
         try {
-          const count = await migrateLocalData(user.id)
-          if (count > 0) console.log(`Migrated ${count} projects from local storage`)
+          await migrateLocalData(user.id)
         } catch (err) {
           console.error('Migration error:', err)
         }

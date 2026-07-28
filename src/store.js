@@ -1,67 +1,4 @@
-// Local storage helpers — no backend needed for V1
-const STORAGE_KEY = 'flipledger_projects'
-
-export function getProjects() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-  } catch { return [] }
-}
-
-export function saveProjects(projects) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
-}
-
-export function getProject(id) {
-  return getProjects().find(p => p.id === id) || null
-}
-
-export function createProject(data) {
-  const projects = getProjects()
-  const project = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    status: 'active', // active | sold
-    expenses: [],
-    salePrice: null,
-    soldAt: null,
-    ...data
-  }
-  projects.unshift(project)
-  saveProjects(projects)
-  return project
-}
-
-export function updateProject(id, updates) {
-  const projects = getProjects().map(p => p.id === id ? { ...p, ...updates } : p)
-  saveProjects(projects)
-}
-
-export function deleteProject(id) {
-  saveProjects(getProjects().filter(p => p.id !== id))
-}
-
-export function addExpense(projectId, expense) {
-  const projects = getProjects().map(p => {
-    if (p.id !== projectId) return p
-    return {
-      ...p,
-      expenses: [...p.expenses, {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        ...expense
-      }]
-    }
-  })
-  saveProjects(projects)
-}
-
-export function deleteExpense(projectId, expenseId) {
-  const projects = getProjects().map(p => {
-    if (p.id !== projectId) return p
-    return { ...p, expenses: p.expenses.filter(e => e.id !== expenseId) }
-  })
-  saveProjects(projects)
-}
+// ── Calculation & formatting helpers ──────────────────────────
 
 export function getTotalInvested(project) {
   const parts = project.expenses.reduce((sum, e) => sum + Number(e.amount), 0)
@@ -71,13 +8,6 @@ export function getTotalInvested(project) {
 export function getProfit(project) {
   if (!project.salePrice) return null
   return Number(project.salePrice) - getTotalInvested(project)
-}
-
-export function getROI(project) {
-  const invested = getTotalInvested(project)
-  const profit = getProfit(project)
-  if (!profit || !invested) return null
-  return ((profit / invested) * 100).toFixed(1)
 }
 
 export function fmt(num) {

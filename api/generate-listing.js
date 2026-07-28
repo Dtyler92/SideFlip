@@ -1,5 +1,45 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
+
+// Simple in-memory rate limiter (per warm serverless instance)
+const RATE = new Map() // key -> [timestamps]
+
+function rateLimited(key, max, windowMs) {
+  const now = Date.now()
+  const hits = (RATE.get(key) || []).filter(t => now - t < windowMs)
+  hits.push(now)
+  RATE.set(key, hits)
+  return hits.length > max
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+
+  // ── Auth: verify Supabase session if provided (native v1.1+) ──
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+  let rateKey
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' })
+    // Authenticated: generous per-user limit
+    rateKey = `user:${user.id}`
+    if (rateLimited(rateKey, 15, 60_000)) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
+    }
+  } else {
+    // No token (legacy v1.0 clients): strict IP-based limit to prevent abuse
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown'
+    rateKey = `ip:${ip}`
+    if (rateLimited(rateKey, 5, 60_000)) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
+    }
+  }
 
   const { title, category, expenses, notes } = req.body
   if (!title) return res.status(400).json({ error: 'Missing project info' })
