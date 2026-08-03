@@ -38,6 +38,11 @@ export default function Goals() {
   const soldProjects = goalProjects.filter(project => project.status === 'sold')
   const availableProjects = projects.filter(project => project.status === 'active' && !project.goalId && !project.tradedFromProjectId)
   const selectedProjectToLink = availableProjects.find(project => project.id === projectLink.projectId)
+  const adjustmentAmount = Number(adjustment.amount) || 0
+  const adjustmentIsValid = adjustmentAmount > 0 && (adjustment.type !== 'cash_out' || adjustmentAmount <= (summary?.available || 0))
+  const availableAfterAdjustment = summary
+    ? summary.available + (adjustment.type === 'cash_out' ? -adjustmentAmount : adjustmentAmount)
+    : 0
 
   async function handleCreate(event) {
     event.preventDefault()
@@ -239,14 +244,35 @@ export default function Goals() {
           <button className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Record Trade'}</button>
         </form>}
 
-        <form onSubmit={handleAdjustment} className="card" style={{ marginTop: 14 }}>
-          <h3 style={sectionTitle}>Update Available Amount</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <select value={adjustment.type} onChange={e => setAdjustment(value => ({ ...value, type: e.target.value }))}><option value="personal_contribution">Add personal money</option><option value="cash_out">Take money out</option></select>
-            <MoneyInput value={adjustment.amount} onChange={amount => setAdjustment(value => ({ ...value, amount }))} />
+        <form onSubmit={handleAdjustment} className="card" style={{ marginTop: 14, padding: 18 }}>
+          <div style={{ ...eyebrow, color: 'var(--accent)', marginBottom: 6 }}>Goal funds · Tracking only</div>
+          <h3 style={{ fontSize: 19, margin: '0 0 5px', color: 'var(--text)' }}>Update Available Amount</h3>
+          <p style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>Record personal money added to this goal or money you have taken out.</p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }} role="group" aria-label="Update type">
+            <button type="button" onClick={() => setAdjustment(value => ({ ...value, type: 'personal_contribution' }))} style={adjustmentChoice(adjustment.type === 'personal_contribution')}>
+              <span style={{ fontSize: 15, fontWeight: 800 }}>Add Money</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>Personal contribution</span>
+            </button>
+            <button type="button" onClick={() => setAdjustment(value => ({ ...value, type: 'cash_out' }))} style={adjustmentChoice(adjustment.type === 'cash_out')}>
+              <span style={{ fontSize: 15, fontWeight: 800 }}>Take Money Out</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>Reduce available funds</span>
+            </button>
           </div>
-          <input style={{ marginTop: 10 }} value={adjustment.note} onChange={e => setAdjustment(value => ({ ...value, note: e.target.value }))} placeholder="Note (optional)" />
-          <button className="btn btn-secondary" disabled={saving}>Save Update</button>
+
+          <Field label="Amount">
+            <MoneyInput value={adjustment.amount} onChange={amount => setAdjustment(value => ({ ...value, amount }))} />
+          </Field>
+          {adjustment.type === 'cash_out' && adjustmentAmount > summary.available && <div style={{ color: 'var(--accent)', fontSize: 12, marginTop: -10, marginBottom: 14 }}>Enter no more than {fmt(summary.available)}, the amount currently available.</div>}
+          <Field label="Note (optional)">
+            <input value={adjustment.note} onChange={e => setAdjustment(value => ({ ...value, note: e.target.value }))} placeholder={adjustment.type === 'cash_out' ? 'e.g. Set aside for another purchase' : 'e.g. Added from this week’s budget'} />
+          </Field>
+
+          <div style={{ background: '#F7F4EE', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ color: 'var(--muted)', fontSize: 12, fontWeight: 600 }}>Available after update</span>
+            <strong style={{ fontSize: 17 }}>{fmt(Math.max(0, availableAfterAdjustment))}</strong>
+          </div>
+          <button className="btn btn-primary" disabled={saving || !adjustmentIsValid}>{saving ? 'Saving…' : adjustment.type === 'cash_out' ? 'Take Money Out' : 'Add to Goal'}</button>
         </form>
         </>}
 
@@ -254,7 +280,7 @@ export default function Goals() {
         <ProjectSection title={`Completed Steps (${soldProjects.length})`} projects={soldProjects} navigate={navigate} />
 
         {selected.status === 'active'
-          ? <button className="btn btn-green" disabled={saving} onClick={() => setGoalStatus('completed')}>✓ Mark Goal Complete</button>
+          ? <button className="btn btn-green" disabled={saving} onClick={() => setGoalStatus('completed')}>Mark Goal Complete</button>
           : <button className="btn btn-green" disabled={saving} onClick={() => setGoalStatus('active')}>↻ Reopen Goal</button>}
         <button className="btn btn-secondary" disabled={saving} style={{ color: 'var(--accent)' }} onClick={removeGoal}>Delete Goal</button>
       </div>
@@ -303,3 +329,17 @@ const statusPill = { borderRadius: 999, padding: '4px 9px', fontSize: 10, fontWe
 const statGrid = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 14 }
 const actionRow = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }
 const sectionTitle = { fontSize: 15, margin: '0 0 10px', color: 'var(--text)' }
+const adjustmentChoice = selected => ({
+  minHeight: 66,
+  padding: '10px 8px',
+  borderRadius: 11,
+  border: selected ? '2px solid var(--accent)' : '1px solid var(--border)',
+  background: selected ? '#FDF1EF' : '#fff',
+  color: selected ? 'var(--accent)' : 'var(--text)',
+  cursor: 'pointer',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontFamily: 'inherit',
+})
