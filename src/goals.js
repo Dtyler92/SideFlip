@@ -78,3 +78,16 @@ export function calculateTradeBasis({ tradeCredit, cashDirection = 'none', cashA
   if (cashDirection === 'received') return Math.max(0, credit - cash)
   return credit
 }
+
+export function calculateProjectLinkFunding(purchasePrice, goalFunding, availableTowardGoal) {
+  const purchase = number(purchasePrice)
+  const fromGoal = number(goalFunding)
+  const available = number(availableTowardGoal)
+  if (purchase < 0 || fromGoal < 0) throw new Error('Funding amounts cannot be negative')
+  if (fromGoal > purchase) throw new Error('Goal funds used cannot exceed the project purchase price')
+  if (fromGoal > available) throw new Error('Goal funds used cannot exceed the amount available toward the goal')
+  return {
+    goalFundingAmount: fromGoal,
+    outOfPocketAmount: purchase - fromGoal,
+  }
+}

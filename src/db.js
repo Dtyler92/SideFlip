@@ -161,6 +161,17 @@ export async function adjustGoalBalance(goalId, type, amount, note, mutationId =
   return data
 }
 
+export async function linkProjectToGoal(userId, projectId, goalId, goalFundingAmount, mutationId = createMutationId()) {
+  const { data: linkedId, error } = await supabase.rpc('link_trade_up_project', {
+    p_project_id: projectId,
+    p_goal_id: goalId,
+    p_goal_funding: Number(goalFundingAmount) || 0,
+    p_mutation_id: mutationId,
+  })
+  if (error) throw error
+  return getProject(userId, linkedId)
+}
+
 export async function recordProjectSale(userId, project, salePrice, keepAmount) {
   const { error } = await supabase.rpc('record_trade_up_sale', {
     p_project_id: project.id,

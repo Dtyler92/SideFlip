@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { createGoal, updateGoal, deleteGoal, adjustGoalBalance, recordDirectTrade } from '../db'
-import { calculateGoalSummary, createMutationId } from '../goals'
+import { createGoal, updateGoal, deleteGoal, adjustGoalBalance, linkProjectToGoal, recordDirectTrade } from '../db'
+import { calculateGoalSummary, calculateProjectLinkFunding, createMutationId } from '../goals'
 import { CATEGORIES, fmt, categoryIcon, getTotalInvested, getProfit } from '../store'
 
 const newGoalForm = () => ({ name: '', goalType: 'item', targetItem: '', targetAmount: '', startingAmount: '', description: '', mutationId: createMutationId() })
@@ -12,6 +12,7 @@ const newTradeForm = () => ({
   cashDirection: 'none', cashAmount: '', goalCashAmount: '', keepCashAmount: '', notes: '', mutationId: createMutationId()
 })
 const newAdjustment = () => ({ type: 'personal_contribution', amount: '', note: '', mutationId: createMutationId() })
+const newProjectLink = () => ({ projectId: '', goalFundingAmount: '', mutationId: createMutationId() })
 
 export default function Goals() {
   const navigate = useNavigate()
@@ -19,10 +20,12 @@ export default function Goals() {
   const { goals, projects, refresh } = useData()
   const [selectedId, setSelectedId] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showAddProject, setShowAddProject] = useState(false)
   const [showTrade, setShowTrade] = useState(false)
   const [goalForm, setGoalForm] = useState(newGoalForm)
   const [tradeForm, setTradeForm] = useState(newTradeForm)
   const [adjustment, setAdjustment] = useState(newAdjustment)
+  const [projectLink, setProjectLink] = useState(newProjectLink)
   const [saving, setSaving] = useState(false)
 
   const selected = goals.find(goal => goal.id === selectedId)
@@ -33,6 +36,8 @@ export default function Goals() {
   const summary = selected ? calculateGoalSummary(selected, projects, selected.ledger) : null
   const activeProjects = goalProjects.filter(project => project.status === 'active')
   const soldProjects = goalProjects.filter(project => project.status === 'sold')
+  const availableProjects = projects.filter(project => project.status === 'active' && !project.goalId && !project.tradedFromProjectId)
+  const selectedProjectToLink = availableProjects.find(project => project.id === projectLink.projectId)
 
   async function handleCreate(event) {
     event.preventDefault()
@@ -65,6 +70,36 @@ export default function Goals() {
       setAdjustment(newAdjustment())
     } catch (error) { alert('Could not update goal: ' + error.message) }
     finally { setSaving(false) }
+  }
+
+  async function handleLinkProject(event) {
+    event.preventDefault()
+    if (!selectedProjectToLink) return alert('Choose a current project to add')
+    let funding
+    try {
+      funding = calculateProjectLinkFunding(
+        selectedProjectToLink.purchasePrice,
+        projectLink.goalFundingAmount,
+        summary.available,
+      )
+    } catch (error) {
+      return alert(error.message)
+    }
+    setSaving(true)
+    try {
+      await linkProjectToGoal(
+        user.id,
+        selectedProjectToLink.id,
+        selected.id,
+        funding.goalFundingAmount,
+        projectLink.mutationId,
+      )
+      await refresh()
+      setProjectLink(newProjectLink())
+      setShowAddProject(false)
+    } catch (error) {
+      alert('Could not add project to goal: ' + error.message)
+    } finally { setSaving(false) }
   }
 
   async function handleTrade(event) {
@@ -121,7 +156,7 @@ export default function Goals() {
   if (selected) return (
     <>
       <div className="page-header">
-        <button className="back-btn" onClick={() => setSelectedId(null)}>‹</button>
+        <button className="back-btn" onClick={() => { setSelectedId(null); setShowAddProject(false); setShowTrade(false); setProjectLink(newProjectLink()) }}>‹</button>
         <h1 style={{ flex: 1 }}>{selected.name}</h1>
       </div>
       <div className="page" style={{ paddingBottom: 110 }}>
@@ -160,9 +195,36 @@ export default function Goals() {
 
         {selected.status === 'active' && <>
         <div style={actionRow}>
-          <button className="btn btn-primary" style={{ margin: 0 }} onClick={() => navigate(`/new?goal=${selected.id}`)}>+ Add Project</button>
-          <button className="btn btn-secondary" style={{ margin: 0 }} onClick={() => setShowTrade(value => !value)} disabled={!activeProjects.length}>⇄ Record Trade</button>
+          <button className="btn btn-primary" style={{ margin: 0 }} onClick={() => { setShowAddProject(value => !value); setShowTrade(false) }}>{showAddProject ? 'Close Add Project' : '+ Add Project'}</button>
+          <button className="btn btn-secondary" style={{ margin: 0 }} onClick={() => { setShowTrade(value => !value); setShowAddProject(false) }} disabled={!activeProjects.length}>⇄ Record Trade</button>
         </div>
+
+        {showAddProject && <form onSubmit={handleLinkProject} className="card" style={{ marginTop: 14 }}>
+          <h3 style={sectionTitle}>Add a Project</h3>
+          <button type="button" className="btn btn-secondary" style={{ marginTop: 0 }} onClick={() => navigate(`/new?goal=${selected.id}`)}>+ Create New Project</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0', color: 'var(--muted)', fontSize: 11 }}><span style={{ height: 1, background: 'var(--border)', flex: 1 }} /><span>OR CHOOSE FROM PROJECTS</span><span style={{ height: 1, background: 'var(--border)', flex: 1 }} /></div>
+          {availableProjects.length === 0
+            ? <div style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>No unlinked active projects are available. Create a new project or reopen one from the Projects tab.</div>
+            : <>
+              <Field label="Current project">
+                <select value={projectLink.projectId} onChange={event => setProjectLink({ projectId: event.target.value, goalFundingAmount: '', mutationId: createMutationId() })}>
+                  <option value="">Select a project</option>
+                  {availableProjects.map(project => <option key={project.id} value={project.id}>{project.title} · {fmt(project.purchasePrice)}</option>)}
+                </select>
+              </Field>
+              {selectedProjectToLink && <>
+                <div style={{ background: '#F7F4EE', borderRadius: 10, padding: 12, marginBottom: 12, fontSize: 13 }}>
+                  <strong>{selectedProjectToLink.title}</strong>
+                  <div style={{ color: 'var(--muted)', marginTop: 4 }}>Original purchase: {fmt(selectedProjectToLink.purchasePrice)} · Expenses: {fmt((selectedProjectToLink.expenses || []).reduce((sum, expense) => sum + Number(expense.amount || 0), 0))}</div>
+                </div>
+                <Field label={`Use from goal (available ${fmt(summary.available)})`}>
+                  <MoneyInput value={projectLink.goalFundingAmount} onChange={goalFundingAmount => setProjectLink(value => ({ ...value, goalFundingAmount }))} />
+                </Field>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: -4, marginBottom: 12 }}>Personal contribution: {fmt(Math.max(0, Number(selectedProjectToLink.purchasePrice || 0) - Number(projectLink.goalFundingAmount || 0)))}</div>
+              </>}
+              <button className="btn btn-primary" disabled={saving || !selectedProjectToLink}>{saving ? 'Adding…' : 'Add Selected Project'}</button>
+            </>}
+        </form>}
 
         {showTrade && <form onSubmit={handleTrade} className="card" style={{ marginTop: 14 }}>
           <h3 style={sectionTitle}>Record a Direct Trade</h3>

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateGoalSummary, splitSaleProceeds, calculateTradeBasis } from '../src/goals.js'
+import { calculateGoalSummary, splitSaleProceeds, calculateTradeBasis, calculateProjectLinkFunding } from '../src/goals.js'
 
 test('keeps multiple goals financially isolated', () => {
   const projects = [
@@ -57,4 +57,13 @@ test('sale split returns all proceeds then records the amount taken out', () => 
 test('direct trade basis includes cash paid and subtracts cash received', () => {
   assert.equal(calculateTradeBasis({ tradeCredit: 1500, cashDirection: 'paid', cashAmount: 500 }), 2000)
   assert.equal(calculateTradeBasis({ tradeCredit: 1500, cashDirection: 'received', cashAmount: 300 }), 1200)
+})
+
+test('linking an existing project splits its original purchase between goal and personal funding', () => {
+  assert.deepEqual(calculateProjectLinkFunding(500, 300, 400), {
+    goalFundingAmount: 300,
+    outOfPocketAmount: 200,
+  })
+  assert.throws(() => calculateProjectLinkFunding(500, 501, 1000), /purchase price/)
+  assert.throws(() => calculateProjectLinkFunding(500, 300, 299), /available toward the goal/)
 })
