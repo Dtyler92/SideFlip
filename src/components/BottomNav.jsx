@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 
 const TABS = [
   { path: '/', label: 'Projects', emoji: '🔧' },
+  { path: '/goals', label: 'Goals', emoji: '🎯' },
   { path: '/calculator', label: 'Calculator', emoji: '🧮' },
   { path: '/analytics', label: 'Analytics', emoji: '📊' },
   { path: '/settings', label: 'Settings', emoji: '⚙️' },

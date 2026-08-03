@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getTotalInvested, fmt } from '../store'
-import { getProject, updateProject } from '../db'
+import { getProject, recordProjectSale } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 
@@ -12,6 +12,8 @@ export default function SellProject() {
   const { refresh } = useData()
   const [project, setProject] = useState(null)
   const [salePrice, setSalePrice] = useState('')
+  const [disposition, setDisposition] = useState('keep')
+  const [keepAmount, setKeepAmount] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -29,13 +31,14 @@ export default function SellProject() {
   async function handleSell(e) {
     e.preventDefault()
     if (!salePrice || Number(salePrice) < 0) return alert('Enter a valid sale price')
+    const sale = Number(salePrice)
+    if (!Number.isFinite(sale)) return alert('Enter a valid sale price')
+    if (project.goalId && disposition === 'split' && keepAmount.trim() === '') return alert('Enter the amount to keep toward the goal')
+    const amountKept = !project.goalId ? 0 : disposition === 'keep' ? sale : disposition === 'take' ? 0 : Number(keepAmount)
+    if (project.goalId && disposition === 'split' && (!Number.isFinite(amountKept) || amountKept < 0 || amountKept > sale)) return alert('Enter an amount between zero and the sale price')
     setSaving(true)
     try {
-      await updateProject(user.id, id, {
-        status: 'sold',
-        salePrice: Number(salePrice),
-        soldAt: new Date().toISOString()
-      })
+      await recordProjectSale(user.id, project, sale, amountKept)
       await refresh()
       navigate(`/project/${id}`)
     } catch (err) {
@@ -81,6 +84,24 @@ export default function SellProject() {
               </div>
               {previewROI && (
                 <div className="roi">{preview >= 0 ? '📈' : '📉'} {previewROI}% ROI</div>
+              )}
+            </div>
+          )}
+
+          {project.goalId && salePrice && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 5 }}>What should happen to the proceeds?</div>
+              <div style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>Tracking only — SideFlip does not hold or transfer this money.</div>
+              <select value={disposition} onChange={e => setDisposition(e.target.value)}>
+                <option value="keep">Keep all toward the goal</option>
+                <option value="take">Take all out for personal use</option>
+                <option value="split">Split the proceeds</option>
+              </select>
+              {disposition === 'split' && (
+                <div className="form-group" style={{ marginTop: 12, marginBottom: 0 }}>
+                  <label>Amount to keep toward the goal</label>
+                  <input type="number" inputMode="decimal" min="0" max={salePrice} step="0.01" placeholder="0.00" value={keepAmount} onChange={e => setKeepAmount(e.target.value)} />
+                </div>
               )}
             </div>
           )}

@@ -1,27 +1,29 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useAuth } from './AuthContext'
-import { getProjects, migrateLocalData, alreadyMigrated } from '../db'
+import { getProjects, getGoals, migrateLocalData, alreadyMigrated } from '../db'
 
 const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
   const { user } = useAuth()
   const [projects, setProjects] = useState([])
+  const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [migrating, setMigrating] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getProjects(user.id)
-      setProjects(data)
+      const [projectData, goalData] = await Promise.all([getProjects(user.id), getGoals(user.id)])
+      setProjects(projectData)
+      setGoals(goalData)
     } catch (err) {
       console.error('Failed to load projects:', err)
     }
   }, [user])
 
   useEffect(() => {
-    if (!user) { setProjects([]); setLoading(false); return }
+    if (!user) { setProjects([]); setGoals([]); setLoading(false); return }
 
     async function init() {
       setLoading(true)
@@ -45,7 +47,7 @@ export function DataProvider({ children }) {
   }, [user])
 
   return (
-    <DataContext.Provider value={{ projects, loading, migrating, refresh }}>
+    <DataContext.Provider value={{ projects, goals, loading, migrating, refresh }}>
       {children}
     </DataContext.Provider>
   )

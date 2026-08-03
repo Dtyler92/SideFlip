@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CATEGORIES, getExtraFields } from '../store'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { CATEGORIES, getExtraFields, fmt } from '../store'
 import { createProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { uploadPhoto } from '../supabase'
+import { calculateGoalSummary, createMutationId } from '../goals'
 
 function PhotoPicker({ photo, onFile, uploading }) {
   return (
@@ -30,8 +31,9 @@ function PhotoPicker({ photo, onFile, uploading }) {
 
 export default function NewProject() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
-  const { refresh } = useData()
+  const { refresh, goals, projects } = useData()
   const [photo, setPhoto] = useState(null)
   const [photoUploading, setPhotoUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -40,9 +42,12 @@ export default function NewProject() {
     modelNumber: '', serialNumber: '',
     engineModel: '', engineSerial: '',
     vin: '', hullNumber: '',
+    goalId: searchParams.get('goal') || '', goalFundingAmount: '', mutationId: createMutationId(),
   })
 
   const fields = getExtraFields(form.category)
+  const selectedGoal = goals.find(goal => goal.id === form.goalId && goal.status === 'active')
+  const goalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   async function handlePhotoFile(e) {
@@ -62,11 +67,22 @@ export default function NewProject() {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.title.trim()) return alert('Give your project a name')
+    if (form.goalId && !selectedGoal) return alert('That Trade-Up Goal is no longer active. Choose another goal or create this project without one.')
+    const purchase = Number(form.purchasePrice) || 0
+    const goalFunding = Number(form.goalFundingAmount) || 0
+    if (goalFunding > purchase) return alert('Goal funds cannot exceed the purchase price')
+    if (goalSummary && goalFunding > goalSummary.available) return alert('That is more than the amount available toward this goal')
     setSaving(true)
     try {
-      await createProject(user.id, { ...form, photo })
+      await createProject(user.id, {
+        ...form,
+        photo,
+        goalId: form.goalId || null,
+        goalFundingAmount: goalFunding,
+        outOfPocketAmount: Math.max(0, purchase - goalFunding),
+      })
       await refresh()
-      navigate('/')
+      navigate(form.goalId ? '/goals' : '/')
     } catch (err) {
       alert('Failed to save: ' + err.message)
     } finally {
@@ -118,6 +134,25 @@ export default function NewProject() {
               onChange={e => set('purchasePrice', e.target.value)}
             />
           </div>
+
+          {goals.filter(goal => goal.status === 'active').length > 0 && (
+            <div className="card" style={{ marginBottom: 18 }}>
+              <div className="form-group">
+                <label>Trade-Up Goal (optional)</label>
+                <select value={form.goalId} onChange={e => { set('goalId', e.target.value); set('goalFundingAmount', '') }}>
+                  <option value="">Not part of a goal</option>
+                  {goals.filter(goal => goal.status === 'active').map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}
+                </select>
+              </div>
+              {selectedGoal && (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Use from goal <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({fmt(goalSummary.available)} available)</span></label>
+                  <input type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00" value={form.goalFundingAmount} onChange={e => set('goalFundingAmount', e.target.value)} />
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Any remaining purchase amount is recorded as personal money contributed.</div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Category-specific identifiers ── */}
           {(fields.hasVin || fields.hasHull) && (

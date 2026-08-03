@@ -13,6 +13,7 @@ import SellProject from './pages/SellProject'
 import Calculator from './pages/Calculator'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import Goals from './pages/Goals'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import InstallBanner from './components/InstallBanner'
@@ -91,6 +92,7 @@ function AppRoutes() {
         <Route path="/project/:id/sell" element={<SellProject />} />
         <Route path="/calculator" element={<Calculator />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/goals" element={<Goals />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
       <BottomNav />
