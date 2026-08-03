@@ -142,7 +142,7 @@ export default function Goals() {
               <span>{fmt(summary.progressValue)} toward goal</span><strong>{summary.progressPercent}%</strong>
             </div>
           </>}
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14, lineHeight: 1.5 }}>Tracking only — SideFlip does not hold or transfer these funds.</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14, lineHeight: 1.5 }}>SideFlip tracks these amounts for your records. SideFlip does not hold, transfer, or process money from item sales.</div>
         </div>
 
         <div style={statGrid}>
