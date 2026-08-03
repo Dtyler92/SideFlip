@@ -82,7 +82,7 @@ const menuItem = {
 export default function Home() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
-  const { projects, loading, migrating } = useData()
+  const { projects, goals, loading, migrating } = useData()
   const [tab, setTab] = useState('active')
   const [search, setSearch] = useState('')
 
@@ -173,8 +173,10 @@ export default function Home() {
         ) : (
           shown.map(p => {
             const profit = getProfit(p)
+            const assignedGoal = p.goalId ? goals.find(goal => goal.id === p.goalId) : null
             return (
               <div key={p.id} className={`project-card ${p.status === 'sold' ? 'sold' : ''}`} onClick={() => navigate(`/project/${p.id}`)}>
+                {p.goalId && <span className="project-goal-marker" title={assignedGoal ? `Assigned to ${assignedGoal.title}` : 'Assigned to a Trade-Up Goal'}>Goal</span>}
                 {p.photo
                   ? <img src={p.photo} alt={p.title} className="project-img" />
                   : <div className="project-img-placeholder">{categoryIcon(p.category)}</div>

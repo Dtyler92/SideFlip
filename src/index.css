@@ -135,6 +135,7 @@ body {
 
 /* ===== PROJECT CARD ===== */
 .project-card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -145,6 +146,22 @@ body {
   display: flex;
   align-items: stretch;
   box-shadow: var(--shadow);
+}
+.project-goal-marker {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  padding: 3px 7px;
+  border: 1px solid rgba(200, 64, 47, 0.22);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .project-card:active { transform: scale(0.985); box-shadow: none; }
 .project-card:hover { border-color: var(--border-strong); }

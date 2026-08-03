@@ -48,7 +48,7 @@ export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { refresh: refreshList } = useData()
+  const { goals, refresh: refreshList } = useData()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -73,6 +73,8 @@ export default function ProjectDetail() {
   const fields = getExtraFields(project.category)
   const totalInvested = getTotalInvested(project)
   const partsTotal = project.expenses.reduce((s, e) => s + Number(e.amount), 0)
+  const assignedGoal = project.goalId ? goals.find(goal => goal.id === project.goalId) : null
+  const assignedGoalName = assignedGoal?.title?.replace(/\s+goal$/i, '')
 
   async function handlePhotoChange(e) {
     const file = e.target.files?.[0]
@@ -147,6 +149,16 @@ export default function ProjectDetail() {
             {project.status === 'sold' && <span className="sold-badge">SOLD</span>}
           </div>
         </div>
+
+        {project.goalId && (
+          <div style={{ background: 'var(--accent-soft)', border: '1px solid rgba(200,64,47,0.22)', borderRadius: 11, padding: '11px 13px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>◎</span>
+            <div>
+              <div style={{ color: 'var(--muted)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Trade-Up Goal</div>
+              <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700 }}>{assignedGoalName ? `Assigned to ${assignedGoalName} Goal` : 'Assigned to a Trade-Up Goal'}</div>
+            </div>
+          </div>
+        )}
 
         {/* Cost summary */}
         <div className="card">
