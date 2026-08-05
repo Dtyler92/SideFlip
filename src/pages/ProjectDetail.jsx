@@ -2,37 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   getTotalInvested, fmt, categoryIcon, expenseIcon,
-  EXPENSE_CATEGORIES, getExtraFields
+  EXPENSE_CATEGORIES, getExtraFields, getProjectPhotoPair, shouldDeleteReplacedProjectPhoto
 } from '../store'
 import { getProject, updateProject, addExpense, deleteExpense, deleteProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { uploadPhoto, deletePhoto } from '../supabase'
-
-function PhotoPicker({ photo, onFile, uploading }) {
-  return (
-    <div style={{ position: 'relative' }}>
-      {photo
-        ? <img src={photo} alt="project" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderBottom: '1px solid var(--border)', display: 'block' }} />
-        : <div style={{ width: '100%', height: 140, background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6, color: 'var(--muted)', fontSize: 13 }}>
-            <span style={{ fontSize: 28 }}>📷</span>
-            <span>{uploading ? 'Uploading…' : 'Tap to add a photo'}</span>
-          </div>
-      }
-      {/* Edit overlay button */}
-      <label style={{
-        position: 'absolute', bottom: 10, right: 12,
-        background: 'rgba(13,13,11,0.62)', color: '#fff',
-        borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600,
-        cursor: 'pointer', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', gap: 5
-      }}>
-        {uploading ? '⏳ Uploading…' : `✏️ ${photo ? 'Change' : 'Add Photo'}`}
-        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
-      </label>
-    </div>
-  )
-}
+import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
 
 function InfoRow({ label, value }) {
   if (!value) return null
@@ -51,7 +27,7 @@ export default function ProjectDetail() {
   const { goals, refresh: refreshList } = useData()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [photoUploading, setPhotoUploading] = useState(false)
+  const [uploadingSlot, setUploadingSlot] = useState(null)
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesVal, setNotesVal] = useState('')
@@ -71,24 +47,36 @@ export default function ProjectDetail() {
   if (!project) return <div className="page" style={{ paddingTop: 40 }}><p style={{ color: 'var(--muted)' }}>Project not found.</p></div>
 
   const fields = getExtraFields(project.category)
+  const { beforePhoto, afterPhoto } = getProjectPhotoPair(project)
   const totalInvested = getTotalInvested(project)
   const partsTotal = project.expenses.reduce((s, e) => s + Number(e.amount), 0)
   const assignedGoal = project.goalId ? goals.find(goal => goal.id === project.goalId) : null
   const assignedGoalName = assignedGoal?.title?.replace(/\s+goal$/i, '')
 
-  async function handlePhotoChange(e) {
+  async function handlePhotoChange(slot, e) {
     const file = e.target.files?.[0]
     if (!file) return
-    setPhotoUploading(true)
+    const { beforePhoto, afterPhoto } = getProjectPhotoPair(project)
+    const previousPhoto = slot === 'before' ? beforePhoto : afterPhoto
+    setUploadingSlot(slot)
+    let uploadedUrl = null
     try {
-      if (project.photo) await deletePhoto(project.photo)
-      const url = await uploadPhoto(user.id, file)
-      await updateProject(user.id, id, { photo: url })
+      uploadedUrl = await uploadPhoto(user.id, file)
+      const updates = slot === 'before'
+        ? { photo: uploadedUrl, beforePhoto: uploadedUrl }
+        : {
+            afterPhoto: uploadedUrl,
+            ...(beforePhoto ? {} : { photo: uploadedUrl }),
+          }
+      await updateProject(user.id, id, updates)
+      if (previousPhoto && previousPhoto !== uploadedUrl && shouldDeleteReplacedProjectPhoto(project, slot, previousPhoto)) await deletePhoto(previousPhoto)
+      await refreshList()
       load()
     } catch (err) {
+      if (uploadedUrl) await deletePhoto(uploadedUrl).catch(() => {})
       alert('Photo upload failed: ' + err.message)
     } finally {
-      setPhotoUploading(false)
+      setUploadingSlot(null)
     }
   }
 
@@ -128,8 +116,13 @@ export default function ProjectDetail() {
 
   return (
     <>
-      {/* Photo with edit overlay */}
-      <PhotoPicker photo={project.photo} onFile={handlePhotoChange} uploading={photoUploading} />
+      <div className="page" style={{ paddingBottom: 0 }}>
+        <div className="section-title" style={{ marginTop: 0 }}>Project Photos</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+          <ProjectPhotoSlot label="Before" photo={beforePhoto} uploading={uploadingSlot === 'before'} onFile={e => handlePhotoChange('before', e)} />
+          <ProjectPhotoSlot label="After" photo={afterPhoto} uploading={uploadingSlot === 'after'} onFile={e => handlePhotoChange('after', e)} />
+        </div>
+      </div>
 
       <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>
         <button className="back-btn" onClick={() => navigate('/')}

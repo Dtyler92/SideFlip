@@ -47,6 +47,12 @@ export async function createProject(userId, data) {
       p_mutation_id: data.mutationId || createMutationId(),
     })
     if (error) throw error
+    if (data.beforePhoto !== undefined || data.afterPhoto !== undefined) {
+      return updateProject(userId, projectId, {
+        beforePhoto: data.beforePhoto ?? null,
+        afterPhoto: data.afterPhoto ?? null,
+      })
+    }
     return getProject(userId, projectId)
   }
 
@@ -278,6 +284,9 @@ function normalizeProject(p) {
     salePrice: p.sale_price,
     soldAt: p.sold_at,
     photo: p.photo,
+    photos: Array.isArray(p.photos) ? p.photos : [],
+    beforePhoto: p.before_photo || (p.after_photo ? null : p.photo || null),
+    afterPhoto: p.after_photo || null,
     notes: p.notes,
     modelNumber: p.model_number,
     serialNumber: p.serial_number,
@@ -309,6 +318,8 @@ function toRow(userId, data) {
   if (data.salePrice !== undefined) row.sale_price = data.salePrice ? Number(data.salePrice) : null
   if (data.soldAt !== undefined) row.sold_at = data.soldAt
   if (data.photo !== undefined) row.photo = data.photo
+  if (data.beforePhoto !== undefined) row.before_photo = data.beforePhoto
+  if (data.afterPhoto !== undefined) row.after_photo = data.afterPhoto
   if (data.notes !== undefined) row.notes = data.notes
   if (data.modelNumber !== undefined) row.model_number = data.modelNumber
   if (data.serialNumber !== undefined) row.serial_number = data.serialNumber

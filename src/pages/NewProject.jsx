@@ -6,36 +6,16 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { uploadPhoto } from '../supabase'
 import { calculateGoalSummary, createMutationId } from '../goals'
-
-function PhotoPicker({ photo, onFile, uploading }) {
-  return (
-    <div className="photo-upload">
-      {photo && <img src={photo} alt="preview" />}
-      {!photo && !uploading && <>
-        <span className="photo-upload-icon">📷</span>
-        <span>Tap to add a photo</span>
-      </>}
-      {uploading && <span style={{ fontSize: 13, color: 'var(--muted)' }}>Uploading…</span>}
-      {photo && !uploading && (
-        <div style={{
-          position: 'absolute', bottom: 8, right: 8,
-          background: 'rgba(13,13,11,0.6)', color: '#fff',
-          borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600,
-          zIndex: 2, pointerEvents: 'none'
-        }}>✏️ Change Photo</div>
-      )}
-      <input type="file" accept="image/*" onChange={onFile} />
-    </div>
-  )
-}
+import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
 
 export default function NewProject() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const { refresh, goals, projects } = useData()
-  const [photo, setPhoto] = useState(null)
-  const [photoUploading, setPhotoUploading] = useState(false)
+  const [beforePhoto, setBeforePhoto] = useState(null)
+  const [afterPhoto, setAfterPhoto] = useState(null)
+  const [uploadingSlot, setUploadingSlot] = useState(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     title: '', category: 'mower', purchasePrice: '', notes: '',
@@ -50,17 +30,18 @@ export default function NewProject() {
   const goalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  async function handlePhotoFile(e) {
+  async function handlePhotoFile(slot, e) {
     const file = e.target.files[0]
     if (!file) return
-    setPhotoUploading(true)
+    setUploadingSlot(slot)
     try {
       const url = await uploadPhoto(user.id, file)
-      setPhoto(url)
+      if (slot === 'before') setBeforePhoto(url)
+      else setAfterPhoto(url)
     } catch (err) {
       alert('Photo upload failed: ' + err.message)
     } finally {
-      setPhotoUploading(false)
+      setUploadingSlot(null)
     }
   }
 
@@ -76,7 +57,9 @@ export default function NewProject() {
     try {
       await createProject(user.id, {
         ...form,
-        photo,
+        photo: beforePhoto || afterPhoto,
+        beforePhoto,
+        afterPhoto,
         goalId: form.goalId || null,
         goalFundingAmount: goalFunding,
         outOfPocketAmount: Math.max(0, purchase - goalFunding),
@@ -100,10 +83,14 @@ export default function NewProject() {
       <div className="page">
         <form onSubmit={handleSubmit}>
 
-          {/* Photo */}
+          {/* Project photos */}
           <div className="form-group">
-            <label>Photo (optional)</label>
-            <PhotoPicker photo={photo} onFile={handlePhotoFile} uploading={photoUploading} />
+            <label>Project Photos (optional)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <ProjectPhotoSlot label="Before" photo={beforePhoto} uploading={uploadingSlot === 'before'} onFile={e => handlePhotoFile('before', e)} />
+              <ProjectPhotoSlot label="After" photo={afterPhoto} uploading={uploadingSlot === 'after'} onFile={e => handlePhotoFile('after', e)} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>Show the starting condition and the finished result for this flip.</div>
           </div>
 
           {/* Title */}

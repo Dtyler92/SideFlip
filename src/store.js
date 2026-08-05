@@ -43,6 +43,7 @@ export const CATEGORIES = [
   { value: 'exercise', label: '💪 Exercise Equipment' },
   { value: 'instrument', label: '🎸 Musical Instrument' },
   { value: 'furniture', label: '🪑 Furniture' },
+  { value: 'house', label: '🏠 House Project' },
   { value: 'other', label: '📦 Other' },
 ]
 
@@ -57,6 +58,26 @@ export const EXPENSE_CATEGORIES = [
 
 export function categoryIcon(value) {
   return CATEGORIES.find(c => c.value === value)?.label?.split(' ')[0] || '📦'
+}
+
+// before_photo / after_photo are additive fields. photo remains the legacy main image.
+export function getProjectPhotoPair(project = {}) {
+  const afterPhoto = project.afterPhoto || project.after_photo || null
+  const explicitBeforePhoto = project.beforePhoto || project.before_photo || null
+  return {
+    beforePhoto: explicitBeforePhoto || (afterPhoto ? null : project.photo || null),
+    afterPhoto,
+  }
+}
+
+export function shouldDeleteReplacedProjectPhoto(project = {}, replacedSlot, previousPhoto) {
+  if (!previousPhoto) return false
+  const { beforePhoto, afterPhoto } = getProjectPhotoPair(project)
+  const retainedPhotos = [
+    replacedSlot === 'before' ? afterPhoto : beforePhoto,
+    ...(Array.isArray(project.photos) ? project.photos : []),
+  ]
+  return !retainedPhotos.includes(previousPhoto)
 }
 
 export function expenseIcon(value) {
