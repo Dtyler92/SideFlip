@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
         <span style={{ color: '#1A1917' }}>Side</span><span style={{ color: '#C8402F' }}>Flip</span>
       </div>
       <h1 style={{ fontSize: 28, fontWeight: 700, margin: '24px 0 8px' }}>Privacy Policy</h1>
-      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: July 23, 2026</p>
+      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: August 5, 2026</p>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>1. Information We Collect</h2>
       <p>We collect information you provide when you create an account (email address, password) and when you use the app (project names, photos, purchase prices, expenses, and sale prices). We also collect payment information through our payment processor, Stripe — we never store your card details directly.</p>
@@ -20,7 +20,7 @@ export default function PrivacyPolicy() {
       </ul>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>3. Data Storage</h2>
-      <p>Your data is stored securely on Supabase (database) and Supabase Storage (photos). Photos are stored on a private CDN and are only accessible to you. We use industry-standard encryption in transit and at rest.</p>
+      <p>Your account and project data are stored on Supabase, and photos are stored in Supabase Storage. SideFlip serves images through public, non-expiring URLs. The URLs are designed to be unguessable, but they are not access-controlled; anyone who has or obtains an image URL can view the image without signing in. We use industry-standard encryption in transit and at rest.</p>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>4. Third-Party Services</h2>
       <p>We use the following third-party services:</p>
