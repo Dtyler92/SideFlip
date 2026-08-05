@@ -1,5 +1,5 @@
 import { useData } from '../context/DataContext'
-import { getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
+import { calculateRealizedROI, getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
 
 const GREEN = 'var(--green)'
 const ACCENT = 'var(--accent)'
@@ -24,18 +24,15 @@ export default function Analytics() {
   const sold = projects.filter(p => p.status === 'sold')
   const active = projects.filter(p => p.status === 'active')
 
-  const totalProfit = sold.reduce((s, p) => s + (getProfit(p) || 0), 0)
-  const totalRevenue = sold.reduce((s, p) => s + (Number(p.sale_price) || 0), 0)
-  const totalInvestedSold = sold.reduce((s, p) => s + getTotalInvested(p), 0)
+  const totalProfit = sold.reduce((s, p) => s + getProfit(p), 0)
   const totalInvestedActive = active.reduce((s, p) => s + getTotalInvested(p), 0)
-  const avgProfit = sold.length > 0 ? totalProfit / sold.length : 0
   const winRate = sold.length > 0 ? (sold.filter(p => (getProfit(p) || 0) > 0).length / sold.length * 100).toFixed(0) : 0
-  const roi = totalInvestedSold > 0 ? ((totalProfit / totalInvestedSold) * 100).toFixed(1) : null
+  const roi = calculateRealizedROI(projects)
 
   // Days to sell
-  const withDays = sold.filter(p => p.created_at && p.sold_at).map(p => ({
+  const withDays = sold.filter(p => p.createdAt && p.soldAt).map(p => ({
     ...p,
-    days: Math.round((new Date(p.sold_at) - new Date(p.created_at)) / (1000 * 60 * 60 * 24))
+    days: Math.round((new Date(p.soldAt) - new Date(p.createdAt)) / (1000 * 60 * 60 * 24))
   }))
   const avgDays = withDays.length > 0 ? Math.round(withDays.reduce((s, p) => s + p.days, 0) / withDays.length) : null
 
@@ -70,7 +67,7 @@ export default function Analytics() {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Overview</div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <StatCard label="Total Flips" value={sold.length} sub={`${active.length} active`} />
-            <StatCard label="Total Profit" value={fmt(totalProfit)} color={totalProfit >= 0 ? GREEN : ACCENT} sub={roi ? `${roi}% ROI` : null} />
+            <StatCard label="Total Profit" value={fmt(totalProfit)} color={totalProfit >= 0 ? GREEN : ACCENT} sub={roi !== null ? `${roi.toFixed(1)}% realized ROI` : null} />
           </div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <StatCard label="Win Rate" value={`${winRate}%`} color={GREEN} sub={`${sold.filter(p => (getProfit(p)||0) > 0).length} of ${sold.length} sold`} />
@@ -102,7 +99,7 @@ export default function Analytics() {
                 </div>
                 <div className="stat-row">
                   <span className="stat-label">Capital Deployed</span>
-                  <span className="stat-value" style={{ color: 'var(--accent)', fontWeight: 700 }}>{fmt(totalInvestedActive)}</span>
+                  <span className="stat-value" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(totalInvestedActive)}</span>
                 </div>
                 <div className="stat-row">
                   <span className="stat-label">Total Profit</span>
@@ -110,8 +107,10 @@ export default function Analytics() {
                 </div>
                 {sold.length > 0 && (
                   <div className="stat-row" style={{ borderBottom: 'none' }}>
-                    <span className="stat-label">Return on Investment</span>
-                    <span className="stat-value" style={{ color: GREEN, fontWeight: 700 }}>{roi}%</span>
+                    <span className="stat-label">Realized ROI (sold projects)</span>
+                    <span className="stat-value" style={{ color: roi !== null && roi < 0 ? ACCENT : GREEN, fontWeight: 700 }}>
+                      {roi === null ? '—' : `${roi.toFixed(1)}%`}
+                    </span>
                   </div>
                 )}
               </div>
@@ -150,7 +149,7 @@ export default function Analytics() {
                 <span style={{ fontSize: 32 }}>{categoryIcon(bestFlip.category)}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{bestFlip.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bought {fmt(bestFlip.purchase_price)} · Sold {fmt(bestFlip.sale_price)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bought {fmt(bestFlip.purchasePrice)} · Sold {fmt(bestFlip.salePrice)}</div>
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: GREEN }}>+{fmt(getProfit(bestFlip))}</div>
               </div>
@@ -168,7 +167,7 @@ export default function Analytics() {
                       <span style={{ fontSize: 20, width: 28 }}>{categoryIcon(p.category)}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{p.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(getTotalInvested(p))} in · {fmt(p.sale_price)} sold</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(getTotalInvested(p))} in · {fmt(p.salePrice)} sold</div>
                       </div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: profit >= 0 ? GREEN : ACCENT }}>{profit >= 0 ? '+' : ''}{fmt(profit)}</div>
                     </div>

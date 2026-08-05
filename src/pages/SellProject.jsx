@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getTotalInvested, fmt } from '../store'
+import { getTotalInvested, fmt, parseSalePrice } from '../store'
 import { getProject, recordProjectSale } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
@@ -23,16 +23,17 @@ export default function SellProject() {
   if (!project) return null
 
   const totalInvested = getTotalInvested(project)
-  const preview = salePrice ? Number(salePrice) - totalInvested : null
-  const previewROI = salePrice && totalInvested
-    ? (((Number(salePrice) - totalInvested) / totalInvested) * 100).toFixed(1)
+  const parsedSalePrice = parseSalePrice(salePrice)
+  const hasSalePrice = parsedSalePrice !== null
+  const preview = hasSalePrice ? parsedSalePrice - totalInvested : null
+  const previewROI = hasSalePrice && totalInvested > 0
+    ? (((parsedSalePrice - totalInvested) / totalInvested) * 100).toFixed(1)
     : null
 
   async function handleSell(e) {
     e.preventDefault()
-    if (!salePrice || Number(salePrice) < 0) return alert('Enter a valid sale price')
-    const sale = Number(salePrice)
-    if (!Number.isFinite(sale)) return alert('Enter a valid sale price')
+    if (!hasSalePrice) return alert('Enter a valid sale price')
+    const sale = parsedSalePrice
     if (project.goalId && disposition === 'split' && keepAmount.trim() === '') return alert('Enter the amount to keep toward the goal')
     const amountKept = !project.goalId ? 0 : disposition === 'keep' ? sale : disposition === 'take' ? 0 : Number(keepAmount)
     if (project.goalId && disposition === 'split' && (!Number.isFinite(amountKept) || amountKept < 0 || amountKept > sale)) return alert('Enter an amount between zero and the sale price')
@@ -76,19 +77,19 @@ export default function SellProject() {
             />
           </div>
 
-          {salePrice && preview !== null && (
+          {hasSalePrice && preview !== null && (
             <div className="profit-result">
               <div className="label">{preview >= 0 ? 'Profit' : 'Loss'}</div>
               <div className={`amount ${preview >= 0 ? 'profit' : 'loss'}`}>
                 {preview >= 0 ? '+' : ''}{fmt(preview)}
               </div>
-              {previewROI && (
+              {previewROI !== null && (
                 <div className="roi">{preview >= 0 ? '📈' : '📉'} {previewROI}% ROI</div>
               )}
             </div>
           )}
 
-          {project.goalId && salePrice && (
+          {project.goalId && hasSalePrice && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 700, marginBottom: 5 }}>What should happen to the proceeds?</div>
               <div style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>Tracking only — SideFlip does not hold or transfer this money.</div>

@@ -6,8 +6,23 @@ export function getTotalInvested(project) {
 }
 
 export function getProfit(project) {
-  if (!project.salePrice) return null
+  if (project.salePrice === null || project.salePrice === undefined) return null
   return Number(project.salePrice) - getTotalInvested(project)
+}
+
+export function parseSalePrice(value) {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null
+  const salePrice = Number(value)
+  return Number.isFinite(salePrice) && salePrice >= 0 ? salePrice : null
+}
+
+export function calculateRealizedROI(projects) {
+  const soldProjects = projects.filter(project => project.status === 'sold')
+  const soldCostBasis = soldProjects.reduce((sum, project) => sum + getTotalInvested(project), 0)
+  if (soldProjects.length === 0 || soldCostBasis <= 0) return null
+
+  const realizedProfit = soldProjects.reduce((sum, project) => sum + getProfit(project), 0)
+  return (realizedProfit / soldCostBasis) * 100
 }
 
 export function fmt(num) {
