@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { signOut } from '../supabase'
+import { signOut, supabase } from '../supabase'
 import { getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
 
 function AccountMenu({ user, profile }) {
@@ -22,13 +22,17 @@ function AccountMenu({ user, profile }) {
     setPortalLoading(true)
     setOpen(false)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Please sign in again.')
       const res = await fetch('/api/create-portal-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: profile?.stripe_customer_id })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       })
       const { url, error } = await res.json()
-      if (error) throw new Error(error)
+      if (!res.ok || error) throw new Error(error || 'Could not open the billing portal.')
       window.location.href = url
     } catch (err) {
       alert('Could not open billing portal: ' + err.message)
