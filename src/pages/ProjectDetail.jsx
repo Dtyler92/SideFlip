@@ -136,7 +136,7 @@ export default function ProjectDetail() {
           style={{ background: '#C8402F', border: 'none', color: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', padding: 0, boxShadow: '0 2px 8px rgba(200,64,47,0.3)' }}>
           ‹
         </button>
-        <h1>{project.title}</h1>
+        <h1 className="project-detail-title">{project.title}</h1>
       </div>
 
       <div className="page">

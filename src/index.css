@@ -61,6 +61,13 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* Project names are data, not editorial headings—keep them clean and readable. */
+.page-header h1.project-detail-title {
+  font-family: var(--font);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
 .back-btn {
   background: var(--surface);
   border: 1px solid var(--border);
