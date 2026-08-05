@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateGoalSummary, splitSaleProceeds, calculateTradeBasis, calculateProjectLinkFunding } from '../src/goals.js'
+import { calculateGoalSummary, splitSaleProceeds, calculateTradeBasis, calculateProjectLinkFunding, shouldShowGoalOnboarding } from '../src/goals.js'
+
+test('shows the goal onboarding panel only before the first goal is created', () => {
+  assert.equal(shouldShowGoalOnboarding([]), true)
+  assert.equal(shouldShowGoalOnboarding([{ id: 'goal-1' }]), false)
+})
 
 test('keeps multiple goals financially isolated', () => {
   const projects = [

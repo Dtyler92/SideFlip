@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { createGoal, updateGoal, deleteGoal, adjustGoalBalance, linkProjectToGoal, recordDirectTrade } from '../db'
-import { calculateGoalSummary, calculateProjectLinkFunding, createMutationId } from '../goals'
+import { calculateGoalSummary, calculateProjectLinkFunding, createMutationId, shouldShowGoalOnboarding } from '../goals'
 import { CATEGORIES, fmt, categoryIcon, getTotalInvested, getProfit } from '../store'
 
 const newGoalForm = () => ({ name: '', goalType: 'item', targetItem: '', targetAmount: '', startingAmount: '', description: '', mutationId: createMutationId() })
@@ -291,10 +291,12 @@ export default function Goals() {
     <>
       <div className="page-header"><h1 style={{ flex: 1 }}>Trade-Up Goals</h1></div>
       <div className="page" style={{ paddingBottom: 110 }}>
-        <div className="card" style={{ marginBottom: 16, background: '#1A1917', color: '#fff' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Start with what you have.</div>
-          <div style={{ color: '#D4CDC1', lineHeight: 1.55 }}>Connect multiple projects and track every step toward an item or dollar goal.</div>
-        </div>
+        {shouldShowGoalOnboarding(goals) && (
+          <div className="card" style={{ marginBottom: 16, background: '#1A1917', color: '#fff' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Start with what you have.</div>
+            <div style={{ color: '#D4CDC1', lineHeight: 1.55 }}>Connect multiple projects and track every step toward an item or dollar goal.</div>
+          </div>
+        )}
         <button className="btn btn-primary" onClick={() => setShowCreate(value => !value)}>{showCreate ? 'Cancel' : '+ Create a Goal'}</button>
         {showCreate && <form onSubmit={handleCreate} className="card" style={{ marginBottom: 16 }}>
           <Field label="Goal name"><input value={goalForm.name} onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Trade up to my dream truck" /></Field>

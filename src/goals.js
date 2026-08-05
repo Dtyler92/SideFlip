@@ -5,6 +5,10 @@ const salePriceOf = value => number(value?.salePrice ?? value?.sale_price)
 const outOfPocketOf = value => number(value?.outOfPocketAmount ?? value?.out_of_pocket_amount)
 const targetAmountOf = value => number(value?.targetAmount ?? value?.target_amount)
 
+export function shouldShowGoalOnboarding(goals = []) {
+  return goals.length === 0
+}
+
 export function createMutationId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
   return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
