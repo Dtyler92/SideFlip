@@ -61,7 +61,7 @@ export default function Paywall({ trialExpired }) {
       </div>
 
       {/* Plan selector */}
-      <div style={{ width: '100%', marginBottom: 24 }}>
+      <div style={{ width: '100%', marginBottom: 24, display: 'flex', gap: 10, alignItems: 'stretch' }}>
         {/* Annual — highlighted */}
         <div
           onClick={() => setSelected('annual')}
@@ -69,9 +69,10 @@ export default function Paywall({ trialExpired }) {
             background: selected === 'annual' ? 'var(--accent)' : '#fff',
             border: `2px solid ${selected === 'annual' ? 'var(--accent)' : 'var(--border)'}`,
             borderRadius: 'var(--radius)',
-            padding: '18px 16px',
+            padding: '18px 12px',
             cursor: 'pointer',
-            marginBottom: 10,
+            flex: 1,
+            marginBottom: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -92,7 +93,7 @@ export default function Paywall({ trialExpired }) {
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 24, fontWeight: 800, color: selected === 'annual' ? '#fff' : 'var(--text)', fontFamily: 'var(--font-heading)' }}>${ANNUAL_PRICE}</div>
-            <div style={{ fontSize: 12, color: selected === 'annual' ? 'rgba(255,255,255,0.75)' : 'var(--muted)' }}>${ANNUAL_MONTHLY_EQUIV}/mo</div>
+            <div style={{ fontSize: 12, color: selected === 'annual' ? 'rgba(255,255,255,0.75)' : 'var(--muted)' }}>${ANNUAL_MONTHLY_EQUIV}/mo · billed annually</div>
           </div>
         </div>
 
@@ -103,8 +104,9 @@ export default function Paywall({ trialExpired }) {
             background: selected === 'monthly' ? 'var(--surface)' : '#fff',
             border: `2px solid ${selected === 'monthly' ? 'var(--border-strong)' : 'var(--border)'}`,
             borderRadius: 'var(--radius)',
-            padding: '18px 16px',
+            padding: '18px 12px',
             cursor: 'pointer',
+            flex: 1,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -151,8 +153,8 @@ export default function Paywall({ trialExpired }) {
       <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5, marginBottom: 12 }}>
         <strong style={{ color: 'var(--text)' }}>
           {selected === 'annual'
-            ? '7-day free trial, then $49 charged annually.'
-            : '7-day free trial, then $7.99 charged monthly.'}
+            ? '7-day free trial, then $99.99 charged annually ($8.33/month equivalent).'
+            : '7-day free trial, then $12.99 charged monthly.'}
         </strong><br />
         Renews automatically until canceled. Cancel before the trial ends to avoid being charged.
       </div>

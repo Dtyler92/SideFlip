@@ -57,8 +57,8 @@ export default async function handler(req, res) {
     }
 
     const planDescription = plan === 'annual'
-      ? '$49 after the 7-day trial, renewing annually'
-      : '$7.99 after the 7-day trial, renewing monthly'
+      ? '$99.99 charged annually (equivalent to $8.33 per month)'
+      : '$12.99 charged monthly'
     const consentTimestamp = new Date().toISOString()
     const metadata = {
       userId: user.id,
