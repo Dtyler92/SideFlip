@@ -50,31 +50,35 @@ function subscriptionDetails(subscription) {
   }
 }
 
-async function updateProfileFromSubscription(subscription) {
+async function updateProfileFromSubscription(subscription, event) {
   const userId = subscription?.metadata?.userId
   if (!userId) {
     console.error('Subscription has no Supabase userId metadata:', subscription?.id)
     return false
   }
 
-  const update = {
-    id: userId,
-    subscription_status: subscription.status,
-    subscription_id: subscription.id,
-    stripe_customer_id: typeof subscription.customer === 'string'
-      ? subscription.customer
-      : subscription.customer?.id,
-  }
-  if (subscription.current_period_end) {
-    update.current_period_end = new Date(subscription.current_period_end * 1000).toISOString()
-  }
-
-  const { error } = await supabase.from('profiles').upsert(update, { onConflict: 'id' })
+  const { error } = await supabase.rpc('apply_stripe_subscription_event', {
+    p_event_id: event.id, p_event_type: event.type, p_provider_created_at: new Date(event.created * 1000).toISOString(), p_user_id: userId,
+    p_subscription_id: subscription.id, p_customer_id: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id,
+    p_status: subscription.status, p_current_period_end: subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null,
+  })
   if (error) {
     console.error('Supabase subscription update error:', error)
     return false
   }
   return true
+}
+
+async function isDeletedStripeObject(object) {
+  const userId = object?.metadata?.userId || object?.client_reference_id
+  const subscriptionId = object?.id?.startsWith?.('sub_') ? object.id : object?.subscription
+  const customerId = typeof object?.customer === 'string' ? object.customer : object?.customer?.id
+  const checks = []
+  if (userId) checks.push(supabase.from('account_deletion_tombstones').select('user_id').eq('user_id', userId).limit(1))
+  if (subscriptionId) checks.push(supabase.from('account_deletion_tombstones').select('user_id').contains('stripe_subscription_ids', [subscriptionId]).limit(1))
+  if (customerId) checks.push(supabase.from('account_deletion_tombstones').select('user_id').contains('stripe_customer_ids', [customerId]).limit(1))
+  const results = await Promise.all(checks)
+  return results.some(({ data, error }) => { if (error) throw error; return data?.length })
 }
 
 export default async function handler(req, res) {
@@ -93,27 +97,22 @@ export default async function handler(req, res) {
   console.log('Webhook event:', event.type, 'eventId:', event.id)
 
   try {
+    if (await isDeletedStripeObject(event.data.object)) {
+      console.log('Suppressed Stripe event for deleted SideFlip account:', event.id)
+      return res.status(200).json({ received: true, suppressed: true })
+    }
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object
-        const userId = session.metadata?.userId || session.client_reference_id
-        if (userId) {
-          const update = {
-            stripe_customer_id: typeof session.customer === 'string'
-              ? session.customer
-              : session.customer?.id,
-          }
-          if (typeof session.subscription === 'string') update.subscription_id = session.subscription
-          const { error } = await supabase.from('profiles').update(update).eq('id', userId)
-          if (error) console.error('Checkout profile update error:', error)
-        }
+        // Subscription lifecycle events carry the authoritative status and are
+        // the only profile writers; do not let checkout delivery bypass ordering.
         break
       }
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object
-        await updateProfileFromSubscription(subscription)
+        await updateProfileFromSubscription(subscription, event)
         const email = await getCustomerEmail(subscription)
 
         if (event.type === 'customer.subscription.created' && email) {
@@ -142,14 +141,7 @@ export default async function handler(req, res) {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object
-        const userId = subscription.metadata?.userId
-        if (userId) {
-          const { error } = await supabase.from('profiles').update({
-            subscription_status: 'canceled',
-            subscription_id: null,
-          }).eq('id', userId)
-          if (error) console.error('Supabase cancellation update error:', error)
-        }
+        await updateProfileFromSubscription(subscription, event)
 
         const wasTrialing = subscription.status === 'trialing'
           || (subscription.trial_end && subscription.trial_end > Math.floor(Date.now() / 1000))
