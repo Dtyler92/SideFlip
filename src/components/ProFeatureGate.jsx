@@ -1,4 +1,7 @@
+import { useNavigate } from 'react-router-dom'
+
 export default function ProFeatureGate({ title, description, features = [] }) {
+  const navigate = useNavigate()
   return (
     <div className="page" style={{ paddingTop: 36, paddingBottom: 110 }}>
       <div className="card" style={{ textAlign: 'center', padding: '30px 22px', marginBottom: features.length ? 16 : 0 }}>
@@ -7,7 +10,8 @@ export default function ProFeatureGate({ title, description, features = [] }) {
           SideFlip Pro
         </div>
         <h1 style={{ fontSize: 23, margin: '0 0 9px', color: 'var(--text)' }}>{title}</h1>
-        <p style={{ color: 'var(--muted)', lineHeight: 1.55, margin: 0 }}>{description}</p>
+        <p style={{ color: 'var(--muted)', lineHeight: 1.55, margin: '0 0 18px' }}>{description}</p>
+        <button className="btn btn-primary" type="button" onClick={() => navigate('/upgrade')}>Upgrade to SideFlip Pro</button>
       </div>
 
       {features.length > 0 && (

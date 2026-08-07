@@ -14,6 +14,7 @@ import Settings from './pages/Settings'
 import Goals from './pages/Goals'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import Paywall from './pages/Paywall'
 import InstallBanner from './components/InstallBanner'
 import BottomNav from './components/BottomNav'
 
@@ -90,6 +91,7 @@ function AppRoutes() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/upgrade" element={<Paywall trialExpired={false} />} />
       </Routes>
       <BottomNav />
     </DataProvider>
