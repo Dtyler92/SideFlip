@@ -12,13 +12,13 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return res.status(401).json({ error: 'Please sign in again.' })
 
-  const { currency, language } = req.body || {}
-  if (!currencies.has(currency) || !languages.has(language)) {
+  const { currency, language, onboarded = false } = req.body || {}
+  if (!currencies.has(currency) || !languages.has(language) || typeof onboarded !== 'boolean') {
     return res.status(400).json({ error: 'Invalid profile preference.' })
   }
 
   const { error } = await supabase.from('profiles')
-    .update({ currency, language })
+    .update({ currency, language, ...(onboarded ? { onboarded: true } : {}) })
     .eq('id', user.id)
   if (error) {
     console.error('Profile preference update failed:', error.message)
