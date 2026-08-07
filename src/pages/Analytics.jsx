@@ -31,6 +31,20 @@ export default function Analytics() {
           description: 'Track portfolio performance, realized ROI, win rate, capital deployed, and category trends.',
         },
         {
+          title: 'VIN Decoder',
+          description: 'Decode VIN details for vehicle projects beyond the Free lifetime allowance.',
+        },
+        {
+          title: 'Tax-Ready Exports',
+          description: 'Export organized project income, expenses, receipts, and sale details for your records or tax preparer.',
+          comingSoon: true,
+        },
+        {
+          title: 'Receipt Tracker',
+          description: 'Keep a complete receipt history with reviewed, editable expense details before anything is added to a project.',
+          comingSoon: true,
+        },
+        {
           title: 'Estimated ROI & Comparable Sales',
           description: 'A future estimate and comparable-sales tool that will launch only after there is enough reliable sales data to support it.',
           comingSoon: true,
