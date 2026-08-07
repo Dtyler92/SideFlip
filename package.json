@@ -14,6 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "@stripe/stripe-js": "^9.12.0",
     "@supabase/supabase-js": "^2.110.8",
     "@vitejs/plugin-react": "^6.0.3",
