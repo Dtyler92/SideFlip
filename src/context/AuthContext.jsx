@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, onAuthChange, getProfile, signOut as supabaseSignOut } from '../supabase'
+import { supabase, onAuthChange, getProfile, getEntitlement, signOut as supabaseSignOut } from '../supabase'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined) // undefined = loading
   const [profile, setProfile] = useState(null)
+  const [entitlement, setEntitlement] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function AuthProvider({ children }) {
       } else {
         setUser(null)
         setProfile(null)
+        setEntitlement(null)
         setLoading(false)
       }
     })
@@ -32,20 +34,21 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function loadProfile(userId) {
-    const p = await getProfile(userId)
+    const [p, serverEntitlement] = await Promise.all([
+      getProfile(userId),
+      getEntitlement().catch(() => null),
+    ])
     setProfile(p)
+    setEntitlement(serverEntitlement)
     setLoading(false)
   }
 
   async function refreshProfile() {
-    if (user) {
-      const p = await getProfile(user.id)
-      setProfile(p)
-    }
+    if (user) await loadProfile(user.id)
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, refreshProfile, signOut: supabaseSignOut }}>
+    <AuthContext.Provider value={{ user, profile, entitlement, loading, refreshProfile, signOut: supabaseSignOut }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,4 +1,7 @@
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
+import { can } from '../capabilities'
+import ProFeatureGate from '../components/ProFeatureGate'
 import { calculateRealizedROI, getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
 
 const GREEN = 'var(--green)'
@@ -15,7 +18,26 @@ function StatCard({ label, value, sub, color }) {
 }
 
 export default function Analytics() {
+  const { profile, entitlement } = useAuth()
   const { projects, loading } = useData()
+
+  if (!can(profile, entitlement, 'portfolio_analytics')) {
+    return <ProFeatureGate
+      title="See the bigger picture"
+      description="Upgrade to SideFlip Pro to unlock portfolio analytics, performance trends, and category insights."
+      features={[
+        {
+          title: 'Portfolio Analytics',
+          description: 'Track portfolio performance, realized ROI, win rate, capital deployed, and category trends.',
+        },
+        {
+          title: 'Estimated ROI & Comparable Sales',
+          description: 'A future estimate and comparable-sales tool that will launch only after there is enough reliable sales data to support it.',
+          comingSoon: true,
+        },
+      ]}
+    />
+  }
 
   if (loading) return (
     <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
@@ -55,6 +77,17 @@ export default function Analytics() {
     <div style={{ padding: '20px 16px 100px', maxWidth: 600, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: '0 0 4px' }}>Analytics</h1>
       <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 20px' }}>Your flipping performance at a glance.</p>
+
+      <div className="card" style={{ marginBottom: 20, border: '1px solid rgba(200,64,47,0.3)', background: 'var(--accent-soft)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span aria-hidden="true" style={{ fontSize: 22, lineHeight: 1 }}>✦</span>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 4 }}>SideFlip Pro · Coming Soon</div>
+            <div style={{ fontSize: 16, color: 'var(--text)', fontWeight: 800, marginBottom: 4 }}>Estimated ROI & Comparable Sales</div>
+            <p style={{ margin: 0, color: 'var(--body)', fontSize: 13, lineHeight: 1.5 }}>We’re building this Pro tool and will release it only when we have enough reliable sales data to provide estimates you can trust.</p>
+          </div>
+        </div>
+      </div>
 
       {projects.length === 0 ? (
         <div style={{ textAlign: 'center', paddingTop: 60 }}>

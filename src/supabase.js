@@ -89,3 +89,16 @@ export async function getProfile(userId) {
   return data
 }
 
+// Entitlement rows are intentionally not readable by browser clients. This
+// endpoint authenticates the session and returns only the capability-safe data.
+export async function getEntitlement() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return null
+  const response = await fetch('/api/entitlement', {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  })
+  if (!response.ok) throw new Error('Could not resolve your plan.')
+  const data = await response.json()
+  return data.entitlement || null
+}
+

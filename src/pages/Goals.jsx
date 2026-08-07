@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { createGoal, updateGoal, deleteGoal, adjustGoalBalance, linkProjectToGoal, recordDirectTrade } from '../db'
 import { calculateGoalSummary, calculateProjectLinkFunding, createMutationId, shouldShowGoalOnboarding } from '../goals'
+import { canCreateGoal } from '../capabilities'
 import { CATEGORIES, fmt, categoryIcon, getTotalInvested, getProfit } from '../store'
 
 const newGoalForm = () => ({ name: '', goalType: 'item', targetItem: '', targetAmount: '', startingAmount: '', description: '', mutationId: createMutationId() })
@@ -16,8 +17,9 @@ const newProjectLink = () => ({ projectId: '', goalFundingAmount: '', mutationId
 
 export default function Goals() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile, entitlement } = useAuth()
   const { goals, projects, refresh } = useData()
+  const canCreateAnotherGoal = canCreateGoal(profile, entitlement, goals)
   const [selectedId, setSelectedId] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -46,6 +48,7 @@ export default function Goals() {
 
   async function handleCreate(event) {
     event.preventDefault()
+    if (!canCreateAnotherGoal) return alert('Free includes one Trade-Up Goal. SideFlip Pro unlocks additional goals.')
     if (!goalForm.name.trim()) return alert('Give your goal a name')
     if (goalForm.goalType === 'item' && !goalForm.targetItem.trim()) return alert('Enter the item you are working toward')
     if (goalForm.goalType === 'amount' && Number(goalForm.targetAmount) <= 0) return alert('Enter a target amount')
@@ -297,8 +300,16 @@ export default function Goals() {
             <div style={{ color: '#D4CDC1', lineHeight: 1.55 }}>Connect multiple projects and track every step toward an item or dollar goal.</div>
           </div>
         )}
-        <button className="btn btn-primary" onClick={() => setShowCreate(value => !value)}>{showCreate ? 'Cancel' : '+ Create a Goal'}</button>
-        {showCreate && <form onSubmit={handleCreate} className="card" style={{ marginBottom: 16 }}>
+        {canCreateAnotherGoal ? (
+          <button className="btn btn-primary" onClick={() => setShowCreate(value => !value)}>{showCreate ? 'Cancel' : '+ Create a Goal'}</button>
+        ) : (
+          <div className="card" style={{ marginBottom: 16, background: '#FDF1EF' }}>
+            <div style={{ fontSize: 11, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 6 }}>SideFlip Pro</div>
+            <strong>Free includes one Trade-Up Goal.</strong>
+            <div style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.5, marginTop: 5 }}>Upgrade to Pro to track additional goals at the same time.</div>
+          </div>
+        )}
+        {showCreate && canCreateAnotherGoal && <form onSubmit={handleCreate} className="card" style={{ marginBottom: 16 }}>
           <Field label="Goal name"><input value={goalForm.name} onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Trade up to my dream truck" /></Field>
           <Field label="Goal type"><select value={goalForm.goalType} onChange={e => setGoalForm(f => ({ ...f, goalType: e.target.value }))}><option value="item">Specific item</option><option value="amount">Dollar amount</option></select></Field>
           {goalForm.goalType === 'item' && <Field label="Item you want"><input value={goalForm.targetItem} onChange={e => setGoalForm(f => ({ ...f, targetItem: e.target.value }))} placeholder="e.g. Ford F-250" /></Field>}

@@ -100,6 +100,20 @@ export async function addExpense(userId, projectId, expense) {
   return data
 }
 
+export async function importReceiptExpenses(projectId, items, mutationId = createMutationId()) {
+  const { data, error } = await supabase.rpc('import_receipt_expenses', {
+    p_project_id: projectId,
+    p_items: items.map(item => ({
+      description: item.description,
+      amount: Number(item.amount),
+      category: item.category || 'parts',
+    })),
+    p_mutation_id: mutationId,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function deleteExpense(userId, expenseId) {
   const { error } = await supabase
     .from('expenses')

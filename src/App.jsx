@@ -2,10 +2,8 @@ import { Routes, Route, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { DataProvider } from './context/DataContext'
-import { isSubscribed } from './billing'
 import { captureReferral } from './pwa'
 import AuthScreen from './pages/AuthScreen'
-import Paywall from './pages/Paywall'
 import Home from './pages/Home'
 import NewProject from './pages/NewProject'
 import ProjectDetail from './pages/ProjectDetail'
@@ -78,10 +76,8 @@ function AppRoutes() {
   // Not logged in
   if (!user) return <AuthScreen />
 
-  // Logged in but no active subscription — hard gate
-  if (!profile || !isSubscribed(profile)) return <Paywall trialExpired={true} />
-
-  // Full access — subscribed
+  // Authenticated users always receive the Free core. Individual Pro features
+  // are gated by their own capability checks inside those screens.
   return (
     <DataProvider>
       {showInstall && <InstallBanner onDismiss={() => setShowInstall(false)} />}

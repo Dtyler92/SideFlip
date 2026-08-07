@@ -4,10 +4,12 @@ import {
   getTotalInvested, fmt, categoryIcon, expenseIcon,
   EXPENSE_CATEGORIES, getExtraFields, getProjectPhotoPair, shouldDeleteReplacedProjectPhoto
 } from '../store'
-import { getProject, updateProject, addExpense, deleteExpense, deleteProject } from '../db'
+import { getProject, updateProject, addExpense, importReceiptExpenses, deleteExpense, deleteProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { uploadPhoto, deletePhoto } from '../supabase'
+import { uploadPhoto, deletePhoto, supabase } from '../supabase'
+import { can } from '../capabilities'
+import { createMutationId } from '../goals'
 import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
 
 function InfoRow({ label, value }) {
@@ -23,7 +25,7 @@ function InfoRow({ label, value }) {
 export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile, entitlement } = useAuth()
   const { goals, refresh: refreshList } = useData()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -32,6 +34,9 @@ export default function ProjectDetail() {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesVal, setNotesVal] = useState('')
   const [expense, setExpense] = useState({ description: '', amount: '', category: 'parts' })
+  const [receiptItems, setReceiptItems] = useState([])
+  const [receiptImportId, setReceiptImportId] = useState(null)
+  const [scanningReceipt, setScanningReceipt] = useState(false)
 
   async function load() {
     try {
@@ -113,6 +118,32 @@ export default function ProjectDetail() {
     load()
   }
 
+  async function scanReceipt(file) {
+    if (!can(profile, entitlement, 'receipt_scanning')) return alert('Receipt scanning is available with SideFlip Pro.')
+    if (!file) return
+    setScanningReceipt(true)
+    try {
+      const imageDataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) })
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/scan-receipt', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ imageDataUrl }) })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not scan receipt.')
+      setReceiptItems((data.items || []).map(item => ({ ...item, selected: true })))
+      setReceiptImportId(createMutationId())
+      if (!(data.items || []).length) alert('No line items found. Try a clearer receipt or add expenses manually.')
+    } catch (error) { alert(error.message || 'Could not scan receipt.') } finally { setScanningReceipt(false) }
+  }
+
+  async function addReceiptItems() {
+    const selected = receiptItems.filter(item => item.selected)
+    if (!selected.length) return alert('Select at least one item to add.')
+    try {
+      await importReceiptExpenses(id, selected, receiptImportId || createMutationId())
+      setReceiptItems([])
+      setReceiptImportId(null)
+      load()
+    } catch (error) { alert('Could not add receipt items: ' + error.message) }
+  }
 
   return (
     <>
@@ -261,6 +292,18 @@ export default function ProjectDetail() {
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title">Add Expense</div>
+            <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'var(--surface)' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 5 }}>✨ Scan receipt with AI · Pro</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 9 }}>Upload a receipt or screenshot. Review selected items before they are added; the image is not saved.</div>
+              <label className="btn btn-secondary" style={{ display: 'block', textAlign: 'center', cursor: 'pointer' }}>
+                {scanningReceipt ? 'Reading receipt…' : 'Upload Receipt'}
+                <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={scanningReceipt} onChange={event => scanReceipt(event.target.files?.[0])} />
+              </label>
+              {receiptItems.length > 0 && <div style={{ marginTop: 10 }}>
+                {receiptItems.map((item, index) => <label key={`${item.description}-${index}`} style={{ display: 'flex', gap: 8, padding: '7px 0', fontSize: 13 }}><input type="checkbox" checked={item.selected} onChange={() => setReceiptItems(items => items.map((entry, i) => i === index ? { ...entry, selected: !entry.selected } : entry))} /><span style={{ flex: 1 }}>{item.description}</span><strong>{fmt(item.amount)}</strong></label>)}
+                <button type="button" className="btn btn-primary" onClick={addReceiptItems}>Add Selected Items</button>
+              </div>}
+            </div>
             <form onSubmit={handleAddExpense}>
               <div className="form-group">
                 <label>Category</label>

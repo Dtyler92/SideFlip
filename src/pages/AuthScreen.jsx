@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import { supabase, signIn, signUp, resetPassword } from '../supabase'
+import { signIn, signUp, resetPassword } from '../supabase'
 
 export default function AuthScreen() {
   const [mode, setMode] = useState('signup') // signup | signin | forgot
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [plan, setPlan] = useState('annual')
-  const [billingConsent, setBillingConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -23,11 +21,6 @@ export default function AuthScreen() {
       setError('Password must be at least 6 characters')
       return
     }
-    if (mode === 'signup' && !billingConsent) {
-      setError('Please agree to the subscription and renewal terms')
-      return
-    }
-
     setLoading(true)
     try {
       if (mode === 'forgot') {
@@ -44,22 +37,13 @@ export default function AuthScreen() {
         const { data, error: err } = await signUp(email, password)
         if (err) throw err
 
-        const accessToken = data?.session?.access_token
-          || (await supabase.auth.getSession()).data.session?.access_token
-        if (!accessToken) throw new Error('Please verify your email, then sign in to start your trial.')
-
-        const ref = sessionStorage.getItem('sf_ref')
-        const res = await fetch('/api/create-checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ plan, ref, billingConsent })
-        })
-        const { url, error: stripeErr } = await res.json()
-        if (!res.ok || stripeErr) throw new Error(stripeErr || 'Could not start checkout.')
-        window.location.href = url
+        // Supabase may require email confirmation before it issues a session.
+        // Either way, Free accounts never enter checkout during signup.
+        if (!data?.session) {
+          alert(`Check ${email} to confirm your account, then sign in to start using SideFlip Free.`)
+          setMode('signin')
+          setLoading(false)
+        }
 
       } else {
         const { error: err } = await signIn(email, password)
@@ -86,52 +70,9 @@ export default function AuthScreen() {
         <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>Track every flip. Know your profit.</div>
       </div>
 
-      {/* Plan toggle — signup only, no prices */}
-      {mode === 'signup' && (
-        <div style={{ width: '100%', marginBottom: 24 }}>
-          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 3 }}>
-            <button
-              type="button"
-              onClick={() => setPlan('annual')}
-              style={{
-                flex: 1, padding: '10px', border: 'none', cursor: 'pointer',
-                borderRadius: 'calc(var(--radius) - 2px)', fontFamily: 'var(--font)',
-                fontSize: 14, fontWeight: 700, transition: 'all 0.15s',
-                background: plan === 'annual' ? 'var(--accent)' : 'transparent',
-                color: plan === 'annual' ? '#fff' : 'var(--muted)',
-                boxShadow: plan === 'annual' ? '0 2px 8px rgba(200,64,47,0.25)' : 'none'
-              }}>
-              Annual
-              <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}> · $99.99/yr</span>
-              <span style={{ display: 'block', fontSize: 10, fontWeight: 600, color: plan === 'annual' ? 'rgba(255,255,255,0.85)' : 'var(--accent)', marginTop: 1 }}>Save 36% · $8.33/mo billed annually</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPlan('monthly')}
-              style={{
-                flex: 1, padding: '10px', border: 'none', cursor: 'pointer',
-                borderRadius: 'calc(var(--radius) - 2px)', fontFamily: 'var(--font)',
-                fontSize: 14, fontWeight: 700, transition: 'all 0.15s',
-                background: plan === 'monthly' ? '#fff' : 'transparent',
-                color: plan === 'monthly' ? 'var(--text)' : 'var(--muted)',
-                boxShadow: plan === 'monthly' ? 'var(--shadow)' : 'none'
-              }}>
-              Monthly
-              <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.75 }}> · $12.99/mo</span>
-            </button>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
-            <strong style={{ color: 'var(--text)' }}>
-              {plan === 'annual'
-                ? '7-day free trial, then $99.99 charged annually ($8.33/month equivalent).'
-                : '7-day free trial, then $12.99 charged monthly.'}
-            </strong>
-            <span style={{ display: 'block', marginTop: 3 }}>
-              Renews automatically until canceled. Cancel before the trial ends to avoid being charged.
-            </span>
-          </div>
-        </div>
-      )}
+      <div style={{ width: '100%', marginBottom: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 14, lineHeight: 1.5 }}>
+        Create your free account to track projects, expenses, profit, and one Trade-Up Goal. No card required.
+      </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} style={{ width: '100%' }}>
@@ -159,34 +100,16 @@ export default function AuthScreen() {
         )}
 
         {mode === 'signup' && (
-          <>
-            <div className="form-group">
-              <label>Confirm Password</label>
-              <input type="password" autoComplete="new-password"
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)} required />
-            </div>
-            <label style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10, margin: '4px 0 16px',
-              color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, cursor: 'pointer'
-            }}>
-              <input
-                type="checkbox"
-                checked={billingConsent}
-                onChange={e => setBillingConsent(e.target.checked)}
-                required
-                style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: 'var(--accent)' }}
-              />
-              <span>
-                I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price after my 7-day trial and at each renewal until I cancel. I can cancel anytime through Settings.
-              </span>
-            </label>
-          </>
+          <div className="form-group">
+            <label>Confirm Password</label>
+            <input type="password" autoComplete="new-password"
+              placeholder="Re-enter your password"
+              value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+          </div>
         )}
 
         <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? 'Please wait...' : mode === 'signup' ? 'Start Free Trial' : mode === 'forgot' ? 'Send Reset Email' : 'Sign In →'}
+          {loading ? 'Please wait...' : mode === 'signup' ? 'Create Free Account' : mode === 'forgot' ? 'Send Reset Email' : 'Sign In →'}
         </button>
       </form>
 
@@ -209,7 +132,7 @@ export default function AuthScreen() {
             <span style={{ margin: '0 10px' }}>·</span>
             Don't have an account?{' '}
             <button onClick={() => { setMode('signup'); setError('') }}
-              style={linkStyle}>Start free trial</button>
+              style={linkStyle}>Create a free account</button>
           </>
         )}
       </div>
