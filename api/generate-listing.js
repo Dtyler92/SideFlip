@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { resolveServerEntitlement } from './_lib/entitlements.js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -19,26 +20,26 @@ function rateLimited(key, max, windowMs) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  // ── Auth: verify Supabase session if provided (native v1.1+) ──
+  // SideFlip Pro only: authenticate first, then resolve Stripe/Apple server truth.
   const authHeader = req.headers.authorization || ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return res.status(401).json({ error: 'Sign in to use the AI Listing Generator.' })
 
-  let rateKey
-  if (token) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' })
-    // Authenticated: generous per-user limit
-    rateKey = `user:${user.id}`
-    if (rateLimited(rateKey, 15, 60_000)) {
-      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
-    }
-  } else {
-    // No token (legacy v1.0 clients): strict IP-based limit to prevent abuse
-    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown'
-    rateKey = `ip:${ip}`
-    if (rateLimited(rateKey, 5, 60_000)) {
-      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
-    }
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) return res.status(401).json({ error: 'Unauthorized' })
+
+  const [{ data: profile, error: profileError }, { data: entitlements, error: entitlementError }] = await Promise.all([
+    supabase.from('profiles').select('subscription_id, subscription_status').eq('id', user.id).maybeSingle(),
+    supabase.from('user_entitlements').select('source, status, expires_at, last_verified_at').eq('user_id', user.id),
+  ])
+  if (profileError || entitlementError) return res.status(500).json({ error: 'Could not verify SideFlip Pro access.' })
+  if (resolveServerEntitlement(profile, entitlements).plan !== 'pro') {
+    return res.status(403).json({ error: 'SideFlip Pro is required for the AI Listing Generator.' })
+  }
+
+  const rateKey = `user:${user.id}`
+  if (rateLimited(rateKey, 15, 60_000)) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
   }
 
   const { title, category, expenses, notes } = req.body
