@@ -7,9 +7,9 @@ function rootCertificates() {
   return roots
 }
 
-function verifierEnvironment() {
-  if (process.env.APPLE_IAP_ENVIRONMENT === 'sandbox') return Environment.SANDBOX
-  if (process.env.APPLE_IAP_ENVIRONMENT === 'production') return Environment.PRODUCTION
+function verifierEnvironment(environmentName = process.env.APPLE_IAP_ENVIRONMENT) {
+  if (environmentName === 'sandbox') return Environment.SANDBOX
+  if (environmentName === 'production') return Environment.PRODUCTION
   throw new Error('APPLE_IAP_ENVIRONMENT must be sandbox or production')
 }
 
@@ -20,7 +20,31 @@ function productionAppAppleId(environment) {
   return Number(value)
 }
 
-export function createAppleVerifier() {
-  const environment = verifierEnvironment()
+export function createAppleVerifier(environmentName) {
+  const environment = verifierEnvironment(environmentName)
   return new SignedDataVerifier(rootCertificates(), true, environment, APPLE_BUNDLE_ID, productionAppAppleId(environment))
+}
+
+export function appleVerificationEnvironments(configuredEnvironment = process.env.APPLE_IAP_ENVIRONMENT) {
+  if (configuredEnvironment !== 'sandbox' && configuredEnvironment !== 'production') {
+    throw new Error('APPLE_IAP_ENVIRONMENT must be sandbox or production')
+  }
+  return configuredEnvironment === 'sandbox' ? ['sandbox', 'production'] : ['production', 'sandbox']
+}
+
+export async function verifyAppleSignedData(signedData, kind = 'transaction') {
+  const environments = appleVerificationEnvironments()
+  let lastError
+  for (const environmentName of environments) {
+    try {
+      const verifier = createAppleVerifier(environmentName)
+      const decoded = kind === 'notification'
+        ? await verifier.verifyAndDecodeNotification(signedData)
+        : await verifier.verifyAndDecodeTransaction(signedData)
+      return { verifier, decoded, environmentName }
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError || new Error('Apple signed-data verification failed')
 }

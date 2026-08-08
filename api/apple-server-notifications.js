@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { APPLE_BUNDLE_ID, createAppleVerifier } from './_lib/apple-verifier.js'
+import { APPLE_BUNDLE_ID, verifyAppleSignedData } from './_lib/apple-verifier.js'
 import { isSideFlipProProduct } from './_lib/apple-products.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -9,10 +9,10 @@ export default async function handler(req, res) {
   const signedPayload = req.body?.signedPayload
   if (typeof signedPayload !== 'string' || signedPayload.length > 30000) return res.status(400).json({ error: 'Invalid Apple notification.' })
   try {
-    const notification = await createAppleVerifier().verifyAndDecodeNotification(signedPayload)
+    const { verifier, decoded: notification } = await verifyAppleSignedData(signedPayload, 'notification')
     const signedTransaction = notification.data?.signedTransactionInfo
     if (!signedTransaction) return res.status(200).json({ received: true, ignored: 'no_transaction' })
-    const transaction = await createAppleVerifier().verifyAndDecodeTransaction(signedTransaction)
+    const transaction = await verifier.verifyAndDecodeTransaction(signedTransaction)
     if (transaction.bundleId !== APPLE_BUNDLE_ID || !isSideFlipProProduct(transaction.productId) || !transaction.originalTransactionId || !transaction.transactionId || !transaction.signedDate || !transaction.expiresDate) return res.status(400).json({ error: 'Invalid Apple transaction notification.' })
 
     const { data: tombstone, error: tombstoneError } = await supabase.from('account_deletion_tombstones').select('user_id').contains('apple_original_transaction_ids', [transaction.originalTransactionId]).maybeSingle()

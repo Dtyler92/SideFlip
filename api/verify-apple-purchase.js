@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { APPLE_BUNDLE_ID, createAppleVerifier } from './_lib/apple-verifier.js'
+import { APPLE_BUNDLE_ID, verifyAppleSignedData } from './_lib/apple-verifier.js'
 import { isSideFlipProProduct } from './_lib/apple-products.js'
 import { createAppleServerApiClient } from './_lib/apple-server-api.js'
 import { currentAppleSubscription } from './_lib/apple-current-subscription.js'
@@ -13,10 +13,9 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return res.status(401).json({ error: 'Please sign in again.' })
   try {
-    const appleVerifier = createAppleVerifier()
-    const transaction = await appleVerifier.verifyAndDecodeTransaction(req.body.signedTransaction)
+    const { verifier: appleVerifier, decoded: transaction, environmentName: verifiedEnvironment } = await verifyAppleSignedData(req.body.signedTransaction)
     if (transaction.bundleId !== APPLE_BUNDLE_ID || !isSideFlipProProduct(transaction.productId) || transaction.appAccountToken !== user.id || !transaction.originalTransactionId || !transaction.transactionId || !transaction.signedDate || !transaction.expiresDate) return res.status(400).json({ error: 'This Apple purchase cannot be used for this SideFlip account.' })
-    const current = await currentAppleSubscription({ apiClient: createAppleServerApiClient(), verifier: appleVerifier, transactionId: transaction.transactionId, expectedOriginalTransactionId: transaction.originalTransactionId })
+    const current = await currentAppleSubscription({ apiClient: createAppleServerApiClient(verifiedEnvironment), verifier: appleVerifier, transactionId: transaction.transactionId, expectedOriginalTransactionId: transaction.originalTransactionId })
     const currentTransaction = current.transaction
     const now = Date.now()
     const status = current.status
