@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { signIn, signUp, resetPassword } from '../supabase'
+import { captureEvent } from '../analytics'
 
 export default function AuthScreen() {
   const [mode, setMode] = useState('signup') // signup | signin | forgot
@@ -34,8 +35,10 @@ export default function AuthScreen() {
       }
 
       if (mode === 'signup') {
+        captureEvent('signup_started', { source: 'web_auth' })
         const { data, error: err } = await signUp(email, password)
         if (err) throw err
+        captureEvent('signup_completed', { source: 'web_auth' })
 
         // Supabase may require email confirmation before it issues a session.
         // Either way, Free accounts never enter checkout during signup.
@@ -48,6 +51,7 @@ export default function AuthScreen() {
       } else {
         const { error: err } = await signIn(email, password)
         if (err) throw err
+        captureEvent('signin_completed', { source: 'web_auth' })
       }
     } catch (err) {
       setError(err.message || 'Something went wrong')

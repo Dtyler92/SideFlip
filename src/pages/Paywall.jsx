@@ -1,11 +1,22 @@
-import { useState } from 'react'
-import { supabase, signOut } from '../supabase'
+import { useEffect, useState } from 'react'
+import { supabase } from '../supabase'
 import { MONTHLY_PRICE, ANNUAL_PRICE, ANNUAL_MONTHLY_EQUIV, SAVINGS_PCT } from '../billing'
+import { captureEvent, getStoredAttribution } from '../analytics'
+import { useAuth } from '../context/AuthContext'
+import { getStoredReferral } from '../pwa'
 
 export default function Paywall({ trialExpired }) {
+  const { user, signOut } = useAuth()
   const [selected, setSelected] = useState('annual')
   const [loading, setLoading] = useState(false)
   const [billingConsent, setBillingConsent] = useState(false)
+
+  useEffect(() => { captureEvent('paywall_viewed', { source: 'web_upgrade' }) }, [])
+
+  function selectPlan(plan) {
+    setSelected(plan)
+    captureEvent('plan_selected', { provider: 'stripe', plan })
+  }
 
   async function handleSubscribe() {
     if (!billingConsent) {
@@ -13,6 +24,7 @@ export default function Paywall({ trialExpired }) {
       return
     }
     setLoading(true)
+    captureEvent('stripe_checkout_started', { provider: 'stripe', plan: selected })
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -23,12 +35,17 @@ export default function Paywall({ trialExpired }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ plan: selected, billingConsent })
+        body: JSON.stringify({
+          plan: selected,
+          billingConsent,
+          ref: getStoredAttribution().last?.referral_code || getStoredReferral(user?.id) || undefined,
+        })
       })
       const { url, error } = await res.json()
       if (!res.ok || error) throw new Error(error || 'Could not start checkout.')
       window.location.href = url
     } catch (error) {
+      captureEvent('stripe_checkout_failed', { provider: 'stripe', plan: selected, error_type: 'checkout_creation' })
       alert(error.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
@@ -64,7 +81,7 @@ export default function Paywall({ trialExpired }) {
       <div style={{ width: '100%', marginBottom: 24, display: 'flex', gap: 10, alignItems: 'stretch' }}>
         {/* Annual — highlighted */}
         <div
-          onClick={() => setSelected('annual')}
+          onClick={() => selectPlan('annual')}
           style={{
             background: selected === 'annual' ? 'var(--accent)' : '#fff',
             border: `2px solid ${selected === 'annual' ? 'var(--accent)' : 'var(--border)'}`,
@@ -99,7 +116,7 @@ export default function Paywall({ trialExpired }) {
 
         {/* Monthly */}
         <div
-          onClick={() => setSelected('monthly')}
+          onClick={() => selectPlan('monthly')}
           style={{
             background: selected === 'monthly' ? 'var(--surface)' : '#fff',
             border: `2px solid ${selected === 'monthly' ? 'var(--border-strong)' : 'var(--border)'}`,

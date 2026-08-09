@@ -4,6 +4,7 @@ import { getTotalInvested, fmt, parseSalePrice } from '../store'
 import { getProject, recordProjectSale } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { captureEvent } from '../analytics'
 
 export default function SellProject() {
   const { id } = useParams()
@@ -40,6 +41,7 @@ export default function SellProject() {
     setSaving(true)
     try {
       await recordProjectSale(user.id, project, sale, amountKept)
+      captureEvent('project_marked_sold', { project_category: project.category, is_goal_linked: Boolean(project.goalId) })
       await refresh()
       navigate(`/project/${id}`)
     } catch (err) {

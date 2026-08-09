@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../supabase'
+import { isAnalyticsEnabled, setAnalyticsEnabled } from '../analytics'
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$', label: 'US Dollar' },
@@ -19,6 +20,20 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [analyticsEnabled, setAnalyticsPreference] = useState(isAnalyticsEnabled(user?.id))
+  const [analyticsSaving, setAnalyticsSaving] = useState(false)
+  const [analyticsError, setAnalyticsError] = useState('')
+
+  async function handleAnalyticsPreference(enabled) {
+    setAnalyticsSaving(true)
+    setAnalyticsError('')
+    // Disabling updates locally before this promise resolves; enabling remains
+    // off until the API confirms the authenticated profile update.
+    const result = await setAnalyticsEnabled(enabled, user?.id)
+    setAnalyticsPreference(result.enabled)
+    if (!result.ok) setAnalyticsError(result.error || 'Could not save analytics preference. Please try again.')
+    setAnalyticsSaving(false)
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -83,6 +98,25 @@ export default function Settings() {
       <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ marginBottom: 12 }}>
         {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
       </button>
+
+      <div style={sectionLabel}>Privacy</div>
+      <label className="card" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={analyticsEnabled}
+          disabled={analyticsSaving}
+          onChange={event => handleAnalyticsPreference(event.target.checked)}
+          style={{ marginTop: 3 }}
+        />
+        <span>
+          <strong style={{ display: 'block', fontSize: 14 }}>Share usage analytics</strong>
+          <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+            Help improve SideFlip by sharing feature and screen usage plus subscription plan, status, amount, and currency. We never collect project text, photos, or project financials; card, billing, or payment-provider identifiers; or session recordings.
+          </span>
+          {analyticsSaving && <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>Saving analytics preference…</span>}
+          {analyticsError && <span role="alert" style={{ display: 'block', color: '#B42318', fontSize: 12, marginTop: 6 }}>{analyticsError}</span>}
+        </span>
+      </label>
 
       <button className="btn btn-secondary" onClick={() => { if (confirm('Sign out?')) signOut() }} style={{ marginBottom: 24 }}>
         🚪 Sign Out

@@ -6,6 +6,7 @@ import { createGoal, updateGoal, deleteGoal, adjustGoalBalance, linkProjectToGoa
 import { calculateGoalSummary, calculateProjectLinkFunding, createMutationId, shouldShowGoalOnboarding } from '../goals'
 import { canCreateGoal } from '../capabilities'
 import { CATEGORIES, fmt, categoryIcon, getTotalInvested, getProfit } from '../store'
+import { captureEvent } from '../analytics'
 
 const newGoalForm = () => ({ name: '', goalType: 'item', targetItem: '', targetAmount: '', startingAmount: '', description: '', mutationId: createMutationId() })
 const newTradeForm = () => ({
@@ -55,6 +56,7 @@ export default function Goals() {
     setSaving(true)
     try {
       const created = await createGoal(user.id, goalForm)
+      captureEvent('goal_created', { goal_type: goalForm.goalType })
       await refresh()
       setGoalForm(newGoalForm())
       setShowCreate(false)
@@ -143,6 +145,7 @@ export default function Goals() {
         status,
         completedAt: status === 'completed' ? new Date().toISOString() : null,
       })
+      if (status === 'completed') captureEvent('goal_completed', { goal_type: selected.goalType })
       await refresh()
     } catch (error) {
       alert(`Could not ${verb} goal: ${error.message}`)

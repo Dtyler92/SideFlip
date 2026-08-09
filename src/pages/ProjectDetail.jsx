@@ -11,6 +11,7 @@ import { uploadPhoto, deletePhoto, supabase } from '../supabase'
 import { can } from '../capabilities'
 import { createMutationId } from '../goals'
 import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
+import { captureEvent } from '../analytics'
 
 function InfoRow({ label, value }) {
   if (!value) return null
@@ -89,6 +90,7 @@ export default function ProjectDetail() {
     e.preventDefault()
     if (!expense.description.trim() || !expense.amount) return alert('Fill in description and amount')
     await addExpense(user.id, id, expense)
+    captureEvent('expense_added', { expense_category: expense.category, project_category: project.category, source: 'manual' })
     setExpense({ description: '', amount: '', category: 'parts' })
     setShowAddExpense(false)
     load()
@@ -97,6 +99,7 @@ export default function ProjectDetail() {
   async function handleDeleteExpense(expId) {
     if (!confirm('Remove this expense?')) return
     await deleteExpense(user.id, expId)
+    captureEvent('expense_deleted', { project_category: project.category, source: 'manual' })
     load()
   }
 
@@ -139,6 +142,7 @@ export default function ProjectDetail() {
     if (!selected.length) return alert('Select at least one item to add.')
     try {
       await importReceiptExpenses(id, selected, receiptImportId || createMutationId())
+      captureEvent('expense_added', { project_category: project.category, source: 'receipt_scan' })
       setReceiptItems([])
       setReceiptImportId(null)
       load()

@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { enqueueServerEvent } from './_lib/analytics.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const supabase = createClient(
@@ -94,6 +95,16 @@ export default async function handler(req, res) {
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?subscribed=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://sideflip.org'}/?canceled=true`,
     })
+
+    // Durable and opt-out-aware. Analytics failure must never strand a checkout
+    // session that Stripe has already created.
+    await enqueueServerEvent(supabase, {
+      dedupeKey: `stripe:${session.id}:stripe_checkout_created`,
+      distinctId: user.id,
+      event: 'stripe_checkout_created',
+      occurredAt: new Date(),
+      properties: { provider: 'stripe', plan, billing_interval: plan, platform: 'web' },
+    }).catch(error => console.error('Checkout analytics enqueue error:', error.message))
 
     return res.status(200).json({ url: session.url })
   } catch (error) {

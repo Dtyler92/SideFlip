@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "analytics:readiness": "node scripts/check-analytics-readiness.mjs",
     "test": "node --experimental-default-type=module --test tests/*.test.js"
   },
   "keywords": [],
@@ -18,6 +19,7 @@
     "@stripe/stripe-js": "^9.12.0",
     "@supabase/supabase-js": "^2.110.8",
     "@vitejs/plugin-react": "^6.0.3",
+    "posthog-js": "^1.414.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.1",

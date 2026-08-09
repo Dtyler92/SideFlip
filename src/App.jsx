@@ -1,5 +1,5 @@
-import { Routes, Route, useSearchParams } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { Routes, Route, useLocation, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { DataProvider } from './context/DataContext'
 import { captureReferral } from './pwa'
@@ -17,15 +17,52 @@ import TermsOfService from './pages/TermsOfService'
 import Paywall from './pages/Paywall'
 import InstallBanner from './components/InstallBanner'
 import BottomNav from './components/BottomNav'
+import { captureAttribution, captureEvent } from './analytics'
+
+function analyticsScreen(pathname) {
+  if (/^\/project\/[^/]+\/sell$/.test(pathname)) return 'sell_project'
+  if (/^\/project\/[^/]+$/.test(pathname)) return 'project_detail'
+  return ({ '/': 'home', '/new': 'new_project', '/calculator': 'calculator', '/analytics': 'analytics', '/goals': 'goals', '/settings': 'settings', '/upgrade': 'paywall', '/privacy': 'privacy', '/terms': 'terms' })[pathname] || 'unknown'
+}
 
 function AppRoutes() {
-  const { user, profile, loading, refreshProfile } = useAuth()
+  const { user, profile, loading, analyticsReady, refreshProfile } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [polling, setPolling] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
+  const location = useLocation()
+  const initialUrlRef = useRef(window.location.href)
+  const referralCapturedRef = useRef(false)
+  const attributionCapturedRef = useRef(false)
 
-  // Capture referral code on landing
-  useEffect(() => { captureReferral() }, [])
+  // Attribution must inspect the original URL before referral cleanup. Keeping
+  // the initial URL in memory also allows consent reconciliation to finish
+  // without persisting raw campaign input.
+  useEffect(() => {
+    if (loading || referralCapturedRef.current) return
+    const attribution = captureAttribution(initialUrlRef.current)
+    attributionCapturedRef.current = Object.keys(attribution).length > 0
+    captureReferral(initialUrlRef.current, user?.id)
+    referralCapturedRef.current = true
+  }, [loading, user?.id])
+
+  useEffect(() => {
+    if (!analyticsReady || attributionCapturedRef.current) return
+    const attribution = captureAttribution(initialUrlRef.current)
+    attributionCapturedRef.current = Object.keys(attribution).length > 0
+  }, [analyticsReady])
+
+  useEffect(() => {
+    if (!analyticsReady) return
+    captureEvent('screen_viewed', { screen: analyticsScreen(location.pathname) })
+  }, [analyticsReady, location.pathname])
+
+  const checkoutCanceled = searchParams.get('canceled')
+  useEffect(() => {
+    if (!analyticsReady || !checkoutCanceled) return
+    captureEvent('stripe_checkout_cancelled', { provider: 'stripe' })
+    setSearchParams({}, { replace: true })
+  }, [analyticsReady, checkoutCanceled, setSearchParams])
 
   // When Stripe redirects back with ?subscribed=true, poll until webhook fires
   useEffect(() => {

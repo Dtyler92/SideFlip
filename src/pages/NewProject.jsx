@@ -7,6 +7,7 @@ import { useData } from '../context/DataContext'
 import { uploadPhoto } from '../supabase'
 import { calculateGoalSummary, createMutationId } from '../goals'
 import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
+import { captureEvent } from '../analytics'
 
 export default function NewProject() {
   const navigate = useNavigate()
@@ -64,6 +65,7 @@ export default function NewProject() {
         goalFundingAmount: goalFunding,
         outOfPocketAmount: Math.max(0, purchase - goalFunding),
       })
+      captureEvent('project_created', { project_category: form.category, is_goal_linked: Boolean(form.goalId) })
       await refresh()
       navigate(form.goalId ? '/goals' : '/')
     } catch (err) {
