@@ -6,7 +6,7 @@ import {
   sendCancellationScheduledEmail,
   sendTrialCanceledEmail,
   sendPaymentFailedEmail,
-} from './emails.js'
+} from './_lib/emails.js'
 import { normalizeBillingInterval } from './_lib/analytics.js'
 import { stripeInvoicePaymentType } from './_lib/stripe-analytics.js'
 
