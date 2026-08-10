@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { calculateGoalSummary, splitSaleProceeds, calculateTradeBasis, calculateProjectLinkFunding, shouldShowGoalOnboarding } from '../src/goals.js'
+
+const source = relative => readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8')
 
 test('shows the goal onboarding panel only before the first goal is created', () => {
   assert.equal(shouldShowGoalOnboarding([]), true)
@@ -71,4 +74,21 @@ test('linking an existing project splits its original purchase between goal and 
   })
   assert.throws(() => calculateProjectLinkFunding(500, 501, 1000), /purchase price/)
   assert.throws(() => calculateProjectLinkFunding(500, 300, 299), /available toward the goal/)
+})
+
+test('repair migration restores owner-scoped atomic existing-project goal assignment', () => {
+  const migration = source('supabase/migrations/20260810203000_restore_link_trade_up_project.sql')
+  assert.match(migration, /security definer/)
+  assert.match(migration, /v_user_id uuid := auth\.uid\(\)/)
+  assert.match(migration, /where id = p_goal_id and user_id = v_user_id/)
+  assert.match(migration, /where id = p_project_id and user_id = v_user_id/)
+  assert.match(migration, /v_project\.status <> 'active'/)
+  assert.match(migration, /v_project\.goal_id is not null/)
+  assert.match(migration, /'goal_purchase'/)
+  assert.match(migration, /out_of_pocket_amount = coalesce\(v_project\.purchase_price, 0\) - coalesce\(p_goal_funding, 0\)/)
+  assert.match(migration, /revoke all on function public\.link_trade_up_project[\s\S]*from public/)
+  assert.match(migration, /grant execute on function public\.link_trade_up_project[\s\S]*to authenticated/)
+  assert.match(migration, /revoke all on function public\.create_trade_up_goal[\s\S]*from public/)
+  assert.match(migration, /grant execute on function public\.create_trade_up_goal[\s\S]*to authenticated/)
+  assert.doesNotMatch(migration, /grant execute[\s\S]*to anon/)
 })
