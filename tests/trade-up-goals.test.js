@@ -92,3 +92,12 @@ test('repair migration restores owner-scoped atomic existing-project goal assign
   assert.match(migration, /grant execute on function public\.create_trade_up_goal[\s\S]*to authenticated/)
   assert.doesNotMatch(migration, /grant execute[\s\S]*to anon/)
 })
+
+test('goal RPC ACL repair removes direct anonymous grants without blocking authenticated app use', () => {
+  const migration = source('supabase/migrations/20260810205500_harden_trade_up_goal_rpc_grants.sql')
+  assert.match(migration, /revoke execute on function public\.link_trade_up_project[\s\S]*from anon/)
+  assert.match(migration, /revoke execute on function public\.create_trade_up_goal[\s\S]*from anon/)
+  assert.match(migration, /revoke execute on function public\.enforce_free_active_trade_up_goal_limit\(\)[\s\S]*from anon, authenticated/)
+  assert.match(migration, /grant execute on function public\.link_trade_up_project[\s\S]*to authenticated/)
+  assert.match(migration, /grant execute on function public\.create_trade_up_goal[\s\S]*to authenticated/)
+})
