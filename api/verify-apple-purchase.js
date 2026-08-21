@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { APPLE_BUNDLE_ID, verifyAppleSignedData } from './_lib/apple-verifier.js'
-import { isSideFlipProProduct } from './_lib/apple-products.js'
+import { verifyAppleSignedData } from './_lib/apple-verifier.js'
+import { APPLE_BUNDLE_ID, isSideFlipProProduct } from './_lib/apple-products.js'
 import { createAppleServerApiClient } from './_lib/apple-server-api.js'
 import { currentAppleSubscription } from './_lib/apple-current-subscription.js'
 import { applePurchaseMayBindToUser } from './_lib/apple-account-binding.js'
