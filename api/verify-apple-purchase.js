@@ -15,8 +15,22 @@ export default async function handler(req, res) {
   if (authError || !user) return res.status(401).json({ error: 'Please sign in again.' })
   try {
     const { verifier: appleVerifier, decoded: transaction, environmentName: verifiedEnvironment } = await verifyAppleSignedData(req.body.signedTransaction)
-    const transactionIsComplete = transaction.bundleId === APPLE_BUNDLE_ID && isSideFlipProProduct(transaction.productId) && transaction.originalTransactionId && transaction.transactionId && transaction.signedDate && transaction.expiresDate
-    if (!transactionIsComplete || !applePurchaseMayBindToUser(transaction.appAccountToken, user.id)) return res.status(400).json({ error: 'This Apple purchase cannot be used for this SideFlip account.' })
+    const bindingChecks = {
+      bundleMatches: transaction.bundleId === APPLE_BUNDLE_ID,
+      productAllowed: isSideFlipProProduct(transaction.productId),
+      originalTransactionIdPresent: Boolean(transaction.originalTransactionId),
+      transactionIdPresent: Boolean(transaction.transactionId),
+      signedDatePresent: Boolean(transaction.signedDate),
+      expiresDatePresent: Boolean(transaction.expiresDate),
+      appAccountTokenState: transaction.appAccountToken === null || transaction.appAccountToken === undefined
+        ? 'missing'
+        : applePurchaseMayBindToUser(transaction.appAccountToken, user.id) ? 'matching' : 'mismatch',
+    }
+    const transactionIsComplete = bindingChecks.bundleMatches && bindingChecks.productAllowed && bindingChecks.originalTransactionIdPresent && bindingChecks.transactionIdPresent && bindingChecks.signedDatePresent && bindingChecks.expiresDatePresent
+    if (!transactionIsComplete || bindingChecks.appAccountTokenState === 'mismatch') {
+      console.warn('Apple purchase binding rejected:', bindingChecks)
+      return res.status(400).json({ error: 'This Apple purchase cannot be used for this SideFlip account.' })
+    }
     const current = await currentAppleSubscription({ apiClient: createAppleServerApiClient(verifiedEnvironment), verifier: appleVerifier, transactionId: transaction.transactionId, expectedOriginalTransactionId: transaction.originalTransactionId })
     const currentTransaction = current.transaction
     const now = Date.now()
