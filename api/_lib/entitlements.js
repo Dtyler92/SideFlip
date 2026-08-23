@@ -1,4 +1,4 @@
-const CANONICAL_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+const EXPLICIT_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$/
 
 function hasActiveLegacyStripeSubscription(profile) {
   return Boolean(
@@ -9,9 +9,9 @@ function hasActiveLegacyStripeSubscription(profile) {
 
 function isVerifiedAppleEntitlement(entitlement, now) {
   if (entitlement?.source !== 'apple' || !['active', 'grace_period'].includes(entitlement.status) || !entitlement.last_verified_at) return false
-  if (typeof entitlement.expires_at !== 'string' || !CANONICAL_UTC_TIMESTAMP.test(entitlement.expires_at)) return false
-  const expiresAt = new Date(entitlement.expires_at).getTime()
-  return Number.isFinite(expiresAt) && new Date(expiresAt).toISOString() === entitlement.expires_at && expiresAt > now
+  if (typeof entitlement.expires_at !== 'string' || !EXPLICIT_UTC_TIMESTAMP.test(entitlement.expires_at)) return false
+  const expiresAt = Date.parse(entitlement.expires_at)
+  return Number.isFinite(expiresAt) && expiresAt > now
 }
 
 export function resolveServerEntitlement(profile, entitlements, now = Date.now()) {
