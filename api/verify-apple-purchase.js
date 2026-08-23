@@ -4,6 +4,7 @@ import { APPLE_BUNDLE_ID, isSideFlipProProduct } from './_lib/apple-products.js'
 import { createAppleServerApiClient } from './_lib/apple-server-api.js'
 import { currentAppleSubscription } from './_lib/apple-current-subscription.js'
 import { applePurchaseMayBindToUser } from './_lib/apple-account-binding.js'
+import { reconcileVerifiedAppleExpiration } from './_lib/apple-entitlement-reconciliation.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
@@ -36,13 +37,14 @@ export default async function handler(req, res) {
     const now = Date.now()
     const status = current.status
     const startsAt = new Date(currentTransaction.originalPurchaseDate || currentTransaction.purchaseDate || now).toISOString()
-    const expiresAt = new Date(currentTransaction.expiresDate).toISOString()
+    const expiresAt = new Date(current.effectiveExpiresDate).toISOString()
+    const providerSignedAt = new Date(currentTransaction.signedDate).toISOString()
     const { data: applied, error: writeError } = await supabase.rpc('apply_apple_entitlement_event', {
       p_user_id: user.id,
       p_original_transaction_id: transaction.originalTransactionId,
       p_transaction_id: currentTransaction.transactionId,
       p_notification_uuid: null,
-      p_provider_signed_at: new Date(currentTransaction.signedDate).toISOString(),
+      p_provider_signed_at: providerSignedAt,
       p_status: status,
       p_product_id: currentTransaction.productId,
       p_starts_at: startsAt,
@@ -52,7 +54,16 @@ export default async function handler(req, res) {
       if (writeError.code === 'P0001') return res.status(409).json({ error: 'This Apple subscription is already linked to another SideFlip account.' })
       throw writeError
     }
-    return res.status(200).json({ entitlement: { verified: true, status, expiresAt }, applied: Boolean(applied) })
+    const reconciled = !applied && await reconcileVerifiedAppleExpiration({
+      supabase,
+      userId: user.id,
+      originalTransactionId: transaction.originalTransactionId,
+      transactionId: currentTransaction.transactionId,
+      status,
+      expiresAt,
+      providerSignedAt,
+    })
+    return res.status(200).json({ entitlement: { verified: true, status, expiresAt }, applied: Boolean(applied || reconciled) })
   } catch (error) {
     console.error('Apple purchase verification failed:', error.message)
     return res.status(503).json({ error: 'Could not verify this Apple purchase. Please try Restore Purchases.' })

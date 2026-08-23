@@ -7,8 +7,8 @@ function hasActiveLegacyStripeSubscription(profile) {
   )
 }
 
-function isVerifiedActiveAppleEntitlement(entitlement, now) {
-  if (entitlement?.source !== 'apple' || entitlement.status !== 'active' || !entitlement.last_verified_at) return false
+function isVerifiedAppleEntitlement(entitlement, now) {
+  if (entitlement?.source !== 'apple' || !['active', 'grace_period'].includes(entitlement.status) || !entitlement.last_verified_at) return false
   if (typeof entitlement.expires_at !== 'string' || !CANONICAL_UTC_TIMESTAMP.test(entitlement.expires_at)) return false
   const expiresAt = new Date(entitlement.expires_at).getTime()
   return Number.isFinite(expiresAt) && new Date(expiresAt).toISOString() === entitlement.expires_at && expiresAt > now
@@ -16,7 +16,7 @@ function isVerifiedActiveAppleEntitlement(entitlement, now) {
 
 export function resolveServerEntitlement(profile, entitlements, now = Date.now()) {
   const apple = Array.isArray(entitlements)
-    ? entitlements.find(entitlement => isVerifiedActiveAppleEntitlement(entitlement, now))
+    ? entitlements.find(entitlement => isVerifiedAppleEntitlement(entitlement, now))
     : null
 
   if (hasActiveLegacyStripeSubscription(profile) || apple) {
@@ -24,7 +24,7 @@ export function resolveServerEntitlement(profile, entitlements, now = Date.now()
       plan: 'pro',
       entitlement: apple ? {
         source: 'apple',
-        status: 'active',
+        status: apple.status,
         expires_at: apple.expires_at,
       } : null,
     }

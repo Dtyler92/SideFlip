@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { verifyAppleSignedData } from './_lib/apple-verifier.js'
 import { APPLE_BUNDLE_ID, isSideFlipProProduct } from './_lib/apple-products.js'
 import { appleNotificationSemantics, appleNotificationStatus } from './_lib/apple-notification-status.js'
+import { appleEffectiveExpiration } from './_lib/apple-effective-expiration.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
@@ -28,11 +29,17 @@ export default async function handler(req, res) {
     if (lookupError) throw lookupError
     if (!entitlement) return res.status(200).json({ received: true, ignored: 'unbound_transaction' })
 
-    const status = appleNotificationStatus({
+    const initialStatus = appleNotificationStatus({
       notificationType: notification.notificationType,
       subtype: notification.subtype,
       transaction,
       renewalInfo,
+    })
+    const { status, effectiveExpiresDate } = appleEffectiveExpiration({
+      status: initialStatus,
+      transaction,
+      renewalInfo,
+      expectedOriginalTransactionId: transaction.originalTransactionId,
     })
     const semantics = appleNotificationSemantics({
       notificationType: notification.notificationType,
@@ -47,7 +54,7 @@ export default async function handler(req, res) {
       p_status: status,
       p_product_id: transaction.productId,
       p_starts_at: new Date(transaction.originalPurchaseDate || transaction.purchaseDate || transaction.signedDate).toISOString(),
-      p_expires_at: new Date(transaction.expiresDate).toISOString(),
+      p_expires_at: new Date(effectiveExpiresDate).toISOString(),
       p_cancellation_just_scheduled: semantics.cancellationScheduled,
       p_billing_failure: semantics.billingFailure,
     })
