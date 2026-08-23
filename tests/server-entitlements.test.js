@@ -1,8 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { resolveServerEntitlement } from '../api/_lib/entitlements.js'
 
+const entitlementEndpointSource = readFileSync(new URL('../api/entitlement.js', import.meta.url), 'utf8')
+
 const now = Date.parse('2026-08-06T00:00:00.000Z')
+
+test('authenticated entitlement responses are private, non-cacheable, and uniquely resolved', () => {
+  assert.match(entitlementEndpointSource, /Cache-Control', 'private, no-store, no-cache, max-age=0, must-revalidate'/)
+  assert.match(entitlementEndpointSource, /CDN-Cache-Control', 'no-store'/)
+  assert.match(entitlementEndpointSource, /Vary', 'Authorization'/)
+  assert.match(entitlementEndpointSource, /resolved_at: new Date\(\)\.toISOString\(\)/)
+})
 
 test('server entitlement resolver grants Pro for a currently verified Apple entitlement', () => {
   const result = resolveServerEntitlement({}, [{

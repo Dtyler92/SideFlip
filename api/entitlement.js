@@ -3,7 +3,17 @@ import { resolveServerEntitlement } from './_lib/entitlements.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
+function sendResolvedPlan(res, profile, entitlements) {
+  return res.status(200).json({
+    ...resolveServerEntitlement(profile, entitlements),
+    resolved_at: new Date().toISOString(),
+  })
+}
+
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store, no-cache, max-age=0, must-revalidate')
+  res.setHeader('CDN-Cache-Control', 'no-store')
+  res.setHeader('Vary', 'Authorization')
   if (req.method !== 'GET') return res.status(405).end()
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
   if (!token) return res.status(401).json({ error: 'Sign in to view your plan.' })
@@ -24,8 +34,8 @@ export default async function handler(req, res) {
     .eq('user_id', user.id)
   if (entitlementError) {
     console.error('Entitlement lookup error:', entitlementError.message)
-    return res.json(resolveServerEntitlement(profile, []))
+    return sendResolvedPlan(res, profile, [])
   }
 
-  return res.json(resolveServerEntitlement(profile, entitlements))
+  return sendResolvedPlan(res, profile, entitlements)
 }
