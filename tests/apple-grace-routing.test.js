@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { reconcileVerifiedAppleExpiration } from '../api/_lib/apple-entitlement-reconciliation.js'
+import { diagnoseAppleReconciliationMismatch, reconcileVerifiedAppleExpiration } from '../api/_lib/apple-entitlement-reconciliation.js'
 
 const notificationSource = readFileSync(new URL('../api/apple-server-notifications.js', import.meta.url), 'utf8')
 
@@ -43,6 +43,35 @@ test('duplicate verified state repairs only its matching shorter Apple expiratio
     ['eq', 'status', 'grace_period'],
     ['lt', 'expires_at', '2026-08-24T00:00:00.000Z'],
     ['select', 'id'],
+  ])
+})
+
+test('reconciliation diagnostics return predicates only, never stored values', async () => {
+  const builder = {
+    select() { return this }, eq() { return this },
+    async maybeSingle() {
+      return { data: {
+        status: 'expired', expires_at: '2026-08-23T20:00:00.000Z',
+        apple_latest_transaction_id: 'newer-transaction',
+        apple_latest_signed_at: '2026-08-23T22:05:00.000Z',
+      }, error: null }
+    },
+  }
+  const result = await diagnoseAppleReconciliationMismatch({
+    supabase: { from() { return builder } },
+    userId: 'user-id', originalTransactionId: 'original-id', transactionId: 'current-transaction',
+    status: 'grace_period', expiresAt: '2026-08-24T00:00:00.000Z',
+    providerSignedAt: '2026-08-23T21:59:00.000Z',
+  })
+  assert.deepEqual(result, {
+    rowFound: true,
+    transactionMatches: false,
+    signedAtMatches: false,
+    statusMatches: false,
+    expirationNeedsExtension: true,
+  })
+  assert.deepEqual(Object.keys(result).sort(), [
+    'expirationNeedsExtension', 'rowFound', 'signedAtMatches', 'statusMatches', 'transactionMatches',
   ])
 })
 

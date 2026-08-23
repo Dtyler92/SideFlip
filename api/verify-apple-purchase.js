@@ -4,7 +4,7 @@ import { APPLE_BUNDLE_ID, isSideFlipProProduct } from './_lib/apple-products.js'
 import { createAppleServerApiClient } from './_lib/apple-server-api.js'
 import { currentAppleSubscription } from './_lib/apple-current-subscription.js'
 import { applePurchaseMayBindToUser } from './_lib/apple-account-binding.js'
-import { reconcileVerifiedAppleExpiration } from './_lib/apple-entitlement-reconciliation.js'
+import { diagnoseAppleReconciliationMismatch, reconcileVerifiedAppleExpiration } from './_lib/apple-entitlement-reconciliation.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
@@ -63,6 +63,22 @@ export default async function handler(req, res) {
       expiresAt,
       providerSignedAt,
     })
+    if (!applied && !reconciled) {
+      try {
+        const diagnostic = await diagnoseAppleReconciliationMismatch({
+          supabase,
+          userId: user.id,
+          originalTransactionId: transaction.originalTransactionId,
+          transactionId: currentTransaction.transactionId,
+          status,
+          expiresAt,
+          providerSignedAt,
+        })
+        console.info('Apple entitlement reconciliation predicates:', diagnostic)
+      } catch {
+        console.warn('Apple entitlement reconciliation diagnostic unavailable.')
+      }
+    }
     return res.status(200).json({ entitlement: { verified: true, status, expiresAt }, applied: Boolean(applied || reconciled) })
   } catch (error) {
     console.error('Apple purchase verification failed:', error.message)
