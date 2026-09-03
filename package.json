@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "analytics:readiness": "node scripts/check-analytics-readiness.mjs",
+    "test:vin:postgres": "bash tests/sql/run-vin-local.sh",
     "test": "node --experimental-default-type=module --test tests/*.test.js"
   },
   "keywords": [],
