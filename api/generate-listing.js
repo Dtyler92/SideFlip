@@ -86,12 +86,23 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
     const { data: { user }, error: authError } = await client.auth.getUser(token)
     if (authError || !user) return json(res, 401, { error: 'Please sign in again.' })
 
-    const [{ data: profile, error: profileError }, { data: entitlements, error: entitlementError }] = await Promise.all([
+    const [modeResult, profileResult, entitlementResult] = await Promise.all([
+      client.rpc('stripe_entitlement_read_mode'),
       client.from('profiles').select('subscription_id, subscription_status').eq('id', user.id).maybeSingle(),
       client.from('user_entitlements').select('source, status, expires_at, last_verified_at').eq('user_id', user.id),
     ])
-    if (profileError || entitlementError) return json(res, 500, { error: 'Could not verify SideFlip Pro access.' })
-    if (resolveServerEntitlement(profile, entitlements).plan !== 'pro') {
+    const stripeCanonicalCutoverComplete = !modeResult.error && modeResult.data === 'canonical'
+    const resolvedEntitlement = resolveServerEntitlement(
+      profileResult.error ? null : profileResult.data,
+      entitlementResult.error ? [] : entitlementResult.data,
+      Date.now(),
+      { stripeCanonicalCutoverComplete },
+    )
+    if (
+      (entitlementResult.error && resolvedEntitlement.plan !== 'pro')
+      || (profileResult.error && !stripeCanonicalCutoverComplete && resolvedEntitlement.plan !== 'pro')
+    ) return json(res, 500, { error: 'Could not verify SideFlip Pro access.' })
+    if (resolvedEntitlement.plan !== 'pro') {
       return json(res, 403, { error: 'SideFlip Pro is required for the Listing Description Generator.' })
     }
 

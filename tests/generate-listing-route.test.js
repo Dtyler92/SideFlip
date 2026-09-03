@@ -29,11 +29,12 @@ function clientFor({ userId = 'user-1', project = { id: '11111111-1111-4111-8111
       }
       if (name === 'renew_ai_generation_request') return { data: renewAllowed, error: null }
       if (name === 'release_ai_generation_request') return { data: true, error: null }
+      if (name === 'stripe_entitlement_read_mode') return { data: 'compatibility', error: null }
       throw new Error(`Unexpected RPC: ${name}`)
     },
     from(table) {
       if (table === 'profiles') return query({ data: { subscription_id: 'sub_synthetic', subscription_status: 'active' }, error: null }, (column, value) => onEq(table, column, value))
-      if (table === 'user_entitlements') return query({ data: [], error: null }, (column, value) => onEq(table, column, value))
+      if (table === 'user_entitlements') return query({ data: [{ source: 'stripe', status: 'active', expires_at: '2030-01-01T00:00:00Z', last_verified_at: '2026-09-01T00:00:00Z' }], error: null }, (column, value) => onEq(table, column, value))
       if (table === 'projects') return query({ data: project, error: null }, (column, value) => onEq(table, column, value))
       if (table === 'expenses') return query({ data: expenses, error: null }, (column, value) => onEq(table, column, value))
       throw new Error(`Unexpected table: ${table}`)
