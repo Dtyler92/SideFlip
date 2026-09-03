@@ -4,6 +4,7 @@ set -euo pipefail
 DB="sideflip_my_stuff_test_$$"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MIGRATION="$ROOT/supabase/migrations/20260824190000_add_my_stuff.sql"
+V2_MIGRATION="$ROOT/supabase/migrations/20260903220000_add_my_stuff_v2.sql"
 PSQL=(sudo -u postgres psql -X -v ON_ERROR_STOP=1 -q "$DB")
 
 cleanup() {
@@ -16,6 +17,9 @@ sudo -u postgres createdb "$DB"
 "${PSQL[@]}" < "$ROOT/tests/sql/my-stuff-fixture.sql"
 "${PSQL[@]}" < "$MIGRATION"
 "${PSQL[@]}" < "$ROOT/tests/sql/my-stuff-assertions.sql"
+"${PSQL[@]}" < "$ROOT/tests/sql/my-stuff-v2-preflight.sql"
+"${PSQL[@]}" < "$V2_MIGRATION"
+"${PSQL[@]}" < "$ROOT/tests/sql/my-stuff-v2-assertions.sql"
 
 # Two real database sessions race Free-account creation. Exactly one may commit.
 run_create() {
@@ -112,4 +116,44 @@ if [[ "$maintenance_state" != "1:200" || "$maintenance_ids" != "1" ]]; then
   exit 1
 fi
 
-printf 'PostgreSQL My Stuff migration behavior passed (Free quota and idempotency races included)\n'
+# V2 transfer races: same request converges; different Free projects cannot both win.
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -q "$DB" <<'SQL'
+insert into public.projects(id,user_id,title,category) values
+('a0000000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000000','Same transfer','car'),
+('b0000000-0000-4000-8000-000000000001','bbbbbbbb-0000-4000-8000-000000000000','Free race one','tool'),
+('b0000000-0000-4000-8000-000000000002','bbbbbbbb-0000-4000-8000-000000000000','Free race two','boat');
+SQL
+run_transfer() {
+  local user="$1" project="$2" mutation="$3" log="$4"
+  sudo -u postgres psql -X -v ON_ERROR_STOP=1 -Atq "$DB" >"$log" 2>&1 <<SQL
+set role authenticated;
+select set_config('request.jwt.claim.sub','$user',false) as claim \gset
+select public.transfer_project_to_my_stuff_v2('$project','{}','$mutation');
+SQL
+}
+run_transfer 'aaaaaaaa-0000-4000-8000-000000000000' 'a0000000-0000-4000-8000-000000000001' 'same-transfer-key' "/tmp/${DB}_same_transfer_1.log" & p1=$!
+run_transfer 'aaaaaaaa-0000-4000-8000-000000000000' 'a0000000-0000-4000-8000-000000000001' 'same-transfer-key' "/tmp/${DB}_same_transfer_2.log" & p2=$!
+wait "$p1"; wait "$p2"
+transfer_count="$(sudo -u postgres psql -X -Atq "$DB" -c "select count(*) from public.my_stuff_project_transfers where user_id='aaaaaaaa-0000-4000-8000-000000000000'")"
+transfer_ids="$(grep -h -E '^[0-9a-f-]{36}$' "/tmp/${DB}_same_transfer_1.log" "/tmp/${DB}_same_transfer_2.log" | sort -u | wc -l)"
+if [[ "$transfer_count" != "1" || "$transfer_ids" != "1" ]]; then
+  printf 'same-key concurrent project transfer was not idempotent\n' >&2
+  exit 1
+fi
+run_transfer 'bbbbbbbb-0000-4000-8000-000000000000' 'b0000000-0000-4000-8000-000000000001' 'free-transfer-race-1' "/tmp/${DB}_transfer_race_1.log" & p1=$!
+run_transfer 'bbbbbbbb-0000-4000-8000-000000000000' 'b0000000-0000-4000-8000-000000000002' 'free-transfer-race-2' "/tmp/${DB}_transfer_race_2.log" & p2=$!
+set +e
+wait "$p1"; s1=$?
+wait "$p2"; s2=$?
+set -e
+if [[ "$s1" -eq "$s2" ]]; then
+  printf 'expected exactly one different-key Free transfer to succeed\n' >&2
+  exit 1
+fi
+transfer_count="$(sudo -u postgres psql -X -Atq "$DB" -c "select count(*) from public.my_stuff_project_transfers where user_id='bbbbbbbb-0000-4000-8000-000000000000'")"
+if [[ "$transfer_count" != "1" ]]; then
+  printf 'expected one Free transfer after race, got %s\n' "$transfer_count" >&2
+  exit 1
+fi
+
+printf 'PostgreSQL My Stuff V1/V2 behavior passed (quota and idempotency races included)\n'
