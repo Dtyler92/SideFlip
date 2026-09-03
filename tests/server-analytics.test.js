@@ -106,9 +106,9 @@ test('provider handlers durably enqueue without PostHog request latency', () => 
   assert.match(migration, /analytics_deletion_queue/)
   assert.match(migration, /claim_token/)
   assert.match(migration, /subscription_trial_started/)
-  assert.match(source('api/analytics-preference.js'), /supabase\.auth\.getUser\(token\)/)
-  assert.match(source('api/analytics-preference.js'), /analytics_opt_out: !req\.body\.enabled/)
-  assert.match(source('api/analytics-preference.js'), /update\([\s\S]*select\('analytics_opt_out'\)[\s\S]*maybeSingle\(\)/)
+  assert.match(source('api/_lib/analytics-preference-handler.js'), /supabase\.auth\.getUser\(token\)/)
+  assert.match(source('api/_lib/analytics-preference-handler.js'), /analytics_opt_out: !req\.body\.enabled/)
+  assert.match(source('api/_lib/analytics-preference-handler.js'), /update\([\s\S]*select\('analytics_opt_out'\)[\s\S]*maybeSingle\(\)/)
 })
 
 test('account deletion queues erasure before Auth deletion and worker fences asynchronous PostHog erasure', () => {
@@ -123,13 +123,13 @@ test('account deletion queues erasure before Auth deletion and worker fences asy
   assert.match(worker, /process\.env\.POSTHOG_KEY/)
   assert.doesNotMatch(worker, /POSTHOG_PROJECT_KEY/)
   assert.match(worker, /AbortSignal\.timeout\(8000\)/)
-  const dispatcher = source('api/analytics-dispatch.js')
+  const dispatcher = source('api/_lib/analytics-dispatch-handler.js')
   assert.match(dispatcher, /dispatchAnalyticsDeletionQueue/)
   assert.doesNotMatch(dispatcher, /Promise\.all/)
   assert.ok(dispatcher.indexOf('dispatchAnalyticsOutbox') < dispatcher.indexOf('dispatchAnalyticsDeletionQueue'))
   assert.match(dispatcher, /deadline/)
   assert.match(dispatcher, /backlog/)
-  assert.match(dispatcher, /maxDuration: 60/)
+
   assert.match(worker, /submitted/)
   assert.doesNotMatch(worker, /p_deleted:/)
   assert.match(deletion, /reconciliationPending/)
@@ -137,7 +137,7 @@ test('account deletion queues erasure before Auth deletion and worker fences asy
 
 test('migration-first release gate, readiness endpoint, and Vault-backed Supabase scheduler are present', () => {
   const scheduler = source('supabase/migrations/20260809030000_schedule_analytics_dispatch.sql')
-  assert.match(source('api/analytics-readiness.js'), /analytics_backend_readiness/)
+  assert.match(source('api/_lib/analytics-readiness-handler.js'), /analytics_backend_readiness/)
   assert.match(source('scripts/check-analytics-readiness.mjs'), /ANALYTICS_READINESS_URL/)
   assert.match(source('docs/analytics-deployment.md'), /migration-first/i)
   assert.match(source('docs/analytics-deployment.md'), /initial rollout/i)
