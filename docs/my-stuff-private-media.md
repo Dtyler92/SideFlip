@@ -1,6 +1,6 @@
 # My Stuff private media storage contract
 
-My Stuff media uses the dedicated private `my-stuff-media` bucket. It must not use the public `project-photos` bucket or change existing project-photo behavior. This migration creates only the bucket and `storage.objects` policies; attachment metadata, cleanup jobs, and upload endpoints remain future application work.
+My Stuff media uses the dedicated private `my-stuff-media` bucket. It must not use the public `project-photos` bucket or change existing project-photo behavior. This migration creates the bucket and `storage.objects` policies tied to existing owned `my_stuff_items`; attachment metadata and upload endpoints remain future application work and no upload UI is exposed.
 
 ## Object and upload contract
 
@@ -18,7 +18,7 @@ Enforced paths:
 <user-id>/items/<item-id>/<receipts|invoices|documents>/<object-id>.<jpg|jpeg|png|webp|heic|heif|pdf|doc|docx>
 ```
 
-The path grammar limits arbitrary owner-prefix namespaces without coupling this storage-only migration to an unavailable attachment table. It does **not** prove that an item UUID exists or cap the number/aggregate bytes of objects under an owner. Before enabling uploads, the backend must verify that `<item-id>` is an existing item owned by the caller and enforce product object-count and aggregate-byte quotas with a race-safe reservation or authoritative metadata boundary. RLS is not a quota system.
+The path grammar limits arbitrary owner-prefix namespaces without coupling this migration to an unavailable attachment table. Every policy also requires the path's `<item-id>` to match an existing `my_stuff_items` row owned by `auth.uid()`, so caller-prefixed paths for nonexistent or another user's item are denied. This does not cap the number or aggregate bytes of objects under an owner. Before enabling uploads, the application still needs an authoritative attachment metadata/API contract and race-safe object-count and aggregate-byte quotas. RLS is not a quota system.
 
 ### MIME and parser safety
 
@@ -26,7 +26,7 @@ The path grammar limits arbitrary owner-prefix namespaces without coupling this 
 
 ## Authorization semantics
 
-All four policies are limited to `authenticated`, `my-stuff-media`, the caller's UUID prefix, and the full path grammar:
+All four policies are limited to `authenticated`, `my-stuff-media`, the caller's UUID prefix, an existing caller-owned item, and the full path grammar:
 
 - download/list/signing requires `SELECT`;
 - a new upload or copy destination requires `INSERT`;
@@ -66,18 +66,18 @@ Do not replace an attachment by upserting bytes over its existing object name. U
 
 ### Account deletion
 
-Account deletion remains server-side work and is intentionally not changed by this storage-only migration. Fence deletion with the account-deletion workflow, stop new uploads, then remove only `<user-id>/` from `my-stuff-media` using service-role Storage API credentials before deleting the Auth user.
+Account deletion remains server-side work. The existing leased account-deletion workflow now removes both the legacy project-photo prefix and only `<user-id>/` from `my-stuff-media` using service-role Storage API credentials before marking storage complete or deleting the Auth user.
 
-The worker must recursively enumerate the fixed `items/` hierarchy, paginate every `list` call (up to 1,000 entries per page), remove exact object names in bounded batches, and continue until a fresh listing of the user's prefix is empty. Because deletion shifts later entries forward, restart each affected folder at offset zero after a removal batch. Treat listing or removal errors as account-deletion failures; never proceed to Auth deletion while private media may remain. Existing `project-photos` cleanup remains separate.
+The cleanup recursively enumerates the fixed `items/` hierarchy, rejects path segments or nesting outside its traversal bounds, and limits each attempt to 1,000 list calls. It lists up to 1,000 entries per call, removes exact object names in bounded batches, and continues until a fresh listing of the user's prefix is empty. Because deletion shifts later entries forward, it restarts each affected folder at offset zero after a removal batch. A repeated unchanged page, exhausted traversal budget, listing error, or removal error fails the deletion attempt before the Auth deletion fence; the tombstone remains retryable and a later account-deletion attempt drains the same prefix. Existing `project-photos` cleanup remains a separate checked step.
 
 ## Review and verification
 
-The migration is review-only. Do not apply it without separate production approval. Static source-contract tests run with `npm test`; the disposable PostgreSQL harness runs with:
+The migration is review-only. Do not apply it without separate production approval. Static and cleanup behavior tests run with `npm test`; the disposable PostgreSQL harness runs with:
 
 ```sh
 bash tests/sql/run-my-stuff-storage-local.sh
 ```
 
-The fixture mirrors the current Supabase `storage.protect_delete` statement trigger: direct table deletes fail unless the Storage service database session has set `storage.allow_delete_query=true`. The harness first proves that direct delete protection, then sets the GUC to model the API's already-authorized metadata-delete phase and exercise RLS. It applies the migration twice and covers upload, upsert, copy, same-owner rename, cross-owner and cross-bucket denials, bounded paths, and anonymous denial.
+The fixture mirrors the current Supabase `storage.protect_delete` statement trigger: direct table deletes fail unless the Storage service database session has set `storage.allow_delete_query=true`. The harness first proves that direct delete protection, then sets the GUC to model the API's already-authorized metadata-delete phase and exercise RLS. It applies the migration twice and covers upload, upsert, copy, same-owner rename, nonexistent-item and other-owner-item write denials, cross-owner and cross-bucket denials, bounded paths, and anonymous denial.
 
 This PostgreSQL simulation does not prove backing-object deletion, HTTP endpoint behavior, upload-byte/declared-MIME enforcement, or signed-token delivery by the real Storage API. Those require an approved local Supabase stack or non-production project. The SQL harness deliberately does not pretend that a direct table `DELETE` is an end-to-end Storage API removal.

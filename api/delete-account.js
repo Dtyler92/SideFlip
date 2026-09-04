@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
+import { removeUserPrivateMedia } from './_lib/account-media-cleanup.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 const PHOTO_BUCKET = 'project-photos'
@@ -58,6 +59,7 @@ export default async function handler(req, res) {
     if (leaseError) throw leaseError
     if (lease?.deletion_lease_id !== leaseId || lease?.status !== 'processing' || new Date(lease.deletion_lease_expires_at) <= new Date()) return res.status(202).json({ deleting: true })
     await removeUserPhotos(user.id)
+    await removeUserPrivateMedia(supabase.storage, user.id)
     const { data: storageClaim, error: storageStatusError } = await supabase.from('account_deletion_tombstones').update({ provider_cleanup_status: { storage: 'complete', auth: 'pending' } }).eq('user_id', user.id).eq('deletion_lease_id', leaseId).eq('status', 'processing').gt('deletion_lease_expires_at', new Date().toISOString()).select('user_id').maybeSingle()
     if (storageStatusError) throw storageStatusError
     if (!storageClaim) return res.status(202).json({ deleting: true })

@@ -46,6 +46,12 @@ to authenticated
 using (
   bucket_id = 'my-stuff-media'
   and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and exists (
+    select 1
+    from public.my_stuff_items
+    where my_stuff_items.id::text = (storage.foldername(name))[3]
+      and my_stuff_items.user_id = (select auth.uid())
+  )
   and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/items/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(photos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|before-after/(before|after)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|(receipts|invoices|documents)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif|pdf|doc|docx))$'
 );
 
@@ -57,6 +63,12 @@ to authenticated
 with check (
   bucket_id = 'my-stuff-media'
   and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and exists (
+    select 1
+    from public.my_stuff_items
+    where my_stuff_items.id::text = (storage.foldername(name))[3]
+      and my_stuff_items.user_id = (select auth.uid())
+  )
   and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/items/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(photos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|before-after/(before|after)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|(receipts|invoices|documents)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif|pdf|doc|docx))$'
 );
 
@@ -68,11 +80,23 @@ to authenticated
 using (
   bucket_id = 'my-stuff-media'
   and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and exists (
+    select 1
+    from public.my_stuff_items
+    where my_stuff_items.id::text = (storage.foldername(name))[3]
+      and my_stuff_items.user_id = (select auth.uid())
+  )
   and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/items/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(photos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|before-after/(before|after)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|(receipts|invoices|documents)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif|pdf|doc|docx))$'
 )
 with check (
   bucket_id = 'my-stuff-media'
   and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and exists (
+    select 1
+    from public.my_stuff_items
+    where my_stuff_items.id::text = (storage.foldername(name))[3]
+      and my_stuff_items.user_id = (select auth.uid())
+  )
   and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/items/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(photos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|before-after/(before|after)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|(receipts|invoices|documents)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif|pdf|doc|docx))$'
 );
 
@@ -84,6 +108,12 @@ to authenticated
 using (
   bucket_id = 'my-stuff-media'
   and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and exists (
+    select 1
+    from public.my_stuff_items
+    where my_stuff_items.id::text = (storage.foldername(name))[3]
+      and my_stuff_items.user_id = (select auth.uid())
+  )
   and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/items/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(photos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|before-after/(before|after)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)|(receipts|invoices|documents)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif|pdf|doc|docx))$'
 );
 

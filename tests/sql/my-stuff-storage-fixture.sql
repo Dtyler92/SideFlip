@@ -9,6 +9,9 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then
     create role authenticated nologin;
   end if;
+  if not exists (select 1 from pg_roles where rolname = 'storage_service_test') then
+    create role storage_service_test nologin bypassrls;
+  end if;
 end;
 $$;
 
@@ -81,6 +84,19 @@ grant execute on function auth.uid() to anon, authenticated;
 grant execute on function storage.foldername(text) to anon, authenticated;
 grant select, insert, update, delete on storage.objects to anon, authenticated;
 grant select on storage.buckets to anon, authenticated;
+grant usage on schema storage to storage_service_test;
+grant select, delete on storage.objects to storage_service_test;
+
+create table public.my_stuff_items (
+  id uuid primary key,
+  user_id uuid not null
+);
+
+grant select on public.my_stuff_items to authenticated;
+
+insert into public.my_stuff_items (id, user_id) values
+  ('33333333-3333-4333-8333-333333333333', '11111111-1111-4111-8111-111111111111'),
+  ('55555555-5555-4555-8555-555555555555', '22222222-2222-4222-8222-222222222222');
 
 insert into storage.buckets (id, name, public)
 values ('other-private', 'other-private', false);

@@ -70,8 +70,17 @@ test('owner-only policies enforce a record-scoped bounded object-name grammar', 
   assert.match(policy('DELETE'), /\busing\b/i)
 })
 
-test('migration remains storage-only and documents private signed-URL access', () => {
-  assert.doesNotMatch(migration, /\b(public\.(projects|expenses|trade_up_goals|goal_ledger|my_stuff_items|my_stuff_schedules|my_stuff_service_logs))\b/i)
+test('every operation requires an existing caller-owned item', () => {
+  for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+    const sql = policy(operation)
+    assert.match(sql, /exists\s*\([\s\S]*from\s+public\.my_stuff_items/i)
+    assert.match(sql, /my_stuff_items\.id::text\s*=\s*\(storage\.foldername\(name\)\)\[3\]/i)
+    assert.match(sql, /my_stuff_items\.user_id\s*=\s*\(select auth\.uid\(\)\)/i)
+  }
+})
+
+test('migration changes no My Stuff rows and documents private signed-URL access', () => {
+  assert.doesNotMatch(migration, /\b(insert\s+into|update|delete\s+from)\s+public\.(projects|expenses|trade_up_goals|goal_ledger|my_stuff_items|my_stuff_schedules|my_stuff_service_logs)\b/i)
   assert.match(migration, /signed URL/i)
   assert.match(migration, /never persist a\s+(?:--\s*)?public URL/i)
 })

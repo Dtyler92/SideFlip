@@ -242,6 +242,48 @@ begin
   begin
     insert into storage.objects(id, bucket_id, name) values
       (
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa13',
+        'my-stuff-media',
+        '11111111-1111-4111-8111-111111111111/items/99999999-9999-4999-8999-999999999999/photos/15151515-1515-4515-8515-151515151515.jpg'
+      );
+    raise exception 'nonexistent-item INSERT unexpectedly succeeded';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into storage.objects(id, bucket_id, name) values
+      (
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa14',
+        'my-stuff-media',
+        '11111111-1111-4111-8111-111111111111/items/55555555-5555-4555-8555-555555555555/photos/16161616-1616-4616-8616-161616161616.jpg'
+      );
+    raise exception 'other-owner item INSERT under caller prefix unexpectedly succeeded';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    update storage.objects
+    set name = '11111111-1111-4111-8111-111111111111/items/99999999-9999-4999-8999-999999999999/photos/17171717-1717-4717-8717-171717171717.jpg'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    raise exception 'nonexistent-item UPDATE unexpectedly succeeded';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    update storage.objects
+    set name = '11111111-1111-4111-8111-111111111111/items/55555555-5555-4555-8555-555555555555/photos/18181818-1818-4818-8818-181818181818.jpg'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    raise exception 'other-owner item UPDATE under caller prefix unexpectedly succeeded';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into storage.objects(id, bucket_id, name) values
+      (
         'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9',
         'my-stuff-media',
         '11111111-1111-4111-8111-111111111111/arbitrary/nested/path/file.exe'
@@ -335,4 +377,18 @@ select public._storage_test_assert(
    from storage.objects
    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
   'cross-owner upsert did not alter sentinel metadata'
+);
+
+-- Account cleanup uses a service-role Storage client. Model its BYPASSRLS database
+-- phase and prove the ownership policies do not strand an orphan after Auth cleanup.
+set role storage_service_test;
+select set_config('storage.allow_delete_query', 'true', false);
+select public._storage_test_assert(
+  (select count(*) = 1 from storage.objects),
+  'service cleanup can list objects independently of owner policy'
+);
+delete from storage.objects where bucket_id = 'my-stuff-media';
+select public._storage_test_assert(
+  (select count(*) = 0 from storage.objects),
+  'service cleanup can delete remaining private media'
 );
