@@ -5,6 +5,7 @@ import {
   createListingFacts,
   normalizeGenerationOptions,
   parseGeneratedDescription,
+  validateGeneratedDescriptionGrounding,
 } from './_lib/listing-description-prompts.js'
 
 const supabase = createClient(
@@ -173,7 +174,10 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
           }),
         })
         if (!response.ok) throw new Error(`provider_status_${response.status}`)
-        const description = parseGeneratedDescription(await response.json())
+        const description = validateGeneratedDescriptionGrounding(
+          parseGeneratedDescription(await response.json()),
+          facts,
+        )
         const listing = legacyRequest && facts.title ? `${facts.title}\n\n${description}` : description
         return json(res, 200, { description, listing })
       } catch (error) {

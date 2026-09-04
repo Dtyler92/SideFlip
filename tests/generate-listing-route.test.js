@@ -60,7 +60,7 @@ function responseRecorder() {
   }
 }
 
-function anthropicResponse(text = 'Runs and drives.\n\nNew clutch installed; rust is visible over the rear wheel wells.', stopReason = 'end_turn') {
+function anthropicResponse(text = 'Runs and drives.\n\nNew clutch; rust is visible over the rear wheel wells.', stopReason = 'end_turn') {
   return { ok: true, status: 200, json: async () => ({ stop_reason: stopReason, content: [{ type: 'text', text }] }) }
 }
 
@@ -301,6 +301,37 @@ test('truncated or malformed provider output is rejected instead of returned as 
     assert.equal(res.statusCode, 500)
     assert.deepEqual(res.body, { error: "Couldn't generate a description. Try again." })
   }
+})
+
+test('unsupported transaction and paperwork claims are rejected before reaching the seller', async () => {
+  let releaseCalls = 0
+  const handler = createGenerateListingHandler({
+    client: clientFor({
+      userId: 'user-grounding-guard',
+      onRpc: name => { if (name === 'release_ai_generation_request') releaseCalls += 1 },
+    }),
+    fetchImpl: async () => anthropicResponse('Runs and drives. Tax, tags, and title are already handled.'),
+  })
+  const res = responseRecorder()
+  await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'funny', humorLevel: 'balanced' }), res)
+  assert.equal(res.statusCode, 500)
+  assert.deepEqual(res.body, { error: "Couldn't generate a description. Try again." })
+  assert.equal(releaseCalls, 1)
+})
+
+test('directly supplied transaction and paperwork facts may be repeated', async () => {
+  const notes = 'Runs and drives. Seller states tax, tags, and title are already handled.'
+  const handler = createGenerateListingHandler({
+    client: clientFor({
+      userId: 'user-grounding-supported',
+      project: { id: '11111111-1111-4111-8111-111111111111', title: '1998 Ford Ranger', category: 'Vehicles', notes },
+    }),
+    fetchImpl: async () => anthropicResponse(notes),
+  })
+  const res = responseRecorder()
+  await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.description, notes)
 })
 
 test('provider abort errors return a retryable timeout without leaking details', async () => {

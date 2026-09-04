@@ -5,6 +5,7 @@ import {
   createListingFacts,
   normalizeGenerationOptions,
   parseGeneratedDescription,
+  validateGeneratedDescriptionGrounding,
 } from '../api/_lib/listing-description-prompts.js'
 
 const project = {
@@ -54,8 +55,8 @@ test('prompt architecture composes core and one style module while treating sell
   const funny = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'balanced' })
   assert.match(funny.system, /Funny style/i)
   assert.match(funny.system, /Balanced humor level/i)
-  assert.match(funny.system, /screenshot/i)
-  assert.match(funny.system, /obviously humorous/i)
+  assert.match(funny.system, /conversational humor throughout/i)
+  assert.match(funny.system, /obviously figurative/i)
   assert.doesNotMatch(funny.system, /flyest cat|your mama/i)
 
   const normal = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'normal' })
@@ -63,13 +64,172 @@ test('prompt architecture composes core and one style module while treating sell
   assert.doesNotMatch(normal.system, /Professional style|Funny style/i)
 
   const subtle = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'subtle' })
-  assert.match(subtle.system, /1–3 understated humorous observations/i)
+  assert.match(subtle.system, /one or two restrained jokes/i)
   assert.doesNotMatch(subtle.system, /Balanced humor level|Unhinged humor level/i)
 
   const unhinged = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'unhinged' })
-  assert.match(unhinged.system, /memorable enough to screenshot/i)
-  assert.match(unhinged.system, /Do not turn.*random nonsense/i)
+  assert.match(unhinged.system, /energetic, exaggerated, absurd humor throughout/i)
+  assert.match(unhinged.system, /Do not create random nonsense/i)
   assert.doesNotMatch(unhinged.system, /Subtle humor level|Balanced humor level/i)
+})
+
+test('all five generation modes have separate recognizable instructions and item-grounded examples', () => {
+  const facts = createListingFacts(project, expenses)
+  const modes = [
+    ['professional', null, /polished and factual/i, /180,000 miles/i],
+    ['normal', null, /casual and direct/i, /180,000 miles/i],
+    ['funny', 'subtle', /one or two restrained jokes/i, /rear wheel wells/i],
+    ['funny', 'balanced', /conversational humor throughout/i, /five of them/i],
+    ['funny', 'unhinged', /energetic, exaggerated, absurd humor throughout/i, /new clutch/i],
+  ]
+  const systems = modes.map(([style, humorLevel, instruction, groundedExample]) => {
+    const request = buildAnthropicRequest(facts, { style, ...(humorLevel ? { humorLevel } : {}) })
+    assert.match(request.system, instruction)
+    assert.match(request.system, groundedExample)
+    assert.match(request.system, /example/i)
+    return request.system
+  })
+  assert.equal(new Set(systems).size, 5)
+})
+
+test('prompt expressly forbids inferred transaction, title, inspection, warranty, repair, and condition details', () => {
+  const request = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'balanced' })
+  for (const term of ['tax', 'tags', 'title', 'transaction', 'inspection', 'warranty', 'repair', 'condition']) {
+    assert.match(request.system, new RegExp(term, 'i'))
+  }
+  assert.match(request.system, /directly and unambiguously stated/i)
+})
+
+test('protected paperwork and transaction claims are rejected unless directly present in seller data', () => {
+  const facts = createListingFacts(project, expenses)
+  assert.throws(
+    () => validateGeneratedDescriptionGrounding('Runs and drives. Tax, tags, and title are already handled.', facts),
+    /unsupported/i,
+  )
+  assert.throws(
+    () => validateGeneratedDescriptionGrounding('It comes with a warranty and has passed inspection.', facts),
+    /unsupported/i,
+  )
+
+  const supplied = createListingFacts({
+    ...project,
+    notes: `${project.notes} Seller states that tax, tags, and title are already handled.`,
+  }, expenses)
+  assert.doesNotThrow(() => validateGeneratedDescriptionGrounding(
+    'Runs and drives. Seller states that tax, tags, and title are already handled.',
+    supplied,
+  ))
+
+  const suppliedRepairAndCondition = createListingFacts({
+    ...project,
+    notes: `${project.notes} New clutch installed. Mechanically sound.`,
+  }, expenses)
+  assert.doesNotThrow(() => validateGeneratedDescriptionGrounding(
+    'New clutch installed. Mechanically sound.',
+    suppliedRepairAndCondition,
+  ))
+})
+
+test('protected claim guard rejects contradictions, paraphrased administrative claims, and invented repair or condition claims', () => {
+  const adversarial = [
+    ['No title.', 'Tax, tags, and title are already handled.'],
+    ['Warranty expired.', 'Warranty included.'],
+    ['Needs inspection.', 'Passed inspection.'],
+    ['Tax not included.', 'Taxes are taken care of.'],
+    ['', 'Tags are already handled.'],
+    ['', 'Title included.'],
+    ['', 'The title is in my name.'],
+    ['', 'Inspection passed.'],
+    ['', 'No inspection needed.'],
+    ['', 'Delivery can be arranged.'],
+    ['', 'Recently serviced and needs nothing.'],
+    ['New clutch.', 'The clutch was professionally installed.'],
+    ['', 'Mechanically sound with no hidden issues.'],
+    ['Not reliable.', 'Reliable.'],
+    ['Unreliable.', 'Reliable.'],
+    ['Far from reliable.', 'Reliable.'],
+    ['Hardly reliable.', 'Reliable.'],
+    ['Anything but reliable.', 'Reliable.'],
+    ['Cannot say it is reliable.', 'Reliable.'],
+    ['Cannot be called roadworthy.', 'Roadworthy.'],
+    ["I wouldn't call it reliable.", 'Reliable.'],
+    ['It fails to be mechanically sound.', 'Mechanically sound.'],
+    ['It failed to be reliable.', 'Reliable.'],
+    ['It was unable to be roadworthy.', 'Roadworthy.'],
+    ["It doesn't need inspection.", 'It may need inspection.'],
+    ["It wouldn't need inspection.", 'It may need inspection.'],
+    ['It did not fail inspection.', 'Failed inspection.'],
+    ['Cannot promise no hidden issues.', 'No hidden issues.'],
+    ['Not mechanically sound.', 'Mechanically sound.'],
+    ['Not roadworthy.', 'Roadworthy.'],
+    ['Not repaired.', 'Repaired.'],
+    ['Not a clean title.', 'Clean title.'],
+    ['', 'In great shape.'],
+    ['', 'Freshly tuned up.'],
+    ['', 'The vehicle has been inspected.'],
+    ['', 'Factory warranty coverage remains.'],
+    ['', 'The title has no liens.'],
+    ['', 'The transmission was overhauled.'],
+    ['', 'Dependable and ready for the road.'],
+    ['', 'Everything works as it should.'],
+    ['', "I'll bring it to the buyer."],
+    ['', 'You will receive the title at pickup.'],
+    ['', 'The title comes with the vehicle.'],
+    ['', 'The title is free and clear.'],
+    ['', 'Tags are good through 2027.'],
+    ['', 'Registration is good until June.'],
+    ['', 'It cleared inspection.'],
+    ['', 'Fresh inspection.'],
+    ['', 'Covered by the factory warranty.'],
+    ['', 'A warranty comes with it.'],
+    ['', 'A factory warranty is provided.'],
+    ['', 'Monthly payments are an option.'],
+    ['', 'I can drop it off.'],
+    ['', 'Free delivery within town.'],
+    ['', 'All documents are complete.'],
+    ['', 'The clutch was done recently.'],
+    ['', 'No known problems.'],
+    ['', 'It starts every time.'],
+    ['', 'It is in excellent mechanical condition.'],
+  ]
+  for (const [sellerNotes, generated] of adversarial) {
+    const facts = createListingFacts({ ...project, notes: sellerNotes || project.notes }, [])
+    assert.throws(() => validateGeneratedDescriptionGrounding(generated, facts), /unsupported/i, generated)
+  }
+  const splitFacts = { workAndParts: ['Tax', 'Paid'] }
+  assert.throws(() => validateGeneratedDescriptionGrounding('Tax paid.', splitFacts), /unsupported/i)
+
+  const priorGeneratedText = createListingFacts(project, [], 'Tax, tags, and title are already handled.')
+  assert.throws(
+    () => validateGeneratedDescriptionGrounding('Tax, tags, and title are already handled.', priorGeneratedText),
+    /unsupported/i,
+  )
+})
+
+test('protected claim guard covers unsupported administrative claims without blocking harmless wording', () => {
+  const facts = createListingFacts(project, expenses)
+  for (const claim of [
+    'Clean title.',
+    'Registration is current.',
+    'Passed inspection.',
+    'Warranty included.',
+    'Financing available.',
+    'Cash only.',
+    'Delivery available.',
+    'Paperwork is ready.',
+  ]) {
+    assert.throws(() => validateGeneratedDescriptionGrounding(claim, facts), /unsupported/i, claim)
+  }
+  for (const harmless of [
+    'It delivers the supplied 5-speed experience.',
+    'The rust earns the title of most visible disclosed flaw.',
+    'No giant price-tag joke is needed.',
+    'The rust is a reliable source of neighborhood conversation.',
+    "The rust is Mother Nature's professionally installed pinstripe.",
+    'No warranty-sized promises here; just the disclosed rust.',
+  ]) {
+    assert.doesNotThrow(() => validateGeneratedDescriptionGrounding(harmless, facts), harmless)
+  }
 })
 
 test('seller prompt injection remains data and cannot replace system instructions', () => {
