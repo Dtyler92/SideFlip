@@ -15,6 +15,7 @@ const MAX_HISTORY_NOTES_LENGTH = 1_000
 const MAX_HISTORY_COUNT = 100
 const MAX_SCHEDULE_COUNT = 50
 const MAX_MEDIA_COUNT = 12
+const MAX_REVISION_LINE_ITEMS = 50
 const MAX_MONEY = 1_000_000_000_000
 
 // PRIVATE_MEDIA_ADAPTER_CONTRACT:
@@ -23,9 +24,14 @@ const MAX_MONEY = 1_000_000_000_000
 // The adapter must resolve private storage server-side. It must never return raw
 // object keys, bucket names, storage paths, permanent/public URLs, or documents
 // that have not been independently authorized for this owner and subject.
-const NO_PRIVATE_MEDIA = Object.freeze({
-  async listPrivateMedia() { return [] },
-})
+const NO_PRIVATE_MEDIA = null
+
+function defaultUserClientFactory(token) {
+  return createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  })
+}
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'private, no-store, no-cache, max-age=0, must-revalidate')
@@ -55,6 +61,24 @@ function cleanNumber(value, maximum = Number.MAX_SAFE_INTEGER) {
   if (value === null || value === undefined || value === '') return undefined
   const number = Number(value)
   return Number.isFinite(number) && Math.abs(number) <= maximum ? number : undefined
+}
+
+function cleanBoolean(value) {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function cleanHttpsUrl(value) {
+  const cleaned = cleanText(value, 2_048)
+  if (!cleaned) return undefined
+  try {
+    const url = new URL(cleaned)
+    return url.protocol === 'https:' ? url.toString() : undefined
+  } catch { return undefined }
+}
+
+function maskIdentifier(value) {
+  const cleaned = cleanText(value, 100)
+  return cleaned && cleaned.length >= 4 ? `••••${cleaned.slice(-4)}` : undefined
 }
 
 function assignDefined(target, entries) {
@@ -116,7 +140,7 @@ function projectIdentifiers(legacy, vehicle) {
     ['serialNumber', cleanText(legacy?.serial_number, 200)],
     ['engineModel', cleanText(legacy?.engine_model, 200)],
     ['engineSerial', cleanText(legacy?.engine_serial, 200)],
-    ['vin', cleanText(legacy?.vin, 100)],
+    ['vin', maskIdentifier(legacy?.vin)],
     ['hullNumber', cleanText(legacy?.hull_number, 100)],
     ['vehicleYear', cleanNumber(vehicle?.vehicle_year, 3000)],
     ['vehicleMake', cleanText(vehicle?.vehicle_make, 100)],
@@ -183,6 +207,7 @@ function itemSummary(row) {
     ['notes', cleanText(row?.notes, MAX_NOTES_LENGTH)],
     ['currentMileage', cleanNumber(row?.current_mileage)],
     ['currentHours', cleanNumber(row?.current_hours)],
+    ['currentCycles', cleanNumber(row?.current_cycles)],
     ['createdAt', cleanDate(row?.created_at)],
     ['updatedAt', cleanDate(row?.updated_at)],
   ])
@@ -200,8 +225,8 @@ function schedules(rows) {
   ]))
 }
 
-function serviceHistory(rows, includeCosts) {
-  return (Array.isArray(rows) ? rows : []).slice(0, MAX_HISTORY_COUNT).map(row => assignDefined({}, [
+function legacyServiceHistory(rows, includeCosts) {
+  return (Array.isArray(rows) ? rows : []).slice(0, MAX_HISTORY_COUNT).map(row => assignDefined({ source: { version: 1 } }, [
     ['name', cleanText(row?.name, 300)],
     ['completedAt', cleanDate(row?.completed_at)],
     ['mileage', cleanNumber(row?.mileage)],
@@ -211,36 +236,200 @@ function serviceHistory(rows, includeCosts) {
   ]))
 }
 
-async function loadMyStuffReport(client, userId, input) {
+function dueState(row) {
+  if (!row) return undefined
+  const status = ['needs_usage_update', 'overdue', 'due_now', 'due_soon', 'upcoming'].includes(row.due_status)
+    ? row.due_status : undefined
+  return assignDefined({}, [
+    ['nextDueAt', cleanDate(row.next_due_at)],
+    ['nextDueMileage', cleanNumber(row.next_due_mileage)],
+    ['nextDueHours', cleanNumber(row.next_due_hours)],
+    ['nextDueCycles', cleanNumber(row.next_due_cycles)],
+    ['status', status],
+  ])
+}
+
+function maintenanceDefinitions(rows, dueRows) {
+  const dueByDefinition = new Map((Array.isArray(dueRows) ? dueRows : []).map(row => [row?.definition_id, row]))
+  return (Array.isArray(rows) ? rows : []).slice(0, MAX_SCHEDULE_COUNT).map(row => {
+    const source = assignDefined({}, [
+      ['provenanceType', cleanText(row?.provenance_type, 40)],
+      ['sourceClass', cleanText(row?.source_class, 50)],
+      ['citationUrl', cleanHttpsUrl(row?.citation_url)],
+      ['citationTitle', cleanText(row?.citation_title, 500)],
+      ['citationPage', cleanText(row?.citation_page, 100)],
+      ['citationSection', cleanText(row?.citation_section, 500)],
+      ['citationAccessedOn', cleanDate(row?.citation_accessed_on)],
+      ['uncertain', cleanBoolean(row?.uncertain)],
+      ['uncertaintyReason', cleanText(row?.uncertainty_reason, 2_000)],
+    ])
+    return assignDefined({ source }, [
+      ['name', cleanText(row?.name, 200)],
+      ['description', cleanText(row?.description, 4_000)],
+      ['serviceCategory', cleanText(row?.service_category, 80)],
+      ['serviceAction', cleanText(row?.service_action, 40)],
+      ['dueSemantics', cleanText(row?.due_semantics, 40)],
+      ['activeProfile', cleanText(row?.active_profile, 40)],
+      ['cadenceAnchor', cleanText(row?.cadence_anchor, 40)],
+      ['normalIntervalMiles', cleanNumber(row?.normal_interval_miles)],
+      ['normalIntervalHours', cleanNumber(row?.normal_interval_hours)],
+      ['normalIntervalCycles', cleanNumber(row?.normal_interval_cycles)],
+      ['normalCalendarMonths', cleanNumber(row?.normal_calendar_months, 1_200)],
+      ['severeIntervalMiles', cleanNumber(row?.severe_interval_miles)],
+      ['severeIntervalHours', cleanNumber(row?.severe_interval_hours)],
+      ['severeIntervalCycles', cleanNumber(row?.severe_interval_cycles)],
+      ['severeCalendarMonths', cleanNumber(row?.severe_calendar_months, 1_200)],
+      ['firstIntervalMiles', cleanNumber(row?.first_interval_miles)],
+      ['firstIntervalHours', cleanNumber(row?.first_interval_hours)],
+      ['firstIntervalCycles', cleanNumber(row?.first_interval_cycles)],
+      ['firstCalendarMonths', cleanNumber(row?.first_calendar_months, 1_200)],
+      ['dueSoonMiles', cleanNumber(row?.due_soon_miles)],
+      ['dueSoonHours', cleanNumber(row?.due_soon_hours)],
+      ['dueSoonCycles', cleanNumber(row?.due_soon_cycles)],
+      ['dueSoonDays', cleanNumber(row?.due_soon_days, 36_500)],
+      ['enabled', cleanBoolean(row?.enabled)],
+      ['dueState', dueState(dueByDefinition.get(row?.id))],
+    ])
+  })
+}
+
+function usageReadings(rows) {
+  return (Array.isArray(rows) ? rows : []).slice(0, MAX_HISTORY_COUNT).map(row => assignDefined({}, [
+    ['type', ['mileage', 'hours', 'cycles'].includes(row?.reading_type) ? row.reading_type : undefined],
+    ['value', cleanNumber(row?.reading_value)],
+    ['recordedAt', cleanDate(row?.recorded_at)],
+    ['source', cleanText(row?.source, 40)],
+    ['correctionReason', cleanText(row?.correction_reason, 1_000)],
+    ['createdAt', cleanDate(row?.created_at)],
+  ]))
+}
+
+function revisionLineItems(rows) {
+  return (Array.isArray(rows) ? rows : []).slice(0, MAX_REVISION_LINE_ITEMS).map(row => assignDefined({}, [
+    ['name', cleanText(row?.name, 300)],
+    ['description', cleanText(row?.description, 500)],
+    ['quantity', cleanNumber(row?.quantity, 1_000_000)],
+    ['cost', cleanNumber(row?.cost, MAX_MONEY)],
+    ['amount', cleanNumber(row?.amount, MAX_MONEY)],
+    ['hours', cleanNumber(row?.hours, 1_000_000)],
+    ['rate', cleanNumber(row?.rate, MAX_MONEY)],
+  ]))
+}
+
+function latestRevision(rows, includeCosts) {
+  const candidates = Array.isArray(rows) ? rows : []
+  const row = candidates.reduce((latest, candidate) => (cleanNumber(candidate?.revision_number, 1_000_000) ?? -1) > (cleanNumber(latest?.revision_number, 1_000_000) ?? -1) ? candidate : latest, null)
+  if (!row) return undefined
+  const revision = assignDefined({}, [
+    ['revisionNumber', cleanNumber(row.revision_number, 1_000_000)],
+    ['notes', cleanText(row.notes, MAX_HISTORY_NOTES_LENGTH)],
+    ['revisionReason', cleanText(row.revision_reason, 1_000)],
+    ['createdAt', cleanDate(row.created_at)],
+  ])
+  if (includeCosts) {
+    revision.parts = revisionLineItems(row.parts)
+    revision.labor = revisionLineItems(row.labor)
+    revision.vendor = assignDefined({}, [['name', cleanText(row.vendor?.name, 300)]])
+    revision.warranty = assignDefined({}, [
+      ['description', cleanText(row.warranty?.description, 500)],
+      ['months', cleanNumber(row.warranty?.months, 1_200)],
+      ['expiresAt', cleanDate(row.warranty?.expires_at)],
+    ])
+  }
+  return revision
+}
+
+function occurrenceProvenance(value, includeCosts) {
+  const result = assignDefined({}, [
+    ['description', cleanText(value?.description, 500)],
+    ['category', cleanText(value?.category, 100)],
+    ['createdAt', cleanDate(value?.created_at)],
+  ])
+  if (includeCosts) assignDefined(result, [['amount', cleanNumber(value?.amount, MAX_MONEY)]])
+  return result
+}
+
+function v2ServiceHistory(rows, includeCosts) {
+  return (Array.isArray(rows) ? rows : []).slice(0, MAX_HISTORY_COUNT).map(row => {
+    const source = assignDefined({ version: 2, provenance: occurrenceProvenance(row?.provenance, includeCosts) }, [
+      ['provenanceType', cleanText(row?.provenance_type, 50)],
+    ])
+    return assignDefined({ source }, [
+      ['name', cleanText(row?.service_name, 300)],
+      ['category', cleanText(row?.service_category, 80)],
+      ['action', cleanText(row?.service_action, 40)],
+      ['scheduled', cleanBoolean(row?.scheduled)],
+      ['completedAt', cleanDate(row?.completed_at)],
+      ['mileage', cleanNumber(row?.mileage)],
+      ['hours', cleanNumber(row?.hours)],
+      ['cycles', cleanNumber(row?.cycles)],
+      ['latestRevision', latestRevision(row?.my_stuff_service_occurrence_revisions, includeCosts)],
+    ])
+  })
+}
+
+function historyTime(row) {
+  const value = Date.parse(row?.completedAt || '')
+  return Number.isFinite(value) ? value : 0
+}
+
+async function loadMyStuffReport(client, userClient, userId, input) {
   const baseResult = await client.from('my_stuff_items')
-    .select('id,name,category,acquired_on,notes,current_mileage,current_hours,created_at,updated_at')
+    .select('id,name,category,acquired_on,notes,current_mileage,current_hours,current_cycles,created_at,updated_at')
     .eq('id', input.subjectId).eq('user_id', userId).maybeSingle()
   if (baseResult.error || !baseResult.data) return { error: true }
   const logColumns = input.includeDetailedCosts
     ? 'name,completed_at,mileage,hours,cost,notes'
     : 'name,completed_at,mileage,hours,notes'
-  const [scheduleResult, logResult] = await Promise.all([
+  const definitionColumns = 'id,name,description,service_category,service_action,due_semantics,active_profile,cadence_anchor,normal_interval_miles,normal_interval_hours,normal_interval_cycles,normal_calendar_months,severe_interval_miles,severe_interval_hours,severe_interval_cycles,severe_calendar_months,first_interval_miles,first_interval_hours,first_interval_cycles,first_calendar_months,due_soon_miles,due_soon_hours,due_soon_cycles,due_soon_days,provenance_type,source_class,citation_url,citation_title,citation_page,citation_section,citation_accessed_on,uncertain,uncertainty_reason,enabled'
+  const occurrenceColumns = 'id,definition_id,service_name,service_category,service_action,scheduled,completed_at,mileage,hours,cycles,provenance_type,provenance,my_stuff_service_occurrence_revisions(revision_number,parts,labor,vendor,warranty,notes,revision_reason,created_at)'
+  const occurrenceQuery = userClient.from('my_stuff_service_occurrences').select(occurrenceColumns)
+    .eq('item_id', input.subjectId).eq('user_id', userId)
+    .order('revision_number', { ascending: false, referencedTable: 'my_stuff_service_occurrence_revisions' })
+    .limit(1, { referencedTable: 'my_stuff_service_occurrence_revisions' })
+    .order('completed_at', { ascending: false }).limit(MAX_HISTORY_COUNT)
+  const [scheduleResult, logResult, definitionResult, dueResult, readingResult, occurrenceResult] = await Promise.all([
     client.from('my_stuff_schedules')
       .select('name,tracking_type,interval_value,last_completed_at,last_completed_value,next_due_at,next_due_value')
       .eq('item_id', input.subjectId).eq('user_id', userId).order('created_at', { ascending: true }).limit(MAX_SCHEDULE_COUNT),
     client.from('my_stuff_service_logs').select(logColumns)
       .eq('item_id', input.subjectId).eq('user_id', userId).order('completed_at', { ascending: false }).limit(MAX_HISTORY_COUNT),
+    userClient.from('my_stuff_maintenance_definitions').select(definitionColumns)
+      .eq('item_id', input.subjectId).eq('user_id', userId).order('created_at', { ascending: true }).limit(MAX_SCHEDULE_COUNT),
+    userClient.rpc('get_my_stuff_due_state_v2', { p_item_id: input.subjectId, p_as_of: new Date().toISOString() })
+      .limit(MAX_SCHEDULE_COUNT),
+    userClient.from('my_stuff_readings').select('reading_type,reading_value,recorded_at,source,correction_reason,created_at')
+      .eq('item_id', input.subjectId).eq('user_id', userId).order('recorded_at', { ascending: false }).limit(MAX_HISTORY_COUNT),
+    occurrenceQuery,
   ])
-  if (scheduleResult.error || logResult.error) return { error: true }
+  if ([scheduleResult, logResult, definitionResult, dueResult, readingResult, occurrenceResult].some(result => result.error)) return { error: true }
   const report = itemSummary(baseResult.data)
   report.schedules = schedules(scheduleResult.data)
-  report.serviceHistory = serviceHistory(logResult.data, input.includeDetailedCosts)
+  report.maintenanceDefinitions = maintenanceDefinitions(definitionResult.data, dueResult.data)
+  report.usageReadings = usageReadings(readingResult.data)
+  report.serviceHistory = [
+    ...v2ServiceHistory(occurrenceResult.data, input.includeDetailedCosts),
+    ...legacyServiceHistory(logResult.data, input.includeDetailedCosts),
+  ].sort((left, right) => historyTime(right) - historyTime(left)).slice(0, MAX_HISTORY_COUNT)
 
   if (input.includeIdentifiers) {
     const optional = await optionalSingle(client.from('my_stuff_items')
-      .select('manufacturer,model,year,serial_number,vin').eq('id', input.subjectId).eq('user_id', userId))
+      .select('manufacturer,make,model,trim,model_year,model_number,engine_model,serial_number,engine_serial,vin,hull_number,registration_number')
+      .eq('id', input.subjectId).eq('user_id', userId))
     if (optional.error) return { error: true }
     report.identifiers = assignDefined({}, [
       ['manufacturer', cleanText(optional.data?.manufacturer, 100)],
+      ['make', cleanText(optional.data?.make, 100)],
       ['model', cleanText(optional.data?.model, 200)],
-      ['year', cleanNumber(optional.data?.year, 3000)],
+      ['trim', cleanText(optional.data?.trim, 100)],
+      ['year', cleanNumber(optional.data?.model_year, 3000)],
+      ['modelNumber', cleanText(optional.data?.model_number, 200)],
+      ['engineModel', cleanText(optional.data?.engine_model, 200)],
       ['serialNumber', cleanText(optional.data?.serial_number, 200)],
-      ['vin', cleanText(optional.data?.vin, 100)],
+      ['engineSerial', cleanText(optional.data?.engine_serial, 200)],
+      ['vin', maskIdentifier(optional.data?.vin)],
+      ['hullNumber', cleanText(optional.data?.hull_number, 100)],
+      ['registrationNumber', cleanText(optional.data?.registration_number, 100)],
     ])
   }
   if (input.includeDetailedCosts) {
@@ -270,7 +459,7 @@ function sanitizeMedia(rows, requestedKinds) {
   })
 }
 
-export function createReportDataHandler({ client = supabase, privateMediaAdapter = NO_PRIVATE_MEDIA } = {}) {
+export function createReportDataHandler({ client = supabase, userClientFactory = defaultUserClientFactory, privateMediaAdapter = NO_PRIVATE_MEDIA } = {}) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return failure(res, 405, 'METHOD_NOT_ALLOWED', 'Use POST for private report data.')
     const parsed = parseRequest(req)
@@ -285,15 +474,17 @@ export function createReportDataHandler({ client = supabase, privateMediaAdapter
     const { data: { user } = {}, error: authError } = await client.auth.getUser(token)
     if (authError || !user?.id) return failure(res, 401, 'AUTH_REQUIRED', 'Sign in again to create a report.')
 
-    const [tombstoneResult, profileResult, entitlementResult] = await Promise.all([
-      client.from('account_deletion_tombstones').select('status').eq('user_id', user.id).maybeSingle(),
+    const tombstoneResult = await client.from('account_deletion_tombstones').select('status').eq('user_id', user.id).maybeSingle()
+    if (tombstoneResult.error) return failure(res, 503, 'SERVICE_UNAVAILABLE', 'Report access could not be verified.')
+    if (tombstoneResult.data) return failure(res, 410, 'ACCOUNT_DELETED', 'This account is unavailable.')
+
+    const [profileResult, entitlementResult] = await Promise.all([
       client.from('profiles').select('subscription_id,subscription_status').eq('id', user.id).maybeSingle(),
       client.from('user_entitlements').select('source,status,expires_at,last_verified_at').eq('user_id', user.id),
     ])
-    if (tombstoneResult.error || profileResult.error || entitlementResult.error) {
+    if (profileResult.error || entitlementResult.error) {
       return failure(res, 503, 'SERVICE_UNAVAILABLE', 'Report access could not be verified.')
     }
-    if (tombstoneResult.data) return failure(res, 410, 'ACCOUNT_DELETED', 'This account is unavailable.')
     if (resolveServerEntitlement(profileResult.data, entitlementResult.data).plan !== 'pro') {
       return failure(res, 403, 'PRO_REQUIRED', 'SideFlip Pro is required for reports.')
     }
@@ -305,10 +496,13 @@ export function createReportDataHandler({ client = supabase, privateMediaAdapter
 
     const loaded = input.subjectType === 'project'
       ? await loadProjectReport(client, user.id, input)
-      : await loadMyStuffReport(client, user.id, input)
+      : await loadMyStuffReport(client, userClientFactory(token), user.id, input)
     if (loaded.error) return failure(res, 503, 'SERVICE_UNAVAILABLE', 'Report data is temporarily unavailable.')
 
     if (input.includePhotos || input.includeDocuments) {
+      if (!privateMediaAdapter || typeof privateMediaAdapter.listPrivateMedia !== 'function') {
+        return failure(res, 503, 'PRIVATE_MEDIA_UNAVAILABLE', 'Private media is not available for reports.')
+      }
       const kinds = [input.includePhotos ? 'photo' : null, input.includeDocuments ? 'document' : null].filter(Boolean)
       let mediaRows
       try {

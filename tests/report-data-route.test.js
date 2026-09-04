@@ -10,17 +10,21 @@ const SUBJECT_ID = '11111111-1111-4111-8111-111111111111'
 
 function result(data, error = null) { return { data, error } }
 
-function clientFor({ userId = 'user-1', plan = 'pro', tombstone = null, tableResults = {}, onQuery = () => {}, authError = null } = {}) {
+function clientFor({ userId = 'user-1', plan = 'pro', tombstone = null, tableResults = {}, rpcResults = {}, onQuery = () => {}, authError = null } = {}) {
   const profile = plan === 'pro' ? { subscription_id: 'sub_synthetic', subscription_status: 'active' } : { subscription_id: null, subscription_status: null }
   return {
     auth: { getUser: async () => ({ data: { user: authError ? null : { id: userId } }, error: authError }) },
     from(table) {
-      const state = { table, columns: null, filters: [], limit: null, order: null }
+      const state = { table, columns: null, filters: [], limit: null, referencedLimits: [], order: null }
       const chain = {
         select(columns) { state.columns = columns; return chain },
         eq(column, value) { state.filters.push([column, value]); return chain },
         order(column, options) { state.order = [column, options]; return chain },
-        limit(value) { state.limit = value; return run(false) },
+        limit(value, options) {
+          if (options?.referencedTable) state.referencedLimits.push([value, options])
+          else state.limit = [value, options]
+          return chain
+        },
         maybeSingle() { return run(true) },
         then(resolve, reject) { return run(false).then(resolve, reject) },
       }
@@ -33,6 +37,19 @@ function clientFor({ userId = 'user-1', plan = 'pro', tombstone = null, tableRes
         if (table === 'user_entitlements') return result([])
         if (table === 'account_deletion_tombstones') return result(tombstone)
         return result(single ? null : [])
+      }
+      return chain
+    },
+    rpc(name, parameters) {
+      const state = { rpc: name, parameters, limit: null }
+      const chain = {
+        limit(value, options) { state.limit = [value, options]; return chain },
+        then(resolve, reject) { return run().then(resolve, reject) },
+      }
+      async function run() {
+        onQuery({ ...state })
+        const configured = rpcResults[name]
+        return typeof configured === 'function' ? configured(parameters) : (configured || result([]))
       }
       return chain
     },
@@ -119,6 +136,17 @@ test('authentication, deletion tombstone, and authoritative Pro checks fail clos
   }
 })
 
+test('authorization gates run in auth, tombstone, Pro, then ownership order', async () => {
+  const sequence = []
+  const client = projectClient({ onQuery: query => sequence.push(query.table || query.rpc) })
+  const res = responseRecorder()
+  await createReportDataHandler({ client })(request(validBody()), res)
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(sequence.slice(0, 5), [
+    'account_deletion_tombstones', 'profiles', 'user_entitlements', 'projects', 'projects',
+  ])
+})
+
 test('thrown database failures are converted to a stable fail-closed response', async () => {
   const client = projectClient()
   client.from = () => { throw new Error('network details must not escape') }
@@ -168,7 +196,7 @@ test('explicit project opt-ins expose only allowlisted identifiers and detailed 
   await createReportDataHandler({ client: projectClient() })(request(validBody({ includeIdentifiers: true, includeDetailedCosts: true })), res)
   assert.equal(res.statusCode, 200)
   assert.deepEqual(res.body.report.identifiers, {
-    modelNumber: 'M-1', serialNumber: 'S-1', engineModel: 'E-1', engineSerial: 'ES-1', vin: 'VIN-PRIVATE', hullNumber: 'H-1',
+    modelNumber: 'M-1', serialNumber: 'S-1', engineModel: 'E-1', engineSerial: 'ES-1', vin: '••••VATE', hullNumber: 'H-1',
     vehicleYear: 1998, vehicleMake: 'Ford', vehicleModel: 'Ranger',
   })
   assert.deepEqual(res.body.report.detailedCosts, {
@@ -177,32 +205,127 @@ test('explicit project opt-ins expose only allowlisted identifiers and detailed 
   })
 })
 
-test('My Stuff report bounds maintenance history and keeps costs opt-in', async () => {
+test('My Stuff report preserves bounded V1 history and reads complete V2 report history', async () => {
   const queries = []
   const logs = Array.from({ length: 140 }, (_, index) => ({
     name: `Service ${index}`, completed_at: '2026-01-01T00:00:00.000Z', mileage: index, hours: null,
     cost: 10, notes: 'x'.repeat(2000),
   }))
+  const occurrenceId = '22222222-2222-4222-8222-222222222222'
+  const definitionId = '33333333-3333-4333-8333-333333333333'
   const client = clientFor({
     onQuery: query => queries.push(query),
     tableResults: {
       my_stuff_items: ({ columns }) => result(columns === 'id' ? { id: SUBJECT_ID } : {
         id: SUBJECT_ID, name: 'Generator', category: 'equipment', acquired_on: '2024-01-01', notes: 'Backup power',
-        current_mileage: null, current_hours: 41, created_at: '2024-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+        current_mileage: null, current_hours: 41, current_cycles: 8, created_at: '2024-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
       }),
       my_stuff_schedules: result([]),
       my_stuff_service_logs: result(logs),
+      my_stuff_maintenance_definitions: result([{
+        id: definitionId, name: 'Oil service', description: 'Change oil', service_category: 'engine', service_action: 'service',
+        due_semantics: 'whichever_first', active_profile: 'normal', cadence_anchor: 'last_completion', normal_interval_hours: 50,
+        due_soon_hours: 10, provenance_type: 'ai_research', source_class: 'manufacturer_manual',
+        citation_url: 'https://manufacturer.example/manual', citation_title: 'Owner manual', citation_page: '42',
+        citation_section: 'Maintenance', citation_accessed_on: '2026-08-01', uncertain: false, enabled: true,
+      }]),
+      my_stuff_readings: result([{
+        reading_type: 'hours', reading_value: 41, recorded_at: '2026-01-01T00:00:00.000Z', source: 'manual',
+        correction_reason: null, created_at: '2026-01-01T00:00:01.000Z',
+      }]),
+      my_stuff_service_occurrences: result([{
+        id: occurrenceId, definition_id: definitionId, service_name: 'Oil service', service_category: 'engine',
+        service_action: 'service', scheduled: true, completed_at: '2026-02-01T00:00:00.000Z', mileage: null,
+        hours: 40, cycles: 8, provenance_type: 'project_expense_snapshot',
+        provenance: { description: 'Oil and filter', category: 'maintenance', amount: 85, user_id: 'must-not-leak' },
+        my_stuff_service_occurrence_revisions: [{
+          revision_number: 2, notes: 'Corrected receipt', revision_reason: 'Receipt correction', created_at: '2026-02-02T00:00:00.000Z',
+          parts: [{ name: 'Filter', cost: 15, storagePath: 'private/key' }], labor: [{ description: 'Oil change', amount: 70 }],
+          vendor: { name: 'Local shop', account: 'private' }, warranty: { description: '90 days', secret: 'private' },
+        }],
+      }]),
+    },
+    rpcResults: { get_my_stuff_due_state_v2: result([{
+      definition_id: definitionId, next_due_at: null, next_due_mileage: null, next_due_hours: 90,
+      next_due_cycles: null, due_status: 'upcoming',
+    }]) },
+  })
+  const tokens = []
+  const res = responseRecorder()
+  await createReportDataHandler({ client, userClientFactory: token => { tokens.push(token); return client } })(request(validBody({ subjectType: 'my_stuff_item' })), res)
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(tokens, ['synthetic-token'])
+  assert.equal(res.body.report.currentCycles, 8)
+  assert.equal(res.body.report.serviceHistory.length, 100)
+  assert.equal(res.body.report.serviceHistory[0].source.version, 2)
+  assert.equal(res.body.report.serviceHistory[0].latestRevision.revisionNumber, 2)
+  assert.equal(res.body.report.serviceHistory[0].latestRevision.notes, 'Corrected receipt')
+  assert.equal('parts' in res.body.report.serviceHistory[0].latestRevision, false)
+  assert.deepEqual(res.body.report.serviceHistory[0].source.provenance, { description: 'Oil and filter', category: 'maintenance' })
+  assert.equal(res.body.report.serviceHistory[1].notes.length, 1000)
+  assert.equal('cost' in res.body.report.serviceHistory[1], false)
+  assert.deepEqual(res.body.report.maintenanceDefinitions[0].dueState, { nextDueHours: 90, status: 'upcoming' })
+  assert.equal(res.body.report.maintenanceDefinitions[0].source.citationTitle, 'Owner manual')
+  assert.deepEqual(res.body.report.usageReadings, [{
+    type: 'hours', value: 41, recordedAt: '2026-01-01T00:00:00.000Z', source: 'manual', createdAt: '2026-01-01T00:00:01.000Z',
+  }])
+  assert.doesNotMatch(JSON.stringify(res.body), /must-not-leak|private\/key|"account"|"secret"|"amount":85/)
+  const historyQuery = queries.find(query => query.table === 'my_stuff_service_logs')
+  assert.equal(historyQuery.limit[0], 100)
+  assert.ok(historyQuery.columns.split(',').every(column => column.trim() !== 'cost'))
+  const v2Query = queries.find(query => query.table === 'my_stuff_service_occurrences')
+  assert.deepEqual(v2Query.limit, [100, undefined])
+  assert.match(v2Query.columns, /my_stuff_service_occurrence_revisions/)
+  const dueStateQuery = queries.find(query => query.rpc === 'get_my_stuff_due_state_v2')
+  assert.deepEqual(dueStateQuery.limit, [50, undefined])
+})
+
+test('detailed-cost opt-in exposes only allowlisted V2 revision and provenance cost fields', async () => {
+  const client = clientFor({ tableResults: {
+    my_stuff_items: ({ columns }) => result(columns === 'id' ? { id: SUBJECT_ID } : columns.includes('purchase_price')
+      ? { purchase_price: 1000, estimated_value: 1200 }
+      : { id: SUBJECT_ID, name: 'Truck' }),
+    my_stuff_schedules: result([]), my_stuff_service_logs: result([]), my_stuff_maintenance_definitions: result([]), my_stuff_readings: result([]),
+    my_stuff_service_occurrences: result([{
+      id: '22222222-2222-4222-8222-222222222222', service_name: 'Repair', completed_at: '2026-01-01T00:00:00Z', provenance_type: 'project_expense_snapshot',
+      provenance: { amount: 85, description: 'Repair', provider_customer_id: 'nope' },
+      my_stuff_service_occurrence_revisions: [{ revision_number: 1, parts: [{ name: 'Part', quantity: 2, cost: 10, private: 'nope' }], labor: [{ hours: 1, rate: 65 }], vendor: { name: 'Shop', phone: 'nope' }, warranty: { description: '90 days' } }],
+    }]),
+  } })
+  const res = responseRecorder()
+  await createReportDataHandler({ client, userClientFactory: () => client })(request(validBody({ subjectType: 'my_stuff_item', includeDetailedCosts: true })), res)
+  assert.equal(res.statusCode, 200)
+  const entry = res.body.report.serviceHistory[0]
+  assert.equal(entry.source.provenance.amount, 85)
+  assert.deepEqual(entry.latestRevision.parts, [{ name: 'Part', quantity: 2, cost: 10 }])
+  assert.deepEqual(entry.latestRevision.labor, [{ hours: 1, rate: 65 }])
+  assert.deepEqual(entry.latestRevision.vendor, { name: 'Shop' })
+  assert.deepEqual(entry.latestRevision.warranty, { description: '90 days' })
+  assert.doesNotMatch(JSON.stringify(entry), /provider_customer_id|private|phone/)
+})
+
+test('My Stuff identifiers use model_year and never expose a full VIN', async () => {
+  const queries = []
+  const client = clientFor({
+    onQuery: query => queries.push(query),
+    tableResults: {
+      my_stuff_items: ({ columns }) => {
+        if (columns === 'id') return result({ id: SUBJECT_ID })
+        if (columns.includes('model_year')) return result({ manufacturer: 'Ford', model: 'Ranger', model_year: 1998, vin: '1FTYR10C8WTA12345' })
+        return result({ id: SUBJECT_ID, name: 'Truck' })
+      },
+      my_stuff_schedules: result([]), my_stuff_service_logs: result([]), my_stuff_maintenance_definitions: result([]),
+      my_stuff_readings: result([]), my_stuff_service_occurrences: result([]),
     },
   })
   const res = responseRecorder()
-  await createReportDataHandler({ client })(request(validBody({ subjectType: 'my_stuff_item' })), res)
+  await createReportDataHandler({ client, userClientFactory: () => client })(request(validBody({ subjectType: 'my_stuff_item', includeIdentifiers: true })), res)
   assert.equal(res.statusCode, 200)
-  assert.equal(res.body.report.serviceHistory.length, 100)
-  assert.equal(res.body.report.serviceHistory[0].notes.length, 1000)
-  assert.equal('cost' in res.body.report.serviceHistory[0], false)
-  const historyQuery = queries.find(query => query.table === 'my_stuff_service_logs')
-  assert.equal(historyQuery.limit, 100)
-  assert.ok(historyQuery.columns.split(',').every(column => column.trim() !== 'cost'))
+  assert.deepEqual(res.body.report.identifiers, { manufacturer: 'Ford', model: 'Ranger', year: 1998, vin: '••••2345' })
+  assert.doesNotMatch(JSON.stringify(res.body), /1FTYR10C8WTA12345/)
+  const query = queries.find(entry => entry.table === 'my_stuff_items' && entry.columns?.includes('vin'))
+  assert.match(query.columns, /\bmodel_year\b/)
+  assert.doesNotMatch(query.columns, /(^|,)year(,|$)/)
 })
 
 test('optional V2 column absence degrades safely, while other database errors fail closed', async () => {
@@ -218,7 +341,7 @@ test('optional V2 column absence degrades safely, while other database errors fa
   const res = responseRecorder()
   await createReportDataHandler({ client })(request(validBody({ includeIdentifiers: true })), res)
   assert.equal(res.statusCode, 200)
-  assert.equal(res.body.report.identifiers.vin, 'VIN-PRIVATE')
+  assert.equal(res.body.report.identifiers.vin, '••••VATE')
   assert.equal('vehicleYear' in res.body.report.identifiers, false)
 
   const failing = projectClient({ tableResults: { projects: ({ columns }) => columns === 'id' ? result({ id: SUBJECT_ID }) : result(null, { code: 'XX000', message: 'failure' }) } })
@@ -228,7 +351,12 @@ test('optional V2 column absence degrades safely, while other database errors fa
   assert.equal(failedRes.body.code, 'SERVICE_UNAVAILABLE')
 })
 
-test('photo and document opt-ins use a private-media adapter and never echo private references', async () => {
+test('photo and document opt-ins fail closed without a real adapter and never echo private references', async () => {
+  const unavailable = responseRecorder()
+  await createReportDataHandler({ client: projectClient() })(request(validBody({ includePhotos: true })), unavailable)
+  assert.equal(unavailable.statusCode, 503)
+  assert.equal(unavailable.body.code, 'PRIVATE_MEDIA_UNAVAILABLE')
+
   const calls = []
   const adapter = {
     async listPrivateMedia(input) { calls.push(input); return [] },
@@ -244,7 +372,10 @@ test('photo and document opt-ins use a private-media adapter and never echo priv
 
 test('source uses explicit allowlists and contains no raw-row or forbidden-account output contract', async () => {
   const source = await fs.readFile(new URL('../api/report-data.js', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /select\(\s*['"]\*|\.\.\.(project|item|row)|ownerEmail|provider_customer_id|provider_subscription_id|goal_id|goalFunding|outOfPocket|tradeCredit|storagePath/)
+  assert.doesNotMatch(source, /select\(\s*['"]\*|\.\.\.(project|item|row|provenance|revision)|ownerEmail|provider_customer_id|provider_subscription_id|goal_id|goalFunding|outOfPocket|tradeCredit|storagePath/)
+  assert.doesNotMatch(source, /\.select\(['"][^'"]*\byear\b/)
+  assert.match(source, /model_year/)
+  assert.match(source, /maskIdentifier/)
   assert.match(source, /MAX_RESPONSE_BYTES/)
   assert.match(source, /PRIVATE_MEDIA_ADAPTER_CONTRACT/)
 })
