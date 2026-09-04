@@ -17,4 +17,41 @@ insert into auth.users(id) values
   ('33333333-3333-4333-8333-333333333333'),
   ('44444444-4444-4444-8444-444444444444');
 
+-- Minimal pg_cron-compatible catalog for hosts where the extension package is
+-- unavailable. The harness removes only CREATE EXTENSION from the production
+-- schedule migration; all scheduling and fail-closed assertions execute here.
+create schema cron;
+create table cron.job (
+  jobid bigint generated always as identity primary key,
+  schedule text not null,
+  command text not null,
+  database text not null default current_database(),
+  username text not null default current_user,
+  active boolean not null default true,
+  jobname text not null
+);
+
+create function cron.schedule(p_jobname text, p_schedule text, p_command text)
+returns bigint
+language plpgsql
+as $$
+declare v_jobid bigint;
+begin
+  insert into cron.job(jobname, schedule, command)
+  values (p_jobname, p_schedule, p_command)
+  returning jobid into v_jobid;
+  return v_jobid;
+end;
+$$;
+
+create function cron.unschedule(p_jobid bigint)
+returns boolean
+language plpgsql
+as $$
+begin
+  delete from cron.job where jobid = p_jobid;
+  return found;
+end;
+$$;
+
 commit;

@@ -1,5 +1,26 @@
 \set ON_ERROR_STOP on
 
+-- The operational migration must converge on exactly one active, deterministic
+-- hourly job and invoke the bounded service-only cleanup with no secrets.
+do $$
+declare
+  v_count integer;
+begin
+  select count(*) into v_count
+  from cron.job
+  where jobname = 'sideflip-vin-state-cleanup'
+    and schedule = '17 * * * *'
+    and command = 'select public.cleanup_vin_decode_state(500, null, null);'
+    and active;
+  if v_count <> 1 then
+    raise exception 'expected one deterministic VIN cleanup job, got %', v_count;
+  end if;
+
+  if (select count(*) from cron.job where jobname = 'sideflip-vin-state-cleanup') <> 1 then
+    raise exception 'duplicate VIN cleanup jobs exist after migration reapply';
+  end if;
+end $$;
+
 -- Privileges: only service_role can execute the RPCs or read cache state.
 do $$
 begin
@@ -137,4 +158,21 @@ begin
   if not exists (select 1 from public.vin_decode_cache where hmac_key_version=2 and vin_hmac=repeat('a',64)) then raise exception 'active v2 cache key deleted'; end if;
   if (select count(*) from public.vin_decode_cache where expires_at <= clock_timestamp()) <> 1 then raise exception 'cleanup exceeded or missed bounded cache retention'; end if;
   if (select count(*) from public.vin_decode_rate_limits where updated_at < clock_timestamp() - interval '7 days') <> 1 then raise exception 'cleanup exceeded or missed bounded rate retention'; end if;
+end $$;
+
+-- Execute the exact persisted cron command and prove it drains the remaining
+-- bounded backlog through cleanup_vin_decode_state rather than a no-op command.
+select command
+from cron.job
+where jobname = 'sideflip-vin-state-cleanup'
+\gexec
+
+do $$
+begin
+  if exists (select 1 from public.vin_decode_cache where expires_at <= clock_timestamp()) then
+    raise exception 'scheduled command did not clean expired VIN cache rows';
+  end if;
+  if exists (select 1 from public.vin_decode_rate_limits where updated_at < clock_timestamp() - interval '7 days') then
+    raise exception 'scheduled command did not clean stale VIN rate-limit rows';
+  end if;
 end $$;

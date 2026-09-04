@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const migration = readFileSync(new URL('../supabase/migrations/20260903203000_add_vin_decode_cache_and_rate_limits.sql', import.meta.url), 'utf8')
+const scheduleMigration = readFileSync(new URL('../supabase/migrations/20260903210000_schedule_vin_decode_cleanup.sql', import.meta.url), 'utf8')
+const operations = readFileSync(new URL('../docs/vin-decode-operations.md', import.meta.url), 'utf8')
 
 test('VIN migration is additive, durable, and stores no raw VIN', () => {
   assert.match(migration, /create table public\.vin_decode_cache/i)
@@ -57,6 +59,18 @@ test('bounded service-only cleanup covers expiry, invalid-entry quarantine, and 
   assert.match(migration, /limit p_batch_limit/i)
   assert.match(migration, /grant execute on function public\.cleanup_vin_decode_state[^;]+to service_role/i)
   assert.doesNotMatch(migration, /grant execute on function public\.cleanup_vin_decode_state[^;]+to (anon|authenticated)/i)
+})
+
+test('VIN cleanup is an idempotent fail-closed hourly deployment gate', () => {
+  assert.match(scheduleMigration, /create extension if not exists pg_cron with schema pg_catalog/i)
+  assert.match(scheduleMigration, /to_regprocedure\('public\.cleanup_vin_decode_state\(integer,integer,text\)'\) is null/i)
+  assert.match(scheduleMigration, /cron\.unschedule\(v_job\.jobid\)/i)
+  assert.match(scheduleMigration, /cron\.schedule\([\s\S]*'sideflip-vin-state-cleanup'[\s\S]*'17 \* \* \* \*'[\s\S]*select public\.cleanup_vin_decode_state\(500, null, null\);/i)
+  assert.match(scheduleMigration, /select count\(\*\)[\s\S]{0,350}\) <> 1/i)
+  assert.match(scheduleMigration, /raise exception 'VIN cleanup cron job verification failed'/i)
+  assert.doesNotMatch(scheduleMigration, /grant execute/i)
+  assert.match(operations, /Post-migration verification SQL/i)
+  assert.match(operations, /where jobname = 'sideflip-vin-state-cleanup'/i)
 })
 
 test('cache, limiter tables, and RPCs are service-role only', () => {
