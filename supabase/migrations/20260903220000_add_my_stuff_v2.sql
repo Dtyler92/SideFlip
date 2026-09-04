@@ -16,6 +16,11 @@ do $$ begin
   end if;
 end $$;
 
+-- Trusted provenance writers live outside the API-exposed public schema.
+create schema if not exists private;
+revoke all on schema private from public,anon,authenticated;
+grant usage on schema private to service_role;
+
 -- Additive project marker. Old clients ignore it; transfer never changes accounting.
 alter table public.projects add column if not exists my_stuff_archived_at timestamptz;
 
@@ -432,22 +437,31 @@ begin
   insert into public.my_stuff_v2_mutations values(v_user,trim(p_mutation_id),'record_reading_v2',v_hash,v_id,now()); return v_id;
 end $$;
 
-create function public.create_my_stuff_maintenance_definition_v2(p_item_id uuid,p_definition jsonb,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
-declare v_user uuid:=auth.uid(); v_hash text; v_id uuid; v_old text;
+create function private.create_my_stuff_maintenance_definition_v2_trusted(p_user_id uuid,p_item_id uuid,p_definition jsonb,p_mutation_id text) returns uuid
+language plpgsql security definer set search_path=public,private as $$
+declare v_hash text; v_id uuid; v_old text; v_key text;
 begin
-  if v_user is null then raise exception 'Authentication required'; end if;
+  if p_user_id is null then raise exception 'User ID required'; end if;
   if jsonb_typeof(p_definition)<>'object' or pg_column_size(p_definition)>131072 then raise exception 'Definition must be a bounded object'; end if;
+  select key into v_key from jsonb_object_keys(p_definition) key where key not in
+    ('name','description','service_category','service_action','due_semantics','active_profile','cadence_anchor',
+     'normal_interval_miles','normal_interval_hours','normal_interval_cycles','normal_calendar_months',
+     'severe_interval_miles','severe_interval_hours','severe_interval_cycles','severe_calendar_months',
+     'first_interval_miles','first_interval_hours','first_interval_cycles','first_calendar_months',
+     'due_soon_miles','due_soon_hours','due_soon_cycles','due_soon_days','provenance_type','source_class',
+     'citation_url','citation_title','citation_page','citation_section','citation_accessed_on','uncertain',
+     'uncertainty_reason','enabled') limit 1;
+  if v_key is not null then raise exception 'Unsupported maintenance definition field: %',v_key; end if;
   if nullif(trim(p_mutation_id),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required and must not exceed 200 characters'; end if;
-  v_hash:=md5(jsonb_build_object('item',p_item_id,'definition',p_definition)::text); perform pg_advisory_xact_lock(hashtextextended(v_user::text||':item:'||p_item_id::text,0));
-  select result_id,request_hash into v_id,v_old from public.my_stuff_v2_mutations where user_id=v_user and mutation_id=trim(p_mutation_id);
+  v_hash:=md5(jsonb_build_object('item',p_item_id,'definition',p_definition)::text); perform pg_advisory_xact_lock(hashtextextended(p_user_id::text||':item:'||p_item_id::text,0));
+  select result_id,request_hash into v_id,v_old from public.my_stuff_v2_mutations where user_id=p_user_id and mutation_id=trim(p_mutation_id);
   if found then if v_old<>v_hash then raise exception 'Idempotency key reused with different request'; end if; return v_id; end if;
-  if not exists(select 1 from public.my_stuff_items where id=p_item_id and user_id=v_user) then raise exception 'My Stuff item not found'; end if;
+  if not exists(select 1 from public.my_stuff_items where id=p_item_id and user_id=p_user_id) then raise exception 'My Stuff item not found'; end if;
   insert into public.my_stuff_maintenance_definitions(user_id,item_id,name,description,service_category,service_action,due_semantics,active_profile,cadence_anchor,
     normal_interval_miles,normal_interval_hours,normal_interval_cycles,normal_calendar_months,severe_interval_miles,severe_interval_hours,severe_interval_cycles,severe_calendar_months,
     first_interval_miles,first_interval_hours,first_interval_cycles,first_calendar_months,due_soon_miles,due_soon_hours,due_soon_cycles,due_soon_days,
     provenance_type,source_class,citation_url,citation_title,citation_page,citation_section,citation_accessed_on,uncertain,uncertainty_reason,enabled,client_mutation_id,request_hash)
-  values(v_user,p_item_id,trim(p_definition->>'name'),nullif(trim(coalesce(p_definition->>'description','')),''),coalesce(p_definition->>'service_category','other'),
+  values(p_user_id,p_item_id,trim(p_definition->>'name'),nullif(trim(coalesce(p_definition->>'description','')),''),coalesce(p_definition->>'service_category','other'),
     coalesce(p_definition->>'service_action','service'),coalesce(p_definition->>'due_semantics','whichever_first'),coalesce(p_definition->>'active_profile','normal'),
     coalesce(p_definition->>'cadence_anchor','last_completion'),nullif(p_definition->>'normal_interval_miles','')::numeric,nullif(p_definition->>'normal_interval_hours','')::numeric,
     nullif(p_definition->>'normal_interval_cycles','')::numeric,nullif(p_definition->>'normal_calendar_months','')::integer,nullif(p_definition->>'severe_interval_miles','')::numeric,
@@ -458,8 +472,29 @@ begin
     nullif(p_definition->>'source_class',''),nullif(p_definition->>'citation_url',''),nullif(p_definition->>'citation_title',''),nullif(p_definition->>'citation_page',''),
     nullif(p_definition->>'citation_section',''),nullif(p_definition->>'citation_accessed_on','')::date,coalesce((p_definition->>'uncertain')::boolean,false),
     nullif(trim(coalesce(p_definition->>'uncertainty_reason','')),''),coalesce((p_definition->>'enabled')::boolean,true),trim(p_mutation_id),v_hash) returning id into v_id;
-  insert into public.my_stuff_v2_mutations values(v_user,trim(p_mutation_id),'create_definition_v2',v_hash,v_id,now()); return v_id;
+  insert into public.my_stuff_v2_mutations values(p_user_id,trim(p_mutation_id),'create_definition_v2',v_hash,v_id,now()); return v_id;
 exception when check_violation or numeric_value_out_of_range or invalid_text_representation or datetime_field_overflow then raise exception 'Maintenance definition contains an invalid or out-of-range value';
+end $$;
+
+create function public.create_my_stuff_maintenance_definition_v2(p_item_id uuid,p_definition jsonb,p_mutation_id text) returns uuid
+language plpgsql security definer set search_path=public as $$
+declare v_user uuid:=auth.uid(); v_key text; v_definition jsonb;
+begin
+  if v_user is null then raise exception 'Authentication required'; end if;
+  if jsonb_typeof(p_definition)<>'object' or pg_column_size(p_definition)>131072 then raise exception 'Definition must be a bounded object'; end if;
+  if p_definition ?| array['provenance','provenance_type','source_class','citation_url','citation_title','citation_page','citation_section','citation_accessed_on']
+     or exists(select 1 from jsonb_object_keys(p_definition) k where k like 'provenance_%') then
+    raise exception 'Provenance fields cannot be supplied to public maintenance definition RPCs';
+  end if;
+  select key into v_key from jsonb_object_keys(p_definition) key where key not in
+    ('name','description','service_category','service_action','due_semantics','active_profile','cadence_anchor',
+     'normal_interval_miles','normal_interval_hours','normal_interval_cycles','normal_calendar_months',
+     'severe_interval_miles','severe_interval_hours','severe_interval_cycles','severe_calendar_months',
+     'first_interval_miles','first_interval_hours','first_interval_cycles','first_calendar_months',
+     'due_soon_miles','due_soon_hours','due_soon_cycles','due_soon_days','uncertain','uncertainty_reason','enabled') limit 1;
+  if v_key is not null then raise exception 'Unsupported maintenance definition field: %',v_key; end if;
+  v_definition:=p_definition||jsonb_build_object('provenance_type','manual','source_class','user','citation_url',null,'citation_title',null,'citation_page',null,'citation_section',null,'citation_accessed_on',null);
+  return private.create_my_stuff_maintenance_definition_v2_trusted(v_user,p_item_id,v_definition,p_mutation_id);
 end $$;
 
 create function public.update_my_stuff_maintenance_definition_v2(p_definition_id uuid,p_definition jsonb,p_mutation_id text) returns uuid
@@ -468,14 +503,17 @@ declare v_user uuid:=auth.uid(); v_old_row public.my_stuff_maintenance_definitio
 begin
   if v_user is null then raise exception 'Authentication required'; end if;
   if jsonb_typeof(p_definition)<>'object' or pg_column_size(p_definition)>131072 then raise exception 'Definition patch must be a bounded object'; end if;
+  if p_definition ?| array['provenance','provenance_type','source_class','citation_url','citation_title','citation_page','citation_section','citation_accessed_on']
+     or exists(select 1 from jsonb_object_keys(p_definition) k where k like 'provenance_%') then
+    raise exception 'Provenance fields cannot be supplied to public maintenance definition RPCs';
+  end if;
   if p_definition ?| array['id','user_id','item_id','client_mutation_id','request_hash','created_at','updated_at','first_service_completed'] then raise exception 'Protected definition field cannot be edited'; end if;
   select key into v_key from jsonb_object_keys(p_definition) key where key not in
     ('name','description','service_category','service_action','due_semantics','active_profile','cadence_anchor',
      'normal_interval_miles','normal_interval_hours','normal_interval_cycles','normal_calendar_months',
      'severe_interval_miles','severe_interval_hours','severe_interval_cycles','severe_calendar_months',
      'first_interval_miles','first_interval_hours','first_interval_cycles','first_calendar_months',
-     'due_soon_miles','due_soon_hours','due_soon_cycles','due_soon_days','provenance_type','source_class',
-     'citation_url','citation_title','citation_page','citation_section','citation_accessed_on','uncertain',
+     'due_soon_miles','due_soon_hours','due_soon_cycles','due_soon_days','uncertain',
      'uncertainty_reason','enabled') limit 1;
   if v_key is not null then raise exception 'Unsupported maintenance definition field: %',v_key; end if;
   if nullif(trim(p_mutation_id),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required and must not exceed 200 characters'; end if;
@@ -495,8 +533,7 @@ begin
     first_interval_miles=nullif(v_merged->>'first_interval_miles','')::numeric,first_interval_hours=nullif(v_merged->>'first_interval_hours','')::numeric,
     first_interval_cycles=nullif(v_merged->>'first_interval_cycles','')::numeric,first_calendar_months=nullif(v_merged->>'first_calendar_months','')::integer,
     due_soon_miles=(v_merged->>'due_soon_miles')::numeric,due_soon_hours=(v_merged->>'due_soon_hours')::numeric,due_soon_cycles=(v_merged->>'due_soon_cycles')::numeric,due_soon_days=(v_merged->>'due_soon_days')::integer,
-    provenance_type=v_merged->>'provenance_type',source_class=nullif(v_merged->>'source_class',''),citation_url=nullif(v_merged->>'citation_url',''),citation_title=nullif(v_merged->>'citation_title',''),
-    citation_page=nullif(v_merged->>'citation_page',''),citation_section=nullif(v_merged->>'citation_section',''),citation_accessed_on=nullif(v_merged->>'citation_accessed_on','')::date,
+    provenance_type='manual',source_class='user',citation_url=null,citation_title=null,citation_page=null,citation_section=null,citation_accessed_on=null,
     uncertain=(v_merged->>'uncertain')::boolean,uncertainty_reason=nullif(trim(coalesce(v_merged->>'uncertainty_reason','')),''),enabled=(v_merged->>'enabled')::boolean
   where id=p_definition_id;
   insert into public.my_stuff_v2_mutations values(v_user,trim(p_mutation_id),'update_definition_v2',v_hash,p_definition_id,now()); return p_definition_id;
@@ -505,7 +542,15 @@ end $$;
 
 create function public.get_my_stuff_due_state_v2(p_item_id uuid,p_as_of timestamptz default now())
 returns table(definition_id uuid,next_due_at timestamptz,next_due_mileage numeric,next_due_hours numeric,next_due_cycles numeric,due_status text)
-language sql stable security definer set search_path=public as $$
+language plpgsql stable security definer set search_path=public as $$
+begin
+  -- Supported business horizon is inclusive 1900-01-01 and exclusive 2200-01-01.
+  if p_as_of is null or not isfinite(p_as_of)
+     or p_as_of<timestamptz '1900-01-01 00:00:00+00'
+     or p_as_of>=timestamptz '2200-01-01 00:00:00+00' then
+    raise exception 'Due-state as-of is outside the supported range [1900-01-01, 2200-01-01)';
+  end if;
+  return query
 with owned as (
   select i.*,
     coalesce((select r.reading_value from public.my_stuff_readings r where r.item_id=i.id and r.user_id=i.user_id and r.reading_type='mileage' and r.recorded_at<=p_as_of order by r.recorded_at desc,r.created_at desc,r.id desc limit 1),i.origin_mileage) as_asof_mileage,
@@ -563,38 +608,41 @@ select id,nda,ndm,ndh,ndc,
     else 'upcoming'
   end
 from flags order by id;
-$$;
+end $$;
 
-create function public.record_my_stuff_service_occurrence_v2(p_item_id uuid,p_definition_id uuid,p_service jsonb,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
-declare v_user uuid:=auth.uid(); v_item public.my_stuff_items%rowtype; v_def public.my_stuff_maintenance_definitions%rowtype; v_hash text; v_id uuid; v_old text; v_revision uuid; v_completed timestamptz; v_name text; v_scheduled boolean;
+create function private.record_my_stuff_service_occurrence_v2_trusted(p_user_id uuid,p_item_id uuid,p_definition_id uuid,p_service jsonb,p_mutation_id text) returns uuid
+language plpgsql security definer set search_path=public,private as $$
+declare v_item public.my_stuff_items%rowtype; v_def public.my_stuff_maintenance_definitions%rowtype; v_hash text; v_id uuid; v_old text; v_revision uuid; v_completed timestamptz; v_name text; v_scheduled boolean; v_key text;
 begin
- if v_user is null then raise exception 'Authentication required'; end if;
+ if p_user_id is null then raise exception 'User ID required'; end if;
  if jsonb_typeof(p_service)<>'object' or pg_column_size(p_service)>262144 then raise exception 'Service must be a bounded object'; end if;
+ select key into v_key from jsonb_object_keys(p_service) key where key not in
+   ('service_name','service_category','service_action','completed_at','mileage','hours','cycles','parts','labor','vendor','warranty','notes','attachment_metadata','provenance_type','provenance') limit 1;
+ if v_key is not null then raise exception 'Unsupported service field: %',v_key; end if;
  if nullif(trim(p_mutation_id),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required and must not exceed 200 characters'; end if;
- v_hash:=md5(jsonb_build_object('item',p_item_id,'definition',p_definition_id,'service',p_service)::text); perform pg_advisory_xact_lock(hashtextextended(v_user::text||':item:'||p_item_id::text,0));
- select result_id,request_hash into v_id,v_old from public.my_stuff_v2_mutations where user_id=v_user and mutation_id=trim(p_mutation_id);
+ v_hash:=md5(jsonb_build_object('item',p_item_id,'definition',p_definition_id,'service',p_service)::text); perform pg_advisory_xact_lock(hashtextextended(p_user_id::text||':item:'||p_item_id::text,0));
+ select result_id,request_hash into v_id,v_old from public.my_stuff_v2_mutations where user_id=p_user_id and mutation_id=trim(p_mutation_id);
  if found then if v_old<>v_hash then raise exception 'Idempotency key reused with different request'; end if; return v_id; end if;
- select * into v_item from public.my_stuff_items where id=p_item_id and user_id=v_user for update; if not found then raise exception 'My Stuff item not found'; end if;
+ select * into v_item from public.my_stuff_items where id=p_item_id and user_id=p_user_id for update; if not found then raise exception 'My Stuff item not found'; end if;
  if (p_service ? 'mileage' and (p_service->>'mileage')::numeric<coalesce(v_item.effective_current_mileage,v_item.current_mileage))
     or (p_service ? 'hours' and (p_service->>'hours')::numeric<coalesce(v_item.effective_current_hours,v_item.current_hours))
     or (p_service ? 'cycles' and (p_service->>'cycles')::numeric<coalesce(v_item.effective_current_cycles,v_item.current_cycles)) then
    raise exception 'Service readings cannot move backwards';
  end if;
  v_scheduled:=p_definition_id is not null;
- if v_scheduled then select * into v_def from public.my_stuff_maintenance_definitions where id=p_definition_id and item_id=p_item_id and user_id=v_user for update; if not found then raise exception 'Maintenance definition not found'; end if; end if;
+ if v_scheduled then select * into v_def from public.my_stuff_maintenance_definitions where id=p_definition_id and item_id=p_item_id and user_id=p_user_id for update; if not found then raise exception 'Maintenance definition not found'; end if; end if;
  v_name:=coalesce(nullif(trim(p_service->>'service_name'),''),v_def.name); if v_name is null then raise exception 'Service name required for unscheduled service'; end if;
  v_completed:=coalesce(nullif(p_service->>'completed_at','')::timestamptz,now());
  insert into public.my_stuff_service_occurrences(user_id,item_id,definition_id,service_name,service_category,service_action,scheduled,completed_at,mileage,hours,cycles,provenance_type,provenance,client_mutation_id,request_hash)
- values(v_user,p_item_id,p_definition_id,v_name,coalesce(p_service->>'service_category',v_def.service_category,'other'),coalesce(p_service->>'service_action',v_def.service_action,'service'),v_scheduled,v_completed,
+ values(p_user_id,p_item_id,p_definition_id,v_name,coalesce(p_service->>'service_category',v_def.service_category,'other'),coalesce(p_service->>'service_action',v_def.service_action,'service'),v_scheduled,v_completed,
  nullif(p_service->>'mileage','')::numeric,nullif(p_service->>'hours','')::numeric,nullif(p_service->>'cycles','')::numeric,coalesce(p_service->>'provenance_type','user_entered'),coalesce(p_service->'provenance','{}'),trim(p_mutation_id),v_hash) returning id into v_id;
  insert into public.my_stuff_service_occurrence_revisions(user_id,item_id,occurrence_id,revision_number,parts,labor,vendor,warranty,notes,attachment_metadata,client_mutation_id,request_hash)
- values(v_user,p_item_id,v_id,1,coalesce(p_service->'parts','[]'),coalesce(p_service->'labor','[]'),coalesce(p_service->'vendor','{}'),coalesce(p_service->'warranty','{}'),
+ values(p_user_id,p_item_id,v_id,1,coalesce(p_service->'parts','[]'),coalesce(p_service->'labor','[]'),coalesce(p_service->'vendor','{}'),coalesce(p_service->'warranty','{}'),
  nullif(trim(coalesce(p_service->>'notes','')),''),coalesce(p_service->'attachment_metadata','[]'),'occurrence:'||v_id::text||':revision:1',v_hash) returning id into v_revision;
- insert into public.my_stuff_service_audit(user_id,item_id,occurrence_id,revision_id,action,actor_id) values(v_user,p_item_id,v_id,v_revision,'created',v_user);
- if p_service ? 'mileage' then insert into public.my_stuff_readings(user_id,item_id,reading_type,reading_value,recorded_at,source,metadata,client_mutation_id) values(v_user,p_item_id,'mileage',(p_service->>'mileage')::numeric,v_completed,'service',jsonb_build_object('occurrence_id',v_id),'occurrence:'||v_id::text||':mileage'); end if;
- if p_service ? 'hours' then insert into public.my_stuff_readings(user_id,item_id,reading_type,reading_value,recorded_at,source,metadata,client_mutation_id) values(v_user,p_item_id,'hours',(p_service->>'hours')::numeric,v_completed,'service',jsonb_build_object('occurrence_id',v_id),'occurrence:'||v_id::text||':hours'); end if;
- if p_service ? 'cycles' then insert into public.my_stuff_readings(user_id,item_id,reading_type,reading_value,recorded_at,source,metadata,client_mutation_id) values(v_user,p_item_id,'cycles',(p_service->>'cycles')::numeric,v_completed,'service',jsonb_build_object('occurrence_id',v_id),'occurrence:'||v_id::text||':cycles'); end if;
+ insert into public.my_stuff_service_audit(user_id,item_id,occurrence_id,revision_id,action,actor_id) values(p_user_id,p_item_id,v_id,v_revision,'created',p_user_id);
+ if p_service ? 'mileage' then insert into public.my_stuff_readings(user_id,item_id,reading_type,reading_value,recorded_at,source,metadata,client_mutation_id) values(p_user_id,p_item_id,'mileage',(p_service->>'mileage')::numeric,v_completed,'service',jsonb_build_object('occurrence_id',v_id),'occurrence:'||v_id::text||':mileage'); end if;
+ if p_service ? 'hours' then insert into public.my_stuff_readings(user_id,item_id,reading_type,reading_value,recorded_at,source,metadata,client_mutation_id) values(p_user_id,p_item_id,'hours',(p_service->>'hours')::numeric,v_completed,'service',jsonb_build_object('occurrence_id',v_id),'occurrence:'||v_id::text||':hours'); end if;
+ if p_service ? 'cycles' then insert into public.my_stuff_readings(user_id,item_id,reading_type,reading_value,recorded_at,source,metadata,client_mutation_id) values(p_user_id,p_item_id,'cycles',(p_service->>'cycles')::numeric,v_completed,'service',jsonb_build_object('occurrence_id',v_id),'occurrence:'||v_id::text||':cycles'); end if;
  update public.my_stuff_items set
    current_mileage=greatest(current_mileage,nullif(p_service->>'mileage','')::numeric),
    current_hours=greatest(current_hours,nullif(p_service->>'hours','')::numeric),
@@ -604,16 +652,39 @@ begin
    effective_current_cycles=case when p_service?'cycles' then (p_service->>'cycles')::numeric else effective_current_cycles end
  where id=p_item_id;
  if v_scheduled then update public.my_stuff_maintenance_definitions set first_service_completed=true where id=p_definition_id; end if;
- insert into public.my_stuff_v2_mutations values(v_user,trim(p_mutation_id),'record_occurrence_v2',v_hash,v_id,now()); return v_id;
+ insert into public.my_stuff_v2_mutations values(p_user_id,trim(p_mutation_id),'record_occurrence_v2',v_hash,v_id,now()); return v_id;
 exception when check_violation or numeric_value_out_of_range or invalid_text_representation or datetime_field_overflow then raise exception 'Service contains an invalid or out-of-range value';
+end $$;
+
+create function public.record_my_stuff_service_occurrence_v2(p_item_id uuid,p_definition_id uuid,p_service jsonb,p_mutation_id text) returns uuid
+language plpgsql security definer set search_path=public as $$
+declare v_user uuid:=auth.uid(); v_key text; v_service jsonb;
+begin
+ if v_user is null then raise exception 'Authentication required'; end if;
+ if jsonb_typeof(p_service)<>'object' or pg_column_size(p_service)>262144 then raise exception 'Service must be a bounded object'; end if;
+ if p_service ?| array['provenance','provenance_type']
+    or exists(select 1 from jsonb_object_keys(p_service) k where k like 'provenance_%') then
+   raise exception 'Provenance fields cannot be supplied to public service RPCs';
+ end if;
+ select key into v_key from jsonb_object_keys(p_service) key where key not in
+   ('service_name','service_category','service_action','completed_at','mileage','hours','cycles','parts','labor','vendor','warranty','notes','attachment_metadata') limit 1;
+ if v_key is not null then raise exception 'Unsupported service field: %',v_key; end if;
+ v_service:=p_service||jsonb_build_object('provenance_type','user_entered','provenance','{}'::jsonb);
+ return private.record_my_stuff_service_occurrence_v2_trusted(v_user,p_item_id,p_definition_id,v_service,p_mutation_id);
 end $$;
 
 create function public.revise_my_stuff_service_occurrence_v2(p_occurrence_id uuid,p_details jsonb,p_reason text,p_mutation_id text) returns uuid
 language plpgsql security definer set search_path=public as $$
-declare v_user uuid:=auth.uid(); v_occ public.my_stuff_service_occurrences%rowtype; v_hash text; v_id uuid; v_old text; v_n integer;
+declare v_user uuid:=auth.uid(); v_occ public.my_stuff_service_occurrences%rowtype; v_hash text; v_id uuid; v_old text; v_n integer; v_key text;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
  if jsonb_typeof(p_details)<>'object' or pg_column_size(p_details)>262144 then raise exception 'Revision must be a bounded object'; end if;
+ if p_details ?| array['provenance','provenance_type']
+    or exists(select 1 from jsonb_object_keys(p_details) k where k like 'provenance_%') then
+   raise exception 'Provenance fields cannot be supplied to public service RPCs';
+ end if;
+ select key into v_key from jsonb_object_keys(p_details) key where key not in ('parts','labor','vendor','warranty','notes','attachment_metadata') limit 1;
+ if v_key is not null then raise exception 'Unsupported service revision field: %',v_key; end if;
  if nullif(trim(coalesce(p_reason,'')),'') is null then raise exception 'Revision reason required'; end if;
  if nullif(trim(p_mutation_id),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required and must not exceed 200 characters'; end if;
  v_hash:=md5(jsonb_build_object('occurrence',p_occurrence_id,'details',p_details,'reason',p_reason)::text); perform pg_advisory_xact_lock(hashtextextended(v_user::text||':occurrence:'||p_occurrence_id::text,0));
@@ -679,7 +750,7 @@ begin
  values(v_user,p_project_id,v_id,v_disp,v_project,v_expenses,v_service,array['title','category','notes','photo','before_photo','after_photo','vehicle_year','vehicle_make','vehicle_model','model_number','serial_number','engine_model','engine_serial','vin','hull_number','purchase_price'],trim(p_mutation_id),v_hash);
  for v_expense in select value from jsonb_array_elements(v_expenses) loop
    if (v_expense->>'id')::uuid=any(v_service) then
-     v_occ:=public.record_my_stuff_service_occurrence_v2(v_id,null,jsonb_build_object('service_name',coalesce(nullif(v_expense->>'description',''),'Transferred project expense'),'service_category',coalesce(v_expense->>'category','other'),'service_action','repair','completed_at',coalesce(v_expense->>'created_at',now()::text),'provenance_type','project_expense_snapshot','provenance',v_expense,'parts','[]','labor','[]','vendor','{}','warranty','{}'),
+     v_occ:=private.record_my_stuff_service_occurrence_v2_trusted(v_user,v_id,null,jsonb_build_object('service_name',coalesce(nullif(v_expense->>'description',''),'Transferred project expense'),'service_category',coalesce(v_expense->>'category','other'),'service_action','repair','completed_at',coalesce(v_expense->>'created_at',now()::text),'provenance_type','project_expense_snapshot','provenance',v_expense,'parts','[]'::jsonb,'labor','[]'::jsonb,'vendor','{}'::jsonb,'warranty','{}'::jsonb),
        'transfer-service:'||(v_expense->>'id'));
    end if;
  end loop;
@@ -715,6 +786,11 @@ grant execute on function public.create_my_stuff_item_v2(jsonb,text),public.upda
  public.get_my_stuff_due_state_v2(uuid,timestamptz),public.record_my_stuff_service_occurrence_v2(uuid,uuid,jsonb,text),
  public.revise_my_stuff_service_occurrence_v2(uuid,jsonb,text,text),public.set_my_stuff_item_archived_v2(uuid,boolean,text,text),
  public.preview_project_to_my_stuff_v2(uuid),public.transfer_project_to_my_stuff_v2(uuid,jsonb,text) to authenticated;
+-- Private provenance writers are callable only by the database owner and service role.
+revoke all on function private.create_my_stuff_maintenance_definition_v2_trusted(uuid,uuid,jsonb,text),
+ private.record_my_stuff_service_occurrence_v2_trusted(uuid,uuid,uuid,jsonb,text) from public,anon,authenticated;
+grant execute on function private.create_my_stuff_maintenance_definition_v2_trusted(uuid,uuid,jsonb,text),
+ private.record_my_stuff_service_occurrence_v2_trusted(uuid,uuid,uuid,jsonb,text) to service_role;
 -- Restore the three unchanged installed-client RPC grants after the blanket hardening.
 grant execute on function public.create_my_stuff_item(text,text,date,text,numeric,numeric,text),
  public.create_my_stuff_schedule(uuid,text,text,numeric,timestamptz,numeric,text),

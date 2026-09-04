@@ -85,6 +85,16 @@ select public._test_assert_v2(
   and has_function_privilege('authenticated','public.transfer_project_to_my_stuff_v2(uuid,jsonb,text)','execute')
   and not has_function_privilege('anon','public.transfer_project_to_my_stuff_v2(uuid,jsonb,text)','execute'),
   'V2 RPC grants are authenticated-only');
+select public._test_assert_v2(
+  to_regnamespace('private') is not null
+  and not has_schema_privilege('authenticated','private','usage')
+  and not has_schema_privilege('anon','private','usage')
+  and has_schema_privilege('service_role','private','usage')
+  and not has_function_privilege('authenticated','private.create_my_stuff_maintenance_definition_v2_trusted(uuid,uuid,jsonb,text)','execute')
+  and not has_function_privilege('authenticated','private.record_my_stuff_service_occurrence_v2_trusted(uuid,uuid,uuid,jsonb,text)','execute')
+  and has_function_privilege('service_role','private.create_my_stuff_maintenance_definition_v2_trusted(uuid,uuid,jsonb,text)','execute')
+  and has_function_privilege('service_role','private.record_my_stuff_service_occurrence_v2_trusted(uuid,uuid,uuid,jsonb,text)','execute'),
+  'trusted provenance writers are private and service-only');
 select public._test_assert_v2(not exists(
   select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace,
        lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
@@ -103,17 +113,18 @@ declare v_item uuid; v_retry uuid; v_reading uuid; v_correction uuid; v_definiti
 begin
   v_item:=public.transfer_project_to_my_stuff_v2(
     '80000000-0000-4000-8000-000000000001',
-    '{"current_mileage":100,"current_hours":5,"current_cycles":2,"usage_dimensions":["mileage","hours","cycles"],"selected_expense_ids":["e0000000-0000-4000-8000-000000000001"],"service_expense_ids":[]}',
+    '{"current_mileage":100,"current_hours":5,"current_cycles":2,"usage_dimensions":["mileage","hours","cycles"],"selected_expense_ids":["e0000000-0000-4000-8000-000000000001"],"service_expense_ids":["e0000000-0000-4000-8000-000000000001"]}',
     'transfer-free-1');
   v_retry:=public.transfer_project_to_my_stuff_v2(
     '80000000-0000-4000-8000-000000000001',
-    '{"current_mileage":100,"current_hours":5,"current_cycles":2,"usage_dimensions":["mileage","hours","cycles"],"selected_expense_ids":["e0000000-0000-4000-8000-000000000001"],"service_expense_ids":[]}',
+    '{"current_mileage":100,"current_hours":5,"current_cycles":2,"usage_dimensions":["mileage","hours","cycles"],"selected_expense_ids":["e0000000-0000-4000-8000-000000000001"],"service_expense_ids":["e0000000-0000-4000-8000-000000000001"]}',
     'transfer-free-1');
   perform public._test_assert_v2(v_item=v_retry,'transfer retry returns the same item');
   perform public._test_assert_v2((select count(*)=1 from public.my_stuff_project_transfers where project_id='80000000-0000-4000-8000-000000000001'),'transfer creates one provenance link');
   perform public._test_assert_v2((select name='Project Truck' and category='truck' and purchase_price=1234.50 and model_number='M1' and vin='VIN1' and current_mileage=100 and current_hours=5 and current_cycles=2 from public.my_stuff_items where id=v_item),'transfer copies approved item fields');
   perform public._test_assert_v2((select status='sold' and sale_price=9999 and goal_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and goal_funding_amount=700 and out_of_pocket_amount=534.50 and trade_credit_amount=111 and my_stuff_archived_at is null from public.projects where id='80000000-0000-4000-8000-000000000001'),'transfer preserves project and Goal/accounting state');
   perform public._test_assert_v2((select not copied_fields && array['status','sale_price','sold_at','goal_id','goal_funding_amount','out_of_pocket_amount','trade_credit_amount']::text[] and jsonb_array_length(selected_expense_snapshot)=1 from public.my_stuff_project_transfers where item_id=v_item),'accounting fields are not copied into item and selected expenses are immutable provenance');
+  perform public._test_assert_v2((select count(*)=1 from public.my_stuff_service_occurrences where item_id=v_item and provenance_type='project_expense_snapshot' and provenance->>'id'='e0000000-0000-4000-8000-000000000001'),'transfer preserves trusted expense provenance through the private writer');
   begin
     perform public.transfer_project_to_my_stuff_v2('80000000-0000-4000-8000-000000000001','{"current_mileage":999}','transfer-free-1');
     raise exception 'expected changed-payload idempotency failure';
@@ -166,6 +177,13 @@ begin
 
   v_definition:=public.create_my_stuff_maintenance_definition_v2(v_item,'{"name":"Full service","due_semantics":"whichever_first","active_profile":"severe","cadence_anchor":"asset_origin","normal_interval_miles":5000,"normal_interval_hours":100,"normal_interval_cycles":50,"normal_calendar_months":12,"first_interval_miles":1000,"first_interval_hours":20,"first_interval_cycles":10,"first_calendar_months":3,"due_soon_miles":500,"due_soon_hours":10,"due_soon_cycles":5,"due_soon_days":30,"enabled":true}','definition-1');
   perform public._test_assert_v2((select due_semantics='whichever_first' and active_profile='severe' and cadence_anchor='asset_origin' and normal_interval_miles=5000 and normal_interval_hours=100 and normal_interval_cycles=50 and normal_calendar_months=12 and first_interval_miles=1000 and due_soon_days=30 and enabled from public.my_stuff_maintenance_definitions where id=v_definition),'rich maintenance definition stored');
+  perform public._test_assert_v2((select provenance_type='manual' and source_class='user' and citation_url is null from public.my_stuff_maintenance_definitions where id=v_definition),'public definition create forces manual user provenance');
+  begin perform public.create_my_stuff_maintenance_definition_v2(v_item,'{"name":"Forged research","provenance_type":"ai_research","source_class":"manufacturer_manual"}','forge-definition-ai'); raise exception 'expected forged definition failure';
+  exception when others then if sqlerrm='expected forged definition failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Provenance fields cannot be supplied to public maintenance definition RPCs','public definition create rejects trusted provenance'); end;
+  begin perform public.create_my_stuff_maintenance_definition_v2(v_item,'{"name":"Arbitrary provenance","provenance":{"authority":"dealer"}}','forge-definition-json'); raise exception 'expected arbitrary definition provenance failure';
+  exception when others then if sqlerrm='expected arbitrary definition provenance failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Provenance fields cannot be supplied to public maintenance definition RPCs','public definition create rejects arbitrary provenance JSON'); end;
+  begin perform public.update_my_stuff_maintenance_definition_v2(v_definition,'{"source_class":"dealer"}','forge-definition-update'); raise exception 'expected forged definition update failure';
+  exception when others then if sqlerrm='expected forged definition update failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Provenance fields cannot be supplied to public maintenance definition RPCs','public definition update rejects trusted source classes'); end;
   begin
     perform public.update_my_stuff_maintenance_definition_v2(v_definition,'{"typo_unknown":123}','definition-unknown-key');
     raise exception 'expected unknown maintenance definition key failure';
@@ -176,6 +194,11 @@ begin
   perform public.update_my_stuff_maintenance_definition_v2(v_definition,'{"enabled":false}','definition-disable');
   perform public._test_assert_v2((select not enabled from public.my_stuff_maintenance_definitions where id=v_definition),'definition can be disabled through narrow RPC');
   v_occurrence:=public.record_my_stuff_service_occurrence_v2(v_item,v_last,'{"completed_at":"2026-09-03T13:00:00Z","mileage":112,"hours":6,"cycles":3,"parts":[{"name":"filter","cost":12}],"labor":[{"hours":1}],"vendor":{"name":"Shop"},"warranty":{"months":12},"notes":"done","attachment_metadata":[{"name":"receipt.pdf","private":true}]}','service-1');
+  perform public._test_assert_v2((select provenance_type='user_entered' and provenance='{}'::jsonb from public.my_stuff_service_occurrences where id=v_occurrence),'public service create forces user provenance');
+  begin perform public.record_my_stuff_service_occurrence_v2(v_item,null,'{"service_name":"Forged import","provenance_type":"import","provenance":{"source":"dealer"}}','forge-service-import'); raise exception 'expected forged service failure';
+  exception when others then if sqlerrm='expected forged service failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Provenance fields cannot be supplied to public service RPCs','public service create rejects imported/arbitrary provenance'); end;
+  begin perform public.revise_my_stuff_service_occurrence_v2(v_occurrence,'{"notes":"forged","provenance":{"source":"import"}}','bad provenance','forge-service-revision'); raise exception 'expected forged revision failure';
+  exception when others then if sqlerrm='expected forged revision failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Provenance fields cannot be supplied to public service RPCs','public service revision rejects arbitrary provenance'); end;
   v_revision:=public.revise_my_stuff_service_occurrence_v2(v_occurrence,'{"parts":[{"name":"filter","cost":10}],"labor":[{"hours":1}],"vendor":{"name":"Shop"},"warranty":{"months":12},"notes":"corrected","attachment_metadata":[{"name":"receipt.pdf","private":true}]}','corrected part cost','service-revision-2');
   perform public._test_assert_v2((select count(*)=2 and max(revision_number)=2 from public.my_stuff_service_occurrence_revisions where occurrence_id=v_occurrence),'service revisions append');
   perform public._test_assert_v2((select count(*)=2 from public.my_stuff_service_audit where occurrence_id=v_occurrence),'service audit records create and revise');
@@ -190,6 +213,12 @@ begin
   perform public.record_my_stuff_reading_v2(v_item,'mileage',200,'2026-09-03T15:00:00Z',null,null,'{}','future-mileage-200');
   perform public._test_assert_v2((select next_due_mileage=150 and due_status='upcoming' from public.get_my_stuff_due_state_v2(v_item,'2026-09-03T11:00:00Z') where definition_id=v_historical),'future reading cannot affect historical due state when no prior reading exists');
   perform public._test_assert_v2((select next_due_mileage=150 and due_status='overdue' from public.get_my_stuff_due_state_v2(v_item,'2026-09-03T16:00:00Z') where definition_id=v_historical),'current due state still uses the future reading once it is in range');
+  begin perform public.get_my_stuff_due_state_v2(v_item,'infinity'); raise exception 'expected infinite due-state date failure';
+  exception when others then if sqlerrm='expected infinite due-state date failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Due-state as-of is outside the supported range [1900-01-01, 2200-01-01)','infinite due-state timestamp rejected'); end;
+  begin perform public.get_my_stuff_due_state_v2(v_item,'1899-12-31T23:59:59Z'); raise exception 'expected old due-state date failure';
+  exception when others then if sqlerrm='expected old due-state date failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Due-state as-of is outside the supported range [1900-01-01, 2200-01-01)','too-old due-state timestamp rejected'); end;
+  begin perform public.get_my_stuff_due_state_v2(v_item,'2200-01-01T00:00:00Z'); raise exception 'expected future due-state date failure';
+  exception when others then if sqlerrm='expected future due-state date failure' then raise; end if; perform public._test_assert_v2(sqlerrm='Due-state as-of is outside the supported range [1900-01-01, 2200-01-01)','too-future due-state timestamp rejected'); end;
   begin
     perform public.record_my_stuff_service_occurrence_v2(v_item,null,'{"service_name":"Invalid rewind","completed_at":"2026-09-03T14:00:00Z","mileage":111}','service-rewind');
     raise exception 'expected service reading rewind failure';

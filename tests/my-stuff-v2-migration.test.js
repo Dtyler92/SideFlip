@@ -78,6 +78,29 @@ test('V2 maintenance definition patching fails closed on unknown keys', () => {
   assert.match(body, /'enabled'/i)
 })
 
+test('public V2 provenance is caller-proof and trusted writes use a private service path', () => {
+  for (const rpc of [
+    'create_my_stuff_maintenance_definition_v2',
+    'update_my_stuff_maintenance_definition_v2',
+    'record_my_stuff_service_occurrence_v2',
+    'revise_my_stuff_service_occurrence_v2',
+  ]) {
+    const start = migration.indexOf(`create function public.${rpc}(`)
+    const end = migration.indexOf('\ncreate function ', start + 1)
+    assert.ok(start >= 0, `${rpc} body found`)
+    const body = migration.slice(start, end < 0 ? migration.length : end)
+    assert.match(body, /Provenance fields cannot be supplied/i)
+  }
+  assert.match(migration, /create schema if not exists private/i)
+  assert.match(migration, /create function private\.create_my_stuff_maintenance_definition_v2_trusted\(/i)
+  assert.match(migration, /create function private\.record_my_stuff_service_occurrence_v2_trusted\(/i)
+  assert.match(migration, /revoke all on schema private from public,anon,authenticated/i)
+  assert.match(migration, /grant execute on function private\.[^;]+to service_role/is)
+  assert.match(migration, /'provenance_type'\s*,\s*'manual'/i)
+  assert.match(migration, /'source_class'\s*,\s*'user'/i)
+  assert.match(migration, /'provenance_type'\s*,\s*'project_expense_snapshot'\s*,\s*'provenance'\s*,\s*v_expense/i)
+})
+
 test('due-state applies as-of, all/whichever-first, and cadence-anchor semantics', () => {
   const start = migration.indexOf('create function public.get_my_stuff_due_state_v2(')
   const end = migration.indexOf('\ncreate function public.', start + 1)
@@ -89,6 +112,10 @@ test('due-state applies as-of, all/whichever-first, and cadence-anchor semantics
   assert.doesNotMatch(body, /recorded_at\s*<=\s*p_as_of[^\n]+current_(mileage|hours|cycles)/i)
   assert.match(body, /due_semantics/i)
   assert.match(body, /cadence_anchor/i)
+  assert.match(body, /isfinite\s*\(\s*p_as_of\s*\)/i)
+  assert.match(body, /1900-01-01/i)
+  assert.match(body, /2200-01-01/i)
+  assert.match(body, /Due-state as-of is outside the supported range/i)
 })
 
 test('revision and archive RPCs validate bounded mutation IDs', () => {
