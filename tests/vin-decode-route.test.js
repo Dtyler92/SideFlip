@@ -196,14 +196,25 @@ test('Stripe read-mode lookup failure denies access before private work', async 
 })
 
 test('fails closed for deleted/tombstoned users and tombstone lookup errors', async () => {
-  for (const client of [
-    { tombstone: { status: 'requested' } },
-    { tombstoneError: { message: 'synthetic lookup failure' } },
+  for (const [label, options, expectedStatus] of [
+    ['tombstoned', { tombstone: { status: 'requested' } }, 410],
+    ['lookup error', { tombstoneError: { message: 'synthetic lookup failure' } }, 503],
   ]) {
+    const tableReads = []
+    const rpcCalls = []
     let fetchCalls = 0
-    const res = await run({ vin: VALID_VIN, subjectType: 'project' }, { client, fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() } })
-    assert.ok([410, 503].includes(res.statusCode))
-    assert.equal(fetchCalls, 0)
+    const res = await run({ vin: VALID_VIN, subjectType: 'project', subjectId: SUBJECT_ID }, {
+      client: {
+        ...options,
+        onEq: table => tableReads.push(table),
+        onRpc: name => rpcCalls.push(name),
+      },
+      fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() },
+    })
+    assert.equal(res.statusCode, expectedStatus, label)
+    assert.deepEqual(tableReads, ['account_deletion_tombstones'], label)
+    assert.deepEqual(rpcCalls, [], label)
+    assert.equal(fetchCalls, 0, label)
   }
 })
 

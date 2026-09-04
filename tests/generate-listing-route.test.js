@@ -20,21 +20,24 @@ function query(result, onEq = () => {}) {
 
 const CLAIM_TOKEN = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 
-function clientFor({ userId = 'user-1', project = { id: '11111111-1111-4111-8111-111111111111', title: '1998 Ford Ranger', category: 'Vehicles', notes: '5-speed. Rust over rear wheel wells.' }, expenses = [{ description: 'New clutch' }], claimDecision = 'allowed', claimError = null, renewAllowed = true, onEq = () => {} } = {}) {
+function clientFor({ userId = 'user-1', project = { id: '11111111-1111-4111-8111-111111111111', title: '1998 Ford Ranger', category: 'Vehicles', notes: '5-speed. Rust over rear wheel wells.' }, expenses = [{ description: 'New clutch' }], claimDecision = 'allowed', claimError = null, renewAllowed = true, stripeMode = 'compatibility', stripeModeError = null, profile = { subscription_id: 'sub_synthetic', subscription_status: 'active' }, entitlements = [{ source: 'stripe', status: 'active', expires_at: '2030-01-01T00:00:00Z', last_verified_at: '2026-09-01T00:00:00Z' }], tombstone = null, tombstoneError = null, onEq = () => {}, onRpc = () => {}, onRead = () => {} } = {}) {
   return {
     auth: { getUser: async () => ({ data: { user: { id: userId } }, error: null }) },
     async rpc(name) {
+      onRpc(name)
       if (name === 'claim_ai_generation_request') {
         return { data: claimDecision === 'allowed' ? { decision: 'allowed', claim_token: CLAIM_TOKEN } : { decision: claimDecision }, error: claimError }
       }
       if (name === 'renew_ai_generation_request') return { data: renewAllowed, error: null }
       if (name === 'release_ai_generation_request') return { data: true, error: null }
-      if (name === 'stripe_entitlement_read_mode') return { data: 'compatibility', error: null }
+      if (name === 'stripe_entitlement_read_mode') return { data: stripeMode, error: stripeModeError }
       throw new Error(`Unexpected RPC: ${name}`)
     },
     from(table) {
-      if (table === 'profiles') return query({ data: { subscription_id: 'sub_synthetic', subscription_status: 'active' }, error: null }, (column, value) => onEq(table, column, value))
-      if (table === 'user_entitlements') return query({ data: [{ source: 'stripe', status: 'active', expires_at: '2030-01-01T00:00:00Z', last_verified_at: '2026-09-01T00:00:00Z' }], error: null }, (column, value) => onEq(table, column, value))
+      onRead(table)
+      if (table === 'account_deletion_tombstones') return query({ data: tombstone, error: tombstoneError }, (column, value) => onEq(table, column, value))
+      if (table === 'profiles') return query({ data: profile, error: null }, (column, value) => onEq(table, column, value))
+      if (table === 'user_entitlements') return query({ data: entitlements, error: null }, (column, value) => onEq(table, column, value))
       if (table === 'projects') return query({ data: project, error: null }, (column, value) => onEq(table, column, value))
       if (table === 'expenses') return query({ data: expenses, error: null }, (column, value) => onEq(table, column, value))
       throw new Error(`Unexpected table: ${table}`)
@@ -60,6 +63,75 @@ function responseRecorder() {
 function anthropicResponse(text = 'Runs and drives.\n\nNew clutch installed; rust is visible over the rear wheel wells.', stopReason = 'end_turn') {
   return { ok: true, status: 200, json: async () => ({ stop_reason: stopReason, content: [{ type: 'text', text }] }) }
 }
+
+test('canonical read-mode failures fail closed before limiter, private project reads, or provider work', async () => {
+  for (const [label, stripeMode, stripeModeError] of [
+    ['rpc error', null, { message: 'synthetic mode failure' }],
+    ['missing row', null, null],
+    ['invalid mode', 'legacy', null],
+  ]) {
+    const rpcCalls = []
+    const tableReads = []
+    let providerCalls = 0
+    const handler = createGenerateListingHandler({
+      client: clientFor({
+        userId: `user-mode-${label}`,
+        stripeMode,
+        stripeModeError,
+        entitlements: [],
+        onRpc: name => rpcCalls.push(name),
+        onEq: table => tableReads.push(table),
+      }),
+      fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+    })
+    const res = responseRecorder()
+    await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
+
+    assert.equal(res.statusCode, 503, label)
+    assert.deepEqual(res.body, { error: 'Could not verify SideFlip Pro access.' }, label)
+    assert.deepEqual(rpcCalls, ['stripe_entitlement_read_mode'], label)
+    assert.equal(tableReads.some(table => ['projects', 'expenses'].includes(table)), false, label)
+    assert.equal(providerCalls, 0, label)
+  }
+})
+
+test('compatibility read mode preserves legacy profile Pro fallback', async () => {
+  let providerCalls = 0
+  const handler = createGenerateListingHandler({
+    client: clientFor({ stripeMode: 'compatibility', entitlements: [] }),
+    fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+  })
+  const res = responseRecorder()
+  await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(providerCalls, 1)
+})
+
+test('deletion tombstones and lookup errors stop listing work before entitlement, limiter, private reads, or provider spend', async () => {
+  for (const [label, options, expectedStatus] of [
+    ['tombstoned', { tombstone: { status: 'requested' } }, 410],
+    ['lookup error', { tombstoneError: { message: 'synthetic lookup failure' } }, 503],
+  ]) {
+    const tableReads = []
+    const rpcCalls = []
+    let providerCalls = 0
+    const handler = createGenerateListingHandler({
+      client: clientFor({
+        userId: `user-deletion-${label}`,
+        ...options,
+        onRead: table => tableReads.push(table),
+        onRpc: name => rpcCalls.push(name),
+      }),
+      fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+    })
+    const res = responseRecorder()
+    await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
+    assert.equal(res.statusCode, expectedStatus, label)
+    assert.deepEqual(tableReads, ['account_deletion_tombstones'], label)
+    assert.deepEqual(rpcCalls, [], label)
+    assert.equal(providerCalls, 0, label)
+  }
+})
 
 test('new client request loads canonical owner-scoped project facts and returns new and legacy response keys', async () => {
   let providerBody

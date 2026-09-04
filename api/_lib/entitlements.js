@@ -1,4 +1,7 @@
 const UTC_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|\+00:00)$/
+const STRIPE_ENTITLEMENT_READ_MODES = new Set(['compatibility', 'canonical'])
+const ENTITLEMENT_SOURCES = new Set(['stripe', 'apple', 'admin'])
+const ENTITLEMENT_STATUSES = new Set(['active', 'trialing', 'grace_period', 'expired', 'revoked', 'refunded', 'canceled'])
 
 function parseFiniteUtcTimestamp(value) {
   if (typeof value !== 'string') return null
@@ -45,6 +48,45 @@ function hasLegacyStripeCompatibility(profile) {
   return Boolean(profile?.subscription_id && ['active', 'trialing'].includes(profile.subscription_status))
 }
 
+function isSuccessfulEnvelope(result) {
+  return Boolean(
+    result
+    && typeof result === 'object'
+    && !Array.isArray(result)
+    && Object.hasOwn(result, 'data')
+    && Object.hasOwn(result, 'error')
+    && result.error === null
+  )
+}
+
+function isProfileRow(profile) {
+  return Boolean(
+    profile
+    && typeof profile === 'object'
+    && !Array.isArray(profile)
+    && Object.hasOwn(profile, 'subscription_id')
+    && Object.hasOwn(profile, 'subscription_status')
+    && (profile.subscription_id === null || typeof profile.subscription_id === 'string')
+    && (profile.subscription_status === null || typeof profile.subscription_status === 'string')
+  )
+}
+
+function isEntitlementRow(row) {
+  return Boolean(
+    row
+    && typeof row === 'object'
+    && !Array.isArray(row)
+    && Object.hasOwn(row, 'source')
+    && Object.hasOwn(row, 'status')
+    && Object.hasOwn(row, 'expires_at')
+    && Object.hasOwn(row, 'last_verified_at')
+    && ENTITLEMENT_SOURCES.has(row.source)
+    && ENTITLEMENT_STATUSES.has(row.status)
+    && (row.expires_at === null || parseFiniteUtcTimestamp(row.expires_at) !== null)
+    && parseFiniteUtcTimestamp(row.last_verified_at) !== null
+  )
+}
+
 // Profile fallback is a temporary rollout compatibility path, never canonical
 // provider state. Canonical terminal/malformed Stripe rows suppress that fallback,
 // and the service-only database gate disables it after verified reconciliation.
@@ -71,5 +113,32 @@ export function resolveServerEntitlement(profile, entitlements, now = Date.now()
       status: entitlement.status,
       expires_at: entitlement.expires_at,
     },
+  }
+}
+
+export async function loadServerEntitlementState(client, userId, now = Date.now()) {
+  try {
+    const [modeResult, profileResult, entitlementResult] = await Promise.all([
+      client.rpc('stripe_entitlement_read_mode'),
+      client.from('profiles').select('subscription_id, subscription_status').eq('id', userId).maybeSingle(),
+      client.from('user_entitlements').select('source, status, expires_at, last_verified_at').eq('user_id', userId),
+    ])
+    if (
+      !isSuccessfulEnvelope(modeResult)
+      || !STRIPE_ENTITLEMENT_READ_MODES.has(modeResult.data)
+      || !isSuccessfulEnvelope(profileResult)
+      || !isProfileRow(profileResult.data)
+      || !isSuccessfulEnvelope(entitlementResult)
+      || !Array.isArray(entitlementResult.data)
+      || entitlementResult.data.some(row => !isEntitlementRow(row))
+    ) return { error: true }
+
+    return {
+      entitlement: resolveServerEntitlement(profileResult.data, entitlementResult.data, now, {
+        stripeCanonicalCutoverComplete: modeResult.data === 'canonical',
+      }),
+    }
+  } catch {
+    return { error: true }
   }
 }

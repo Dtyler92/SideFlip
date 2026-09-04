@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { resolveServerEntitlement } from './_lib/entitlements.js'
+import { loadServerEntitlementState } from './_lib/entitlements.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
@@ -478,17 +478,9 @@ export function createReportDataHandler({ client = supabase, userClientFactory =
     if (tombstoneResult.error) return failure(res, 503, 'SERVICE_UNAVAILABLE', 'Report access could not be verified.')
     if (tombstoneResult.data) return failure(res, 410, 'ACCOUNT_DELETED', 'This account is unavailable.')
 
-    const [modeResult, profileResult, entitlementResult] = await Promise.all([
-      client.rpc('stripe_entitlement_read_mode'),
-      client.from('profiles').select('subscription_id,subscription_status').eq('id', user.id).maybeSingle(),
-      client.from('user_entitlements').select('source,status,expires_at,last_verified_at').eq('user_id', user.id),
-    ])
-    if (modeResult.error || !['compatibility', 'canonical'].includes(modeResult.data) || profileResult.error || entitlementResult.error) {
-      return failure(res, 503, 'SERVICE_UNAVAILABLE', 'Report access could not be verified.')
-    }
-    if (resolveServerEntitlement(profileResult.data, entitlementResult.data, Date.now(), {
-      stripeCanonicalCutoverComplete: modeResult.data === 'canonical',
-    }).plan !== 'pro') {
+    const entitlementState = await loadServerEntitlementState(client, user.id)
+    if (entitlementState.error) return failure(res, 503, 'SERVICE_UNAVAILABLE', 'Report access could not be verified.')
+    if (entitlementState.entitlement.plan !== 'pro') {
       return failure(res, 403, 'PRO_REQUIRED', 'SideFlip Pro is required for reports.')
     }
 

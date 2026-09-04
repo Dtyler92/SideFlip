@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveServerEntitlement } from '../api/_lib/entitlements.js'
+import { loadServerEntitlementState, resolveServerEntitlement } from '../api/_lib/entitlements.js'
 
 const now = Date.parse('2026-08-06T00:00:00.000Z')
 const verifiedAt = '2026-08-05T00:00:00+00:00'
@@ -8,6 +8,30 @@ const future = '2030-01-01T00:00:00+00:00'
 
 function entitlement(source, status, overrides = {}) {
   return { source, status, expires_at: future, last_verified_at: verifiedAt, ...overrides }
+}
+
+function loaderClient({
+  modeResult = { data: 'compatibility', error: null },
+  profileResult = { data: { subscription_id: 'sub_legacy', subscription_status: 'active' }, error: null },
+  entitlementResult = { data: [], error: null },
+} = {}) {
+  const query = result => {
+    const chain = {
+      select() { return chain },
+      eq() { return chain },
+      maybeSingle() { return Promise.resolve(result) },
+      then(resolve, reject) { return Promise.resolve(result).then(resolve, reject) },
+    }
+    return chain
+  }
+  return {
+    rpc: async () => modeResult,
+    from(table) {
+      if (table === 'profiles') return query(profileResult)
+      if (table === 'user_entitlements') return query(entitlementResult)
+      throw new Error(`Unexpected table: ${table}`)
+    },
+  }
 }
 
 test('normalized active and trialing Stripe entitlements grant Pro without trusting profile fields', () => {
@@ -92,4 +116,75 @@ test('PostgREST UTC timestamps with up to six fractional digits are accepted', (
   ]) {
     assert.equal(resolveServerEntitlement({}, [entitlement('apple', 'active', { expires_at })], now).plan, 'pro')
   }
+})
+
+test('loader rejects null and non-array entitlement table data instead of authorizing profile fallback', async () => {
+  for (const data of [null, {}, 'rows', entitlement('stripe', 'active')]) {
+    const state = await loadServerEntitlementState(loaderClient({ entitlementResult: { data, error: null } }), 'user-1', now)
+    assert.deepEqual(state, { error: true })
+  }
+})
+
+test('loader rejects malformed entitlement rows and fields', async () => {
+  for (const row of [
+    null,
+    [],
+    { source: 'stripe', status: 'active', expires_at: future },
+    entitlement('unknown', 'active'),
+    entitlement('stripe', 'unknown'),
+    entitlement('stripe', 'active', { expires_at: 123 }),
+    entitlement('stripe', 'active', { expires_at: 'not-a-timestamp' }),
+    entitlement('stripe', 'active', { last_verified_at: null }),
+    entitlement('stripe', 'active', { last_verified_at: 'not-a-timestamp' }),
+  ]) {
+    const state = await loadServerEntitlementState(loaderClient({ entitlementResult: { data: [row], error: null } }), 'user-1', now)
+    assert.deepEqual(state, { error: true })
+  }
+})
+
+test('loader rejects missing or malformed profile table data', async () => {
+  for (const data of [
+    null,
+    [],
+    {},
+    { subscription_id: 'sub_legacy' },
+    { subscription_id: 123, subscription_status: 'active' },
+    { subscription_id: 'sub_legacy', subscription_status: true },
+  ]) {
+    const state = await loadServerEntitlementState(loaderClient({ profileResult: { data, error: null } }), 'user-1', now)
+    assert.deepEqual(state, { error: true })
+  }
+})
+
+test('loader requires complete successful PostgREST and RPC envelopes', async () => {
+  for (const [field, malformed] of [
+    ['modeResult', null],
+    ['modeResult', { data: 'compatibility' }],
+    ['modeResult', { error: null }],
+    ['profileResult', null],
+    ['profileResult', { data: { subscription_id: null, subscription_status: null } }],
+    ['entitlementResult', null],
+    ['entitlementResult', { data: [] }],
+  ]) {
+    const state = await loadServerEntitlementState(loaderClient({ [field]: malformed }), 'user-1', now)
+    assert.deepEqual(state, { error: true }, `${field}: ${JSON.stringify(malformed)}`)
+  }
+})
+
+test('loader grants only the exact compatibility profile fallback and denies it in canonical mode', async () => {
+  for (const profile of [
+    { subscription_id: '', subscription_status: 'active' },
+    { subscription_id: 'sub_legacy', subscription_status: 'ACTIVE' },
+    { subscription_id: 'sub_legacy', subscription_status: 'canceled' },
+    { subscription_id: null, subscription_status: 'trialing' },
+  ]) {
+    const state = await loadServerEntitlementState(loaderClient({ profileResult: { data: profile, error: null } }), 'user-1', now)
+    assert.equal(state.entitlement.plan, 'free')
+  }
+
+  const compatibility = await loadServerEntitlementState(loaderClient(), 'user-1', now)
+  assert.deepEqual(compatibility, { entitlement: { plan: 'pro', entitlement: null } })
+
+  const canonical = await loadServerEntitlementState(loaderClient({ modeResult: { data: 'canonical', error: null } }), 'user-1', now)
+  assert.deepEqual(canonical, { entitlement: { plan: 'free', entitlement: null } })
 })

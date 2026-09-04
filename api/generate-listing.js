@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { resolveServerEntitlement } from './_lib/entitlements.js'
+import { loadServerEntitlementState } from './_lib/entitlements.js'
 import {
   buildAnthropicRequest,
   createListingFacts,
@@ -86,23 +86,13 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
     const { data: { user }, error: authError } = await client.auth.getUser(token)
     if (authError || !user) return json(res, 401, { error: 'Please sign in again.' })
 
-    const [modeResult, profileResult, entitlementResult] = await Promise.all([
-      client.rpc('stripe_entitlement_read_mode'),
-      client.from('profiles').select('subscription_id, subscription_status').eq('id', user.id).maybeSingle(),
-      client.from('user_entitlements').select('source, status, expires_at, last_verified_at').eq('user_id', user.id),
-    ])
-    const stripeCanonicalCutoverComplete = !modeResult.error && modeResult.data === 'canonical'
-    const resolvedEntitlement = resolveServerEntitlement(
-      profileResult.error ? null : profileResult.data,
-      entitlementResult.error ? [] : entitlementResult.data,
-      Date.now(),
-      { stripeCanonicalCutoverComplete },
-    )
-    if (
-      (entitlementResult.error && resolvedEntitlement.plan !== 'pro')
-      || (profileResult.error && !stripeCanonicalCutoverComplete && resolvedEntitlement.plan !== 'pro')
-    ) return json(res, 500, { error: 'Could not verify SideFlip Pro access.' })
-    if (resolvedEntitlement.plan !== 'pro') {
+    const tombstoneResult = await client.from('account_deletion_tombstones').select('status').eq('user_id', user.id).maybeSingle()
+    if (tombstoneResult.error) return json(res, 503, { error: 'Could not verify SideFlip Pro access.' })
+    if (tombstoneResult.data) return json(res, 410, { error: 'This account is being deleted.' })
+
+    const entitlementState = await loadServerEntitlementState(client, user.id)
+    if (entitlementState.error) return json(res, 503, { error: 'Could not verify SideFlip Pro access.' })
+    if (entitlementState.entitlement.plan !== 'pro') {
       return json(res, 403, { error: 'SideFlip Pro is required for the Listing Description Generator.' })
     }
 

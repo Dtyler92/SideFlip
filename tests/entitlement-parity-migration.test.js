@@ -31,11 +31,19 @@ test('migration aligns the SQL resolver and fails closed on terminal or non-fini
   assert.match(sql, /isfinite\(e\.last_verified_at\)/i)
 })
 
-test('server entitlement consumers retain explicitly gated profile compatibility until cutover', () => {
-  for (const path of ['api/entitlement.js', 'api/generate-listing.js']) {
-    assert.match(source(path), /from\(['"]profiles['"]\)/)
-    assert.match(source(path), /from\(['"]user_entitlements['"]\)/)
-    assert.match(source(path), /stripe_entitlement_read_mode/)
+test('all Pro consumers share one fail-closed, explicitly gated compatibility loader', () => {
+  const loader = source('api/_lib/entitlements.js')
+  assert.match(loader, /new Set\(\['compatibility', 'canonical'\]\)/)
+  assert.match(loader, /stripe_entitlement_read_mode/)
+  assert.match(loader, /from\(['"]profiles['"]\)/)
+  assert.match(loader, /from\(['"]user_entitlements['"]\)/)
+  assert.match(loader, /isSuccessfulEnvelope\(modeResult\)/)
+  assert.match(loader, /isProfileRow\(profileResult\.data\)/)
+  assert.match(loader, /Array\.isArray\(entitlementResult\.data\)/)
+  assert.match(loader, /isEntitlementRow\(row\)/)
+
+  for (const path of ['api/entitlement.js', 'api/generate-listing.js', 'api/decode-vin.js', 'api/report-data.js']) {
+    assert.match(source(path), /loadServerEntitlementState/)
   }
 })
 
