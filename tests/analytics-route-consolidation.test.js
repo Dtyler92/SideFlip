@@ -41,7 +41,7 @@ test('analytics compatibility rewrites are explicit, ordered before the SPA fall
   assert.equal(config.rewrites[5].destination, '/index.html')
 })
 
-test('the dynamic analytics entry is one of exactly ten Vercel functions and retains the 60-second maximum', () => {
+test('the dynamic analytics entry keeps VIN and report within the twelve-function Vercel budget', () => {
   const entry = source('api/analytics/[operation].js')
   assert.match(entry, /maxDuration:\s*60/)
   assert.match(entry, /createAnalyticsRouter/)
@@ -50,9 +50,11 @@ test('the dynamic analytics entry is one of exactly ten Vercel functions and ret
     'apple-server-notifications.js',
     'create-checkout.js',
     'create-portal-session.js',
+    'decode-vin.js',
     'delete-account.js',
     'entitlement.js',
     'generate-listing.js',
+    'report-data.js',
     'stripe-webhook.js',
     'update-profile-preferences.js',
     'verify-apple-purchase.js',
