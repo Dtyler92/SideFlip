@@ -10,7 +10,7 @@ const SUBJECT_ID = '11111111-1111-4111-8111-111111111111'
 
 function result(data, error = null) { return { data, error } }
 
-function clientFor({ userId = 'user-1', plan = 'pro', tombstone = null, tableResults = {}, rpcResults = {}, onQuery = () => {}, authError = null } = {}) {
+function clientFor({ userId = 'user-1', plan = 'pro', stripeMode = 'compatibility', stripeModeError = null, entitlements = [], tombstone = null, tableResults = {}, rpcResults = {}, onQuery = () => {}, authError = null } = {}) {
   const profile = plan === 'pro' ? { subscription_id: 'sub_synthetic', subscription_status: 'active' } : { subscription_id: null, subscription_status: null }
   return {
     auth: { getUser: async () => ({ data: { user: authError ? null : { id: userId } }, error: authError }) },
@@ -34,7 +34,7 @@ function clientFor({ userId = 'user-1', plan = 'pro', tombstone = null, tableRes
         if (typeof configured === 'function') return configured({ ...state, single })
         if (configured) return configured
         if (table === 'profiles') return result(profile)
-        if (table === 'user_entitlements') return result([])
+        if (table === 'user_entitlements') return result(entitlements)
         if (table === 'account_deletion_tombstones') return result(tombstone)
         return result(single ? null : [])
       }
@@ -42,11 +42,13 @@ function clientFor({ userId = 'user-1', plan = 'pro', tombstone = null, tableRes
     },
     rpc(name, parameters) {
       const state = { rpc: name, parameters, limit: null }
+      if (name === 'stripe_entitlement_read_mode') onQuery({ ...state })
       const chain = {
         limit(value, options) { state.limit = [value, options]; return chain },
         then(resolve, reject) { return run().then(resolve, reject) },
       }
       async function run() {
+        if (name === 'stripe_entitlement_read_mode') return result(stripeMode, stripeModeError)
         onQuery({ ...state })
         const configured = rpcResults[name]
         return typeof configured === 'function' ? configured(parameters) : (configured || result([]))
@@ -136,14 +138,38 @@ test('authentication, deletion tombstone, and authoritative Pro checks fail clos
   }
 })
 
+test('canonical Stripe cutover denies legacy profile-only Pro before ownership', async () => {
+  const sequence = []
+  const client = projectClient({ stripeMode: 'canonical', onQuery: query => sequence.push(query.table || query.rpc) })
+  const res = responseRecorder()
+  await createReportDataHandler({ client })(request(validBody()), res)
+  assert.equal(res.statusCode, 403)
+  assert.equal(res.body.code, 'PRO_REQUIRED')
+  assert.deepEqual(sequence, [
+    'account_deletion_tombstones', 'stripe_entitlement_read_mode', 'profiles', 'user_entitlements',
+  ])
+})
+
+test('Stripe read-mode lookup failure denies access before ownership', async () => {
+  const sequence = []
+  const client = projectClient({ stripeModeError: { message: 'synthetic mode failure' }, onQuery: query => sequence.push(query.table || query.rpc) })
+  const res = responseRecorder()
+  await createReportDataHandler({ client })(request(validBody()), res)
+  assert.equal(res.statusCode, 503)
+  assert.equal(res.body.code, 'SERVICE_UNAVAILABLE')
+  assert.deepEqual(sequence, [
+    'account_deletion_tombstones', 'stripe_entitlement_read_mode', 'profiles', 'user_entitlements',
+  ])
+})
+
 test('authorization gates run in auth, tombstone, Pro, then ownership order', async () => {
   const sequence = []
   const client = projectClient({ onQuery: query => sequence.push(query.table || query.rpc) })
   const res = responseRecorder()
   await createReportDataHandler({ client })(request(validBody()), res)
   assert.equal(res.statusCode, 200)
-  assert.deepEqual(sequence.slice(0, 5), [
-    'account_deletion_tombstones', 'profiles', 'user_entitlements', 'projects', 'projects',
+  assert.deepEqual(sequence.slice(0, 6), [
+    'account_deletion_tombstones', 'stripe_entitlement_read_mode', 'profiles', 'user_entitlements', 'projects', 'projects',
   ])
 })
 
@@ -275,6 +301,7 @@ test('My Stuff report preserves bounded V1 history and reads complete V2 report 
   assert.ok(historyQuery.columns.split(',').every(column => column.trim() !== 'cost'))
   const v2Query = queries.find(query => query.table === 'my_stuff_service_occurrences')
   assert.deepEqual(v2Query.limit, [100, undefined])
+  assert.deepEqual(v2Query.referencedLimits, [[1, { referencedTable: 'my_stuff_service_occurrence_revisions' }]])
   assert.match(v2Query.columns, /my_stuff_service_occurrence_revisions/)
   const dueStateQuery = queries.find(query => query.rpc === 'get_my_stuff_due_state_v2')
   assert.deepEqual(dueStateQuery.limit, [50, undefined])

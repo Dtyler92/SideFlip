@@ -228,14 +228,20 @@ async function readResponseText(response, maxBytes) {
 }
 
 async function loadEntitlementState(client, userId) {
-  const [tombstoneResult, profileResult, entitlementResult] = await Promise.all([
+  const [tombstoneResult, modeResult, profileResult, entitlementResult] = await Promise.all([
     client.from('account_deletion_tombstones').select('status').eq('user_id', userId).maybeSingle(),
+    client.rpc('stripe_entitlement_read_mode'),
     client.from('profiles').select('subscription_id, subscription_status').eq('id', userId).maybeSingle(),
     client.from('user_entitlements').select('source, status, expires_at, last_verified_at').eq('user_id', userId),
   ])
-  if (tombstoneResult.error || profileResult.error || entitlementResult.error) return { error: true }
+  if (tombstoneResult.error || modeResult.error || profileResult.error || entitlementResult.error) return { error: true }
+  if (!['compatibility', 'canonical'].includes(modeResult.data)) return { error: true }
   if (tombstoneResult.data) return { deleted: true }
-  return { entitlement: resolveServerEntitlement(profileResult.data, entitlementResult.data) }
+  return {
+    entitlement: resolveServerEntitlement(profileResult.data, entitlementResult.data, Date.now(), {
+      stripeCanonicalCutoverComplete: modeResult.data === 'canonical',
+    }),
+  }
 }
 
 async function verifyOwnership(client, userId, subjectType, subjectId) {

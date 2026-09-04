@@ -35,6 +35,9 @@ function query(result, onEq = () => {}) {
 function clientFor({
   userId = 'user-1',
   pro = true,
+  stripeMode = 'compatibility',
+  stripeModeError = null,
+  entitlements = [],
   tombstone = null,
   tombstoneError = null,
   subject = { id: SUBJECT_ID },
@@ -51,6 +54,7 @@ function clientFor({
     auth: { getUser: async () => ({ data: { user: { id: userId } }, error: null }) },
     async rpc(name, args) {
       onRpc(name, args)
+      if (name === 'stripe_entitlement_read_mode') return { data: stripeMode, error: stripeModeError }
       if (name === 'claim_vin_decode_request') {
         return { data: { decision: rateDecision, retry_after_seconds: rateDecision === 'rate_limited' ? 42 : 0 }, error: rateError }
       }
@@ -61,7 +65,7 @@ function clientFor({
     from(table) {
       if (table === 'account_deletion_tombstones') return query({ data: tombstone, error: tombstoneError }, (column, value) => onEq(table, column, value))
       if (table === 'profiles') return query({ data: pro ? { subscription_id: 'sub_synthetic', subscription_status: 'active' } : { subscription_id: null, subscription_status: 'inactive' }, error: null }, (column, value) => onEq(table, column, value))
-      if (table === 'user_entitlements') return query({ data: [], error: null }, (column, value) => onEq(table, column, value))
+      if (table === 'user_entitlements') return query({ data: entitlements, error: null }, (column, value) => onEq(table, column, value))
       if (table === 'projects' || table === 'my_stuff_items') return query({ data: subject, error: subjectError }, (column, value) => onEq(table, column, value))
       if (table === 'vin_decode_cache') return query(filters => ({
         data: cacheByVersion ? (cacheByVersion[filters.hmac_key_version] ?? null) : cached,
@@ -161,8 +165,34 @@ test('denies Free users before ownership, rate-limit, cache, or NHTSA work', asy
   assert.equal(res.statusCode, 403)
   assert.equal(res.body.manualEntry, true)
   assert.equal(fetchCalls, 0)
-  assert.deepEqual(rpcCalls, [])
+  assert.deepEqual(rpcCalls, ['stripe_entitlement_read_mode'])
   assert.equal(filters.some(([table]) => ['projects', 'my_stuff_items', 'vin_decode_cache'].includes(table)), false)
+})
+
+test('canonical Stripe cutover denies legacy profile-only Pro before private work', async () => {
+  let fetchCalls = 0
+  const calls = []
+  const res = await run({ vin: VALID_VIN, subjectType: 'project', subjectId: SUBJECT_ID }, {
+    client: { stripeMode: 'canonical', onRpc: name => calls.push(name) },
+    fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() },
+  })
+  assert.equal(res.statusCode, 403)
+  assert.equal(res.body.code, 'PRO_REQUIRED')
+  assert.deepEqual(calls, ['stripe_entitlement_read_mode'])
+  assert.equal(fetchCalls, 0)
+})
+
+test('Stripe read-mode lookup failure denies access before private work', async () => {
+  let fetchCalls = 0
+  const calls = []
+  const res = await run({ vin: VALID_VIN, subjectType: 'project', subjectId: SUBJECT_ID }, {
+    client: { stripeModeError: { message: 'synthetic mode failure' }, onRpc: name => calls.push(name) },
+    fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() },
+  })
+  assert.equal(res.statusCode, 503)
+  assert.equal(res.body.code, 'ENTITLEMENT_UNAVAILABLE')
+  assert.deepEqual(calls, ['stripe_entitlement_read_mode'])
+  assert.equal(fetchCalls, 0)
 })
 
 test('fails closed for deleted/tombstoned users and tombstone lookup errors', async () => {
@@ -211,7 +241,7 @@ test('rejects invalid IDs and unowned subjects before rate-limit or NHTSA work',
     })
     assert.ok([400, 404].includes(res.statusCode))
     assert.equal(fetchCalls, 0)
-    assert.deepEqual(rpcCalls, [])
+    assert.deepEqual(rpcCalls, ['stripe_entitlement_read_mode'])
   }
 })
 
@@ -263,7 +293,9 @@ test('claims the persistent per-user limiter before every cache read, including 
   })
   assert.equal(res.statusCode, 200)
   assert.equal(res.body.cached, true)
-  assert.equal(events[0], 'claim_vin_decode_request')
+  assert.deepEqual(events.slice(0, 2), [
+    'stripe_entitlement_read_mode', 'claim_vin_decode_request',
+  ])
   assert.ok(events.indexOf('claim_vin_decode_request') < events.indexOf('cache_read'))
 })
 
