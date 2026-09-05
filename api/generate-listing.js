@@ -61,7 +61,7 @@ async function loadOwnedListingFacts(client, userId, projectId, existingDescript
   if (!PROJECT_ID_PATTERN.test(projectId || '')) return { error: 'invalid' }
   const [projectResult, expenseResult] = await Promise.all([
     client.from('projects').select('id,title,category,notes').eq('id', projectId).eq('user_id', userId).maybeSingle(),
-    client.from('expenses').select('description').eq('project_id', projectId).eq('user_id', userId).limit(30),
+    client.from('expenses').select('description,category').eq('project_id', projectId).eq('user_id', userId).limit(30),
   ])
   if (projectResult.error || expenseResult.error) return { error: 'lookup' }
   if (!projectResult.data) return { error: 'not_found' }

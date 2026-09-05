@@ -276,6 +276,65 @@ test('released-client payload remains supported and bounded by centralized promp
   assert.match(providerBody.system, /Normal style/)
 })
 
+test('listing facts omit tax, tags, registration, and gas expenses without hiding repairs', async () => {
+  let providerBody
+  const handler = createGenerateListingHandler({
+    client: clientFor({ expenses: [
+      { description: 'Sales tax', category: 'fees' },
+      { description: 'Tags', category: 'fees' },
+      { description: 'Annual registration', category: 'registration' },
+      { description: 'Gas', category: 'fuel' },
+      { description: 'Gas tank repair', category: 'parts' },
+      { description: 'New clutch', category: 'parts' },
+    ] }),
+    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return anthropicResponse('Runs and drives.') },
+  })
+  const res = responseRecorder()
+  await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
+
+  assert.equal(res.statusCode, 200)
+  const promptFacts = JSON.parse(providerBody.messages[0].content)
+  assert.deepEqual(promptFacts.workAndParts, ['Gas tank repair', 'New clutch'])
+})
+
+test('released legacy bodies apply the same administrative filter and preserve fuel-system repairs', async () => {
+  let providerBody
+  const handler = createGenerateListingHandler({
+    client: clientFor(),
+    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return anthropicResponse('Runs and drives.') },
+  })
+  const res = responseRecorder()
+  await handler(request({
+    title: 'Truck',
+    category: 'Vehicles',
+    notes: 'Runs and drives.',
+    style: 'normal',
+    expenses: [
+      { description: 'Registration renewal fee', category: 'other' },
+      { description: 'DMV Tags!', category: 'fees' },
+      { description: 'State Taxes', category: 'fees' },
+      { description: 'Fuel refill', category: 'other' },
+      { description: 'Sales tax service', category: 'fees' },
+      { description: 'Vehicle registration service', category: 'other' },
+      { description: 'Gasoline tank fill-up', category: 'gasoline' },
+      { description: 'Diesel tank refill', category: 'diesel' },
+      { description: 'Gas tank repair', category: 'fuel' },
+      { description: 'Fuel pump replacement', category: 'gas' },
+      { description: 'Diesel engine rebuilt', category: 'diesel' },
+      { description: 'Fuel system overhauled', category: 'fuel' },
+    ],
+  }), res)
+
+  assert.equal(res.statusCode, 200)
+  const promptFacts = JSON.parse(providerBody.messages[0].content)
+  assert.deepEqual(promptFacts.workAndParts, [
+    'Gas tank repair',
+    'Fuel pump replacement',
+    'Diesel engine rebuilt',
+    'Fuel system overhauled',
+  ])
+})
+
 test('provider failures return a friendly generic error without leaking provider details', async () => {
   const handler = createGenerateListingHandler({
     client: clientFor({ userId: 'user-5' }),

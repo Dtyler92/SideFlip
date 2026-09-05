@@ -42,6 +42,36 @@ test('canonical listing facts include only useful stored seller facts and omit f
   assert.doesNotMatch(JSON.stringify(facts), /900|450|38|purchase_price|amount/)
 })
 
+test('listing facts omit administrative and fuel expenses while preserving fuel-system work', () => {
+  const facts = createListingFacts(project, [
+    { description: 'State taxes', category: 'fees' },
+    { description: 'DMV tags', category: 'fees' },
+    { description: 'Registration renewal fee', category: 'other' },
+    { description: 'Gas fill-up', category: 'other' },
+    { description: 'Fuel refill', category: 'other' },
+    { description: 'Sales tax service', category: 'fees' },
+    { description: 'Vehicle registration service', category: 'other' },
+    { description: 'Gas tank refill', category: 'fuel' },
+    { description: 'Gasoline tank fill-up', category: 'other' },
+    { description: 'Diesel tank refill', category: 'other' },
+    { description: 'Tank refill', category: 'gasoline' },
+    { description: 'Fill-up', category: 'diesel' },
+    { description: 'Gas tank repair', category: 'fuel' },
+    { description: 'Fuel pump replacement', category: 'gas' },
+    { description: 'Diesel engine rebuilt', category: 'diesel' },
+    { description: 'Fuel system overhauled', category: 'fuel' },
+    { description: 'New clutch', category: 'parts' },
+  ])
+
+  assert.deepEqual(facts.workAndParts, [
+    'Gas tank repair',
+    'Fuel pump replacement',
+    'Diesel engine rebuilt',
+    'Fuel system overhauled',
+    'New clutch',
+  ])
+})
+
 test('prompt architecture composes core and one style module while treating seller text as untrusted facts', () => {
   const professional = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'professional' })
   assert.match(professional.system, /Never invent/i)

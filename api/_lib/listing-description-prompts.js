@@ -60,6 +60,36 @@ function boundedText(value, max = 2000) {
   return clean ? clean.slice(0, max) : null
 }
 
+const ADMINISTRATIVE_EXPENSE_CATEGORIES = new Set(['tax', 'taxes', 'tag', 'tags', 'registration'])
+const FUEL_EXPENSE_CATEGORIES = new Set(['gas', 'gasoline', 'fuel', 'diesel'])
+const ADMINISTRATIVE_EXPENSE_PATTERN = /\b(?:tax|taxes|taxation|tag|tags|registration)\b/
+const FUEL_EXPENSE_PATTERN = /\b(?:gas|gasoline|fuel|diesel)\b/
+const STRONG_REPAIR_ACTION_PATTERN = /\b(?:repair|repaired|replace|replaced|replacement|fix|fixed|install|installed|installation|rebuild|rebuilt|overhaul|overhauled|clean|cleaned|restore|restored|upgrade|upgraded)\b/
+const FUEL_COMPONENT_PATTERN = /\b(?:pump|filter|injector|carburetor|cap|gauge|sending unit|hose|rail|sensor)\b/
+
+function shouldIncludeListingExpense(expense) {
+  const category = String(expense?.category || '').trim().toLowerCase()
+  const description = String(expense?.description || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+  // Paperwork/administrative expenses are never useful listing work, even
+  // when a description contains a generic word such as "service".
+  if (ADMINISTRATIVE_EXPENSE_CATEGORIES.has(category)) return false
+  if (ADMINISTRATIVE_EXPENSE_PATTERN.test(description)) return false
+
+  const isFuelExpense = FUEL_EXPENSE_CATEGORIES.has(category) || FUEL_EXPENSE_PATTERN.test(description)
+  if (!isFuelExpense) return true
+
+  // Preserve clearly described fuel-system repairs and parts, while omitting
+  // purchases/refills such as "Gas tank refill" or "Diesel fill-up".
+  if (STRONG_REPAIR_ACTION_PATTERN.test(description)) return true
+  if (FUEL_COMPONENT_PATTERN.test(description)) return true
+  return false
+}
+
 export function normalizeGenerationOptions(input = {}) {
   const style = typeof input.style === 'string' ? input.style.trim().toLowerCase() : ''
   if (!STYLES.has(style)) throw new Error('Choose a valid description style.')
@@ -90,6 +120,7 @@ export function createListingFacts(project = {}, expenses = [], existingDescript
   if (currentDescription) facts.existingDescription = currentDescription
 
   const workAndParts = [...new Set((Array.isArray(expenses) ? expenses : [])
+    .filter(shouldIncludeListingExpense)
     .map(expense => boundedText(expense?.description, 300))
     .filter(Boolean))]
     .slice(0, 30)
