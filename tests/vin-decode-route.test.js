@@ -102,10 +102,12 @@ function nhtsaResponse(overrides = {}, responseUrl = 'https://vpic.nhtsa.dot.gov
     BodyClass: 'Sedan/Saloon',
     VehicleType: 'PASSENGER CAR',
     Manufacturer: 'AMERICAN HONDA MOTOR CO., INC.',
+    PlantCompanyName: 'Marysville Auto Plant',
     PlantCountry: 'UNITED STATES (USA)',
     FuelTypePrimary: 'Gasoline',
     EngineCylinders: '6',
     DisplacementL: '3',
+    EngineModel: 'J30A4',
     DriveType: '4x2',
     TransmissionStyle: 'Automatic',
     ...overrides,
@@ -154,7 +156,7 @@ test('requires authentication and explicit supported subject domain', async () =
   }
 })
 
-test('denies Free users before ownership, rate-limit, cache, or NHTSA work', async () => {
+test('authenticated Free users receive the same basic VIN decode', async () => {
   let fetchCalls = 0
   const rpcCalls = []
   const filters = []
@@ -162,37 +164,36 @@ test('denies Free users before ownership, rate-limit, cache, or NHTSA work', asy
     client: { pro: false, onRpc: name => rpcCalls.push(name), onEq: (...args) => filters.push(args) },
     fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() },
   })
-  assert.equal(res.statusCode, 403)
-  assert.equal(res.body.manualEntry, true)
-  assert.equal(fetchCalls, 0)
-  assert.deepEqual(rpcCalls, ['stripe_entitlement_read_mode'])
-  assert.equal(filters.some(([table]) => ['projects', 'my_stuff_items', 'vin_decode_cache'].includes(table)), false)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.vehicle.engineModel, 'J30A4')
+  assert.equal(res.body.vehicle.plantName, 'Marysville Auto Plant')
+  assert.equal(fetchCalls, 1)
+  assert.deepEqual(rpcCalls, ['claim_vin_decode_request', 'store_vin_decode_cache'])
+  assert.equal(filters.some(([table]) => ['projects', 'my_stuff_items'].includes(table)), true)
 })
 
-test('canonical Stripe cutover denies legacy profile-only Pro before private work', async () => {
+test('basic decode does not depend on Pro entitlement mode', async () => {
   let fetchCalls = 0
   const calls = []
   const res = await run({ vin: VALID_VIN, subjectType: 'project', subjectId: SUBJECT_ID }, {
     client: { stripeMode: 'canonical', onRpc: name => calls.push(name) },
     fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() },
   })
-  assert.equal(res.statusCode, 403)
-  assert.equal(res.body.code, 'PRO_REQUIRED')
-  assert.deepEqual(calls, ['stripe_entitlement_read_mode'])
-  assert.equal(fetchCalls, 0)
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(calls, ['claim_vin_decode_request', 'store_vin_decode_cache'])
+  assert.equal(fetchCalls, 1)
 })
 
-test('Stripe read-mode lookup failure denies access before private work', async () => {
+test('basic decode remains available when entitlement read mode is unavailable', async () => {
   let fetchCalls = 0
   const calls = []
   const res = await run({ vin: VALID_VIN, subjectType: 'project', subjectId: SUBJECT_ID }, {
     client: { stripeModeError: { message: 'synthetic mode failure' }, onRpc: name => calls.push(name) },
     fetchImpl: async () => { fetchCalls += 1; return nhtsaResponse() },
   })
-  assert.equal(res.statusCode, 503)
-  assert.equal(res.body.code, 'ENTITLEMENT_UNAVAILABLE')
-  assert.deepEqual(calls, ['stripe_entitlement_read_mode'])
-  assert.equal(fetchCalls, 0)
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(calls, ['claim_vin_decode_request', 'store_vin_decode_cache'])
+  assert.equal(fetchCalls, 1)
 })
 
 test('fails closed for deleted/tombstoned users and tombstone lookup errors', async () => {
@@ -252,7 +253,7 @@ test('rejects invalid IDs and unowned subjects before rate-limit or NHTSA work',
     })
     assert.ok([400, 404].includes(res.statusCode))
     assert.equal(fetchCalls, 0)
-    assert.deepEqual(rpcCalls, ['stripe_entitlement_read_mode'])
+    assert.deepEqual(rpcCalls, [])
   }
 })
 
@@ -304,9 +305,7 @@ test('claims the persistent per-user limiter before every cache read, including 
   })
   assert.equal(res.statusCode, 200)
   assert.equal(res.body.cached, true)
-  assert.deepEqual(events.slice(0, 2), [
-    'stripe_entitlement_read_mode', 'claim_vin_decode_request',
-  ])
+  assert.deepEqual(events.slice(0, 2), ['claim_vin_decode_request', 'cache_read'])
   assert.ok(events.indexOf('claim_vin_decode_request') < events.indexOf('cache_read'))
 })
 
@@ -392,10 +391,12 @@ test('maps only allowlisted structured NHTSA fields and caches by HMAC without r
     bodyClass: 'Sedan/Saloon',
     vehicleType: 'PASSENGER CAR',
     manufacturer: 'AMERICAN HONDA MOTOR CO., INC.',
+    plantName: 'Marysville Auto Plant',
     plantCountry: 'UNITED STATES (USA)',
     fuelTypePrimary: 'Gasoline',
     engineCylinders: 6,
     displacementLiters: 3,
+    engineModel: 'J30A4',
     driveType: '4x2',
     transmissionStyle: 'Automatic',
   })
