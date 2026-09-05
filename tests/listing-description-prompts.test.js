@@ -87,6 +87,11 @@ test('prompt architecture composes core and one style module while treating sell
   assert.match(funny.system, /Balanced humor level/i)
   assert.match(funny.system, /conversational humor throughout/i)
   assert.match(funny.system, /obviously figurative/i)
+  assert.match(funny.system, /silently identify up to five comedy hooks/i)
+  assert.match(funny.system, /opening hook/i)
+  assert.match(funny.system, /at least three distinct comedic beats/i)
+  assert.match(funny.system, /punchlines? short/i)
+  assert.match(funny.system, /do not explain.*joke/i)
   assert.doesNotMatch(funny.system, /flyest cat|your mama/i)
 
   const normal = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'normal' })
@@ -94,11 +99,15 @@ test('prompt architecture composes core and one style module while treating sell
   assert.doesNotMatch(normal.system, /Professional style|Funny style/i)
 
   const subtle = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'subtle' })
-  assert.match(subtle.system, /one or two restrained jokes/i)
+  assert.match(subtle.system, /two restrained.*comedic beats.*otherwise use one rather than inventing/i)
   assert.doesNotMatch(subtle.system, /Balanced humor level|Unhinged humor level/i)
 
   const unhinged = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'unhinged' })
   assert.match(unhinged.system, /energetic, exaggerated, absurd humor throughout/i)
+  assert.match(unhinged.system, /punchy, surprising, and slightly chaotic/i)
+  assert.match(unhinged.system, /at least four distinct comedic beats/i)
+  assert.match(unhinged.system, /commit to the bit/i)
+  assert.match(unhinged.system, /fill-in-the-blank skit/i)
   assert.match(unhinged.system, /Do not create random nonsense/i)
   assert.doesNotMatch(unhinged.system, /Subtle humor level|Balanced humor level/i)
 })
@@ -108,8 +117,8 @@ test('all five generation modes have separate recognizable instructions and item
   const modes = [
     ['professional', null, /polished and factual/i, /180,000 miles/i],
     ['normal', null, /casual and direct/i, /180,000 miles/i],
-    ['funny', 'subtle', /one or two restrained jokes/i, /rear wheel wells/i],
-    ['funny', 'balanced', /conversational humor throughout/i, /five of them/i],
+    ['funny', 'subtle', /two restrained.*comedic beats/i, /rear wheel wells/i],
+    ['funny', 'balanced', /conversational humor throughout/i, /comma is load-bearing/i],
     ['funny', 'unhinged', /energetic, exaggerated, absurd humor throughout/i, /new clutch/i],
   ]
   const systems = modes.map(([style, humorLevel, instruction, groundedExample]) => {

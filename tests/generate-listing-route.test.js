@@ -154,6 +154,8 @@ test('new client request loads canonical owner-scoped project facts and returns 
     ['expenses', 'user_id', 'user-1'],
   ])
   assert.match(providerBody.system, /Balanced humor level/)
+  assert.match(providerBody.system, /silently identify up to five comedy hooks/i)
+  assert.match(providerBody.system, /at least three distinct comedic beats/i)
   assert.deepEqual(JSON.parse(providerBody.messages[0].content), {
     title: '1998 Ford Ranger',
     category: 'Vehicles',
