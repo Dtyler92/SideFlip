@@ -218,7 +218,7 @@ create table private.my_stuff_research_dead_letters(
  unique(job_id), check(payload_hash ~ '^[0-9a-f]{64}$' and length(coalesce(error_detail,''))<=4000)
 );
 
-create function public.prevent_my_stuff_v3_immutable_update() returns trigger language plpgsql set search_path=public as $$
+create function public.prevent_my_stuff_v3_immutable_update() returns trigger language plpgsql set search_path=public,extensions as $$
 begin if tg_op='DELETE' and pg_trigger_depth()>1 then return old; end if; raise exception '% rows are immutable; append a revision or event',tg_table_name; end $$;
 create trigger my_stuff_expense_revisions_immutable before update or delete on public.my_stuff_expense_revisions for each row execute function public.prevent_my_stuff_v3_immutable_update();
 create trigger my_stuff_expense_audit_immutable before update or delete on public.my_stuff_expense_audit for each row execute function public.prevent_my_stuff_v3_immutable_update();
@@ -226,7 +226,7 @@ create trigger my_stuff_definition_versions_immutable before update or delete on
 create trigger my_stuff_status_events_immutable before update or delete on public.my_stuff_occurrence_status_events for each row execute function public.prevent_my_stuff_v3_immutable_update();
 
 create function private.my_stuff_vehicle_identity_fingerprint_v3(p_item public.my_stuff_items) returns text
-language sql immutable set search_path=public,private as $$
+language sql immutable set search_path=public,private,extensions as $$
  select encode(digest(jsonb_strip_nulls(jsonb_build_object(
    'vin_sha256',case when nullif(upper(regexp_replace(coalesce(p_item.vin,''),'[^A-Z0-9]','','g')),'') is null then null
      else encode(digest(upper(regexp_replace(p_item.vin,'[^A-Z0-9]','','g')),'sha256'),'hex') end,
@@ -238,7 +238,7 @@ language sql immutable set search_path=public,private as $$
  ))::text,'sha256'),'hex')
 $$;
 
-create function public.invalidate_my_stuff_vehicle_confirmation_v3() returns trigger language plpgsql set search_path=public as $$
+create function public.invalidate_my_stuff_vehicle_confirmation_v3() returns trigger language plpgsql set search_path=public,extensions as $$
 begin
  if row(new.vin,new.model_year,new.manufacturer,new.make,new.model,new.trim,new.engine,new.engine_model,new.engine_displacement_liters,new.engine_cylinders,
    new.transmission,new.drivetrain,new.fuel_power_type,new.vehicle_type,new.body_style,new.plant_name,new.plant_country,new.vehicle_market) is distinct from
@@ -252,7 +252,7 @@ create trigger my_stuff_vehicle_confirmation_invalidate_v3 before update on publ
 for each row execute function public.invalidate_my_stuff_vehicle_confirmation_v3();
 
 create function public.confirm_my_stuff_vehicle_identity_v3(p_item_id uuid,p_identity jsonb,p_mutation_id text) returns jsonb
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_hash text; v_old text; v_result jsonb; v_key text; v_vin text; v_item public.my_stuff_items%rowtype;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -286,7 +286,7 @@ exception when check_violation or numeric_value_out_of_range or invalid_text_rep
 end $$;
 
 create function private.create_my_stuff_expense_v3_trusted(p_user_id uuid,p_item_id uuid,p_expense jsonb,p_source_type text,p_project_id uuid,p_project_expense_id uuid,p_occurrence_id uuid,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public,private as $$
+language plpgsql security definer set search_path=public,private,extensions as $$
 declare v_hash text; v_old text; v_result jsonb; v_id uuid; v_revision uuid; v_purchase_currency text; v_currency text;
 begin
  if p_user_id is null then raise exception 'User ID required'; end if;
@@ -321,7 +321,7 @@ begin
 end $$;
 
 create function public.create_my_stuff_expense_v3(p_item_id uuid,p_expense jsonb,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid();
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -330,7 +330,7 @@ begin
 end $$;
 
 create function public.revise_my_stuff_expense_v3(p_expense_id uuid,p_patch jsonb,p_reason text,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_exp public.my_stuff_expenses%rowtype; v_latest public.my_stuff_expense_revisions%rowtype; v_hash text; v_old text; v_result jsonb; v_id uuid; v_n integer; v_merged jsonb; v_key text; v_purchase_currency text;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -357,7 +357,7 @@ begin
 end $$;
 
 create function public.void_my_stuff_expense_v3(p_expense_id uuid,p_reason text,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_hash text; v_old text; v_result jsonb; v_item uuid;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -372,7 +372,7 @@ begin
 end $$;
 
 create function public.get_my_stuff_expenses_v3(p_item_id uuid) returns table(expense_id uuid,source_type text,linked_occurrence_id uuid,voided_at timestamptz,revision_id uuid,revision_number integer,description text,category text,custom_category text,amount numeric,currency text,incurred_on date,vendor text,mileage numeric,hours numeric,notes text)
-language plpgsql stable security definer set search_path=public as $$
+language plpgsql stable security definer set search_path=public,extensions as $$
 begin
  if auth.uid() is null then raise exception 'Authentication required'; end if;
  return query select e.id,e.source_type,e.linked_occurrence_id,e.voided_at,r.id,r.revision_number,r.description,r.category,r.custom_category,r.amount,r.currency,r.incurred_on,r.vendor,r.mileage,r.hours,r.notes
@@ -381,7 +381,7 @@ begin
 end $$;
 
 create function public.get_my_stuff_financial_summary_v3(p_item_id uuid) returns jsonb
-language plpgsql stable security definer set search_path=public as $$
+language plpgsql stable security definer set search_path=public,extensions as $$
 declare v_result jsonb;
 begin
  if auth.uid() is null then raise exception 'Authentication required'; end if;
@@ -408,7 +408,7 @@ begin
 end $$;
 
 create function public.record_my_stuff_service_with_expense_v3(p_item_id uuid,p_planned_occurrence_id uuid,p_definition_id uuid,p_service jsonb,p_expense jsonb,p_mutation_id text) returns jsonb
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_hash text; v_old text; v_result jsonb; v_occ uuid; v_exp uuid; v_plan public.my_stuff_planned_occurrences%rowtype;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -432,7 +432,7 @@ begin
 end $$;
 
 create function public.revise_my_stuff_service_expense_v3(p_occurrence_id uuid,p_expense_id uuid,p_service_patch jsonb,p_expense_patch jsonb,p_reason text,p_mutation_id text) returns jsonb
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_hash text; v_old text; v_result jsonb; v_service_revision uuid; v_expense_revision uuid; v_latest public.my_stuff_service_occurrence_revisions%rowtype; v_merged jsonb;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -454,14 +454,14 @@ begin
 end $$;
 
 create function public.materialize_my_stuff_next_occurrence_v3(p_definition_id uuid) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_def public.my_stuff_maintenance_definitions%rowtype; v_due record; v_id uuid; v_key text;
 begin if v_user is null then raise exception 'Authentication required'; end if; select * into v_def from public.my_stuff_maintenance_definitions where id=p_definition_id and user_id=v_user and enabled; if not found then raise exception 'Maintenance definition not found'; end if; select * into v_due from public.get_my_stuff_due_state_v2(v_def.item_id,now()) where definition_id=p_definition_id;
  v_key:=encode(digest(jsonb_build_object('definition',p_definition_id,'at',v_due.next_due_at,'mileage',v_due.next_due_mileage,'hours',v_due.next_due_hours,'cycles',v_due.next_due_cycles)::text,'sha256'),'hex');
  insert into public.my_stuff_planned_occurrences(user_id,item_id,definition_id,definition_version_id,occurrence_key,status,due_at,due_mileage,due_hours,due_cycles) values(v_user,v_def.item_id,p_definition_id,(select id from public.my_stuff_definition_versions where definition_id=p_definition_id order by version_number desc limit 1),v_key,'not_completed',v_due.next_due_at,v_due.next_due_mileage,v_due.next_due_hours,v_due.next_due_cycles) on conflict(definition_id,occurrence_key) do update set definition_id=excluded.definition_id returning id into v_id; return v_id; end $$;
 
 create function public.create_my_stuff_custom_task_v3(p_item_id uuid,p_definition jsonb,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_def uuid; v_version uuid; v_hash text; v_old text; v_result jsonb;
 begin if v_user is null then raise exception 'Authentication required'; end if; if p_definition ?| array['provenance','provenance_type','source_class','citation_url','citation_title','citation_page','citation_section','citation_accessed_on'] then raise exception 'Provenance fields cannot be supplied to manual task RPC'; end if;
  if nullif(trim(coalesce(p_mutation_id,'')),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required'; end if;
@@ -472,7 +472,7 @@ begin if v_user is null then raise exception 'Authentication required'; end if; 
  v_result:=jsonb_build_object('definition_id',v_def,'version_id',v_version); insert into public.my_stuff_v3_mutations values(v_user,trim(p_mutation_id),'create_task',v_hash,v_result,now()); return v_def; end $$;
 
 create function public.version_my_stuff_task_v3(p_definition_id uuid,p_patch jsonb,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_old public.my_stuff_maintenance_definitions%rowtype; v_def uuid; v_version uuid; v_n integer; v_hash text; v_prior_hash text; v_result jsonb;
 begin if v_user is null then raise exception 'Authentication required'; end if; select * into v_old from public.my_stuff_maintenance_definitions where id=p_definition_id and user_id=v_user; if not found then raise exception 'Maintenance definition not found'; end if;
  if jsonb_typeof(p_patch)<>'object' or p_patch='{}'::jsonb then raise exception 'Task patch must change at least one field'; end if; if nullif(trim(coalesce(p_mutation_id,'')),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required'; end if;
@@ -483,14 +483,14 @@ begin if v_user is null then raise exception 'Authentication required'; end if; 
  v_result:=jsonb_build_object('definition_id',v_def,'version_id',v_version); insert into public.my_stuff_v3_mutations values(v_user,trim(p_mutation_id),'version_task',v_hash,v_result,now()); return v_version; end $$;
 
 create function public.list_my_stuff_schedule_groups_v3(p_item_id uuid) returns jsonb
-language plpgsql stable security definer set search_path=public as $$
+language plpgsql stable security definer set search_path=public,extensions as $$
 declare v_result jsonb; begin if auth.uid() is null then raise exception 'Authentication required'; end if; select coalesce(jsonb_agg(to_jsonb(x) order by x.due_at nulls last,x.id),'[]') into v_result from (select p.* from public.my_stuff_planned_occurrences p where p.item_id=p_item_id and p.user_id=auth.uid() limit 1000)x; return v_result; end $$;
 create function public.get_my_stuff_due_views_v3(p_item_id uuid,p_as_of timestamptz default now()) returns jsonb
-language plpgsql stable security definer set search_path=public as $$
+language plpgsql stable security definer set search_path=public,extensions as $$
 declare v_result jsonb; begin if auth.uid() is null then raise exception 'Authentication required'; end if; if p_as_of is null or not isfinite(p_as_of) or p_as_of<'1900-01-01Z' or p_as_of>='2200-01-01Z' then raise exception 'As-of date outside supported range'; end if; select coalesce(jsonb_agg(jsonb_build_object('occurrence',to_jsonb(p),'view',case when p.status='completed' and p_as_of-p.created_at<=interval '30 days' then 'completed_recently' when p.status<>'not_completed' then p.status when p.due_at<p_as_of then 'overdue' when p.due_at<=p_as_of+interval '30 days' then 'due_soon' else 'upcoming' end) order by p.due_at nulls last),'[]') into v_result from public.my_stuff_planned_occurrences p where p.item_id=p_item_id and p.user_id=auth.uid(); return v_result; end $$;
 
 create function public.transition_my_stuff_occurrence_status_v3(p_occurrence_id uuid,p_status text,p_reason text,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_plan public.my_stuff_planned_occurrences%rowtype; v_hash text; v_id uuid; v_old text; v_result jsonb;
 begin if v_user is null then raise exception 'Authentication required'; end if; if p_status not in ('not_completed','not_applicable','skipped','history_unknown') then raise exception 'Completed status must use completion RPC'; end if; if nullif(trim(coalesce(p_mutation_id,'')),'') is null or length(p_mutation_id)>200 then raise exception 'Mutation ID required'; end if;
  v_hash:=encode(digest(jsonb_build_object('occurrence',p_occurrence_id,'status',p_status,'reason',p_reason)::text,'sha256'),'hex'); perform pg_advisory_xact_lock(hashtextextended(v_user::text||':planned:'||p_occurrence_id::text,0));
@@ -500,11 +500,11 @@ begin if v_user is null then raise exception 'Authentication required'; end if; 
  v_result:=jsonb_build_object('event_id',v_id,'occurrence_id',p_occurrence_id,'status',p_status); insert into public.my_stuff_v3_mutations values(v_user,trim(p_mutation_id),'transition_occurrence',v_hash,v_result,now()); return v_id; end $$;
 
 create function public.complete_my_stuff_planned_occurrence_v3(p_occurrence_id uuid,p_service jsonb,p_expense jsonb,p_mutation_id text) returns jsonb
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_plan public.my_stuff_planned_occurrences%rowtype; begin if v_user is null then raise exception 'Authentication required'; end if; select * into v_plan from public.my_stuff_planned_occurrences where id=p_occurrence_id and user_id=v_user; if not found then raise exception 'Planned occurrence not found'; end if; return public.record_my_stuff_service_with_expense_v3(v_plan.item_id,p_occurrence_id,v_plan.definition_id,p_service,p_expense,p_mutation_id); end $$;
 
 create function public.transfer_project_to_my_stuff_v3(p_project_id uuid,p_options jsonb,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_item uuid; v_hash text; v_transfer_hash text; v_old text; v_result jsonb; v_project record; v_project_snapshot jsonb; v_expense_snapshot jsonb; v_e record; v_occ uuid; v_exp uuid; v_service_ids uuid[]; v_category text; v_disp text; v_dims text[];
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -558,15 +558,15 @@ begin
 end $$;
 
 create function public.reserve_my_stuff_attachment_v3(p_item_id uuid,p_expense_revision_id uuid,p_service_revision_id uuid,p_media_type text,p_byte_size bigint,p_sha256 text,p_mutation_id text) returns jsonb
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_id uuid:=gen_random_uuid(); v_path text; v_hash text; v_result jsonb;
 begin if v_user is null then raise exception 'Authentication required'; end if; if not exists(select 1 from public.my_stuff_items where id=p_item_id and user_id=v_user) then raise exception 'My Stuff item not found'; end if; v_path:=v_user::text||'/'||p_item_id::text||'/attachments/'||v_id::text; v_hash:=encode(digest(jsonb_build_object('item',p_item_id,'expense_revision',p_expense_revision_id,'service_revision',p_service_revision_id,'media_type',p_media_type,'byte_size',p_byte_size,'sha256',p_sha256)::text,'sha256'),'hex'); insert into public.my_stuff_attachments(id,user_id,item_id,expense_revision_id,service_revision_id,storage_path,media_type,byte_size,sha256,state) values(v_id,v_user,p_item_id,p_expense_revision_id,p_service_revision_id,v_path,p_media_type,p_byte_size,lower(p_sha256),'reserved'); v_result:=jsonb_build_object('attachment_id',v_id,'bucket','my-stuff-media','storage_path',v_path); insert into public.my_stuff_v3_mutations values(v_user,trim(p_mutation_id),'reserve_attachment',v_hash,v_result,now()); return v_result; end $$;
 create function public.finalize_my_stuff_attachment_v3(p_attachment_id uuid,p_storage_path text,p_sha256 text,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_id uuid; begin if v_user is null then raise exception 'Authentication required'; end if; update public.my_stuff_attachments set state='finalized',finalized_at=clock_timestamp() where id=p_attachment_id and user_id=v_user and state='reserved' and storage_path=p_storage_path and sha256=lower(p_sha256) returning id into v_id; if v_id is null then raise exception 'Reserved attachment not found or metadata mismatch'; end if; return v_id; end $$;
 
 create function public.enqueue_my_stuff_research_v3(p_item_id uuid,p_confirmed_fingerprint text,p_mutation_id text) returns uuid
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public,extensions as $$
 declare v_user uuid:=auth.uid(); v_item public.my_stuff_items%rowtype;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
@@ -579,10 +579,10 @@ begin
 end $$;
 
 create function private.lease_my_stuff_research_job_v3(p_worker text,p_lease_seconds integer default 300) returns private.my_stuff_research_jobs
-language plpgsql security definer set search_path=public,private as $$
+language plpgsql security definer set search_path=public,private,extensions as $$
 begin raise exception 'RESEARCH_PROVIDER_DISABLED'; end $$;
 create function private.settle_my_stuff_research_job_v3(p_job_id uuid,p_worker text,p_cost_cents integer,p_evidence jsonb,p_candidates jsonb) returns uuid
-language plpgsql security definer set search_path=public,private as $$
+language plpgsql security definer set search_path=public,private,extensions as $$
 begin raise exception 'RESEARCH_PROVIDER_DISABLED'; end $$;
 
 -- RLS and least privilege: authenticated clients can read owned public records but only RPCs write them.
