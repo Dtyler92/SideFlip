@@ -42,9 +42,12 @@ test('all Pro consumers share one fail-closed, explicitly gated compatibility lo
   assert.match(loader, /Array\.isArray\(entitlementResult\.data\)/)
   assert.match(loader, /isEntitlementRow\(row\)/)
 
-  for (const path of ['api/entitlement.js', 'api/generate-listing.js', 'api/decode-vin.js', 'api/report-data.js']) {
+  for (const path of ['api/entitlement.js', 'api/generate-listing.js', 'api/report-data.js']) {
     assert.match(source(path), /loadServerEntitlementState/)
   }
+  // Basic authenticated VIN decoding is a Free capability. Paid enrichment and
+  // manufacturer research remain independently Pro-gated.
+  assert.doesNotMatch(source('api/decode-vin.js'), /loadServerEntitlementState/)
 })
 
 test('migration fences tombstones, avoids profile backfill, and hardens authority objects', () => {

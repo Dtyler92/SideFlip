@@ -1,6 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
-import { loadServerEntitlementState } from './_lib/entitlements.js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -145,10 +144,12 @@ function mapVehicle(result) {
     bodyClass: safeText(result.BodyClass),
     vehicleType: safeText(result.VehicleType),
     manufacturer: safeText(result.Manufacturer),
+    plantName: safeText(result.PlantCompanyName),
     plantCountry: safeText(result.PlantCountry),
     fuelTypePrimary: safeText(result.FuelTypePrimary),
     engineCylinders: safeNumber(result.EngineCylinders, VEHICLE_NUMBER_RULES.engineCylinders),
     displacementLiters: safeNumber(result.DisplacementL, VEHICLE_NUMBER_RULES.displacementLiters),
+    engineModel: safeText(result.EngineModel),
     driveType: safeText(result.DriveType),
     transmissionStyle: safeText(result.TransmissionStyle),
   }
@@ -178,7 +179,7 @@ function mapCachedWarnings(codes) {
 
 function validCachedVehicle(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const keys = new Set(['modelYear', 'make', 'model', 'trim', 'bodyClass', 'vehicleType', 'manufacturer', 'plantCountry', 'fuelTypePrimary', 'engineCylinders', 'displacementLiters', 'driveType', 'transmissionStyle'])
+  const keys = new Set(['modelYear', 'make', 'model', 'trim', 'bodyClass', 'vehicleType', 'manufacturer', 'plantName', 'plantCountry', 'fuelTypePrimary', 'engineCylinders', 'displacementLiters', 'engineModel', 'driveType', 'transmissionStyle'])
   if (Object.keys(value).some(key => !keys.has(key))) return null
   const result = {}
   for (const [key, entry] of Object.entries(value)) {
@@ -227,14 +228,12 @@ async function readResponseText(response, maxBytes) {
   return text
 }
 
-async function loadEntitlementState(client, userId) {
+async function loadAccountState(client, userId) {
   const tombstoneResult = await client.from('account_deletion_tombstones').select('status').eq('user_id', userId).maybeSingle()
   if (tombstoneResult.error) return { error: true }
   if (tombstoneResult.data) return { deleted: true }
 
-  const entitlementState = await loadServerEntitlementState(client, userId)
-  if (entitlementState.error) return { error: true }
-  return entitlementState
+  return { deleted: false }
 }
 
 async function verifyOwnership(client, userId, subjectType, subjectId) {
@@ -316,12 +315,9 @@ export function createDecodeVinHandler({
     const user = authData?.user
     if (authError || !user) return json(res, 401, { error: 'Please sign in again.' })
 
-    const state = await loadEntitlementState(client, user.id)
-    if (state.error) return json(res, 503, fallback('Could not verify SideFlip Pro access. Try again or use manual entry.', 'ENTITLEMENT_UNAVAILABLE', true))
+    const state = await loadAccountState(client, user.id)
+    if (state.error) return json(res, 503, fallback('Could not verify this account. Try again or use manual entry.', 'ACCOUNT_STATE_UNAVAILABLE', true))
     if (state.deleted) return json(res, 410, fallback('This account is being deleted and cannot decode VINs.', 'ACCOUNT_DELETED'))
-    if (state.entitlement.plan !== 'pro') {
-      return json(res, 403, fallback('SideFlip Pro is required for VIN decoding. Manual entry is still available.', 'PRO_REQUIRED'))
-    }
 
     const input = validateRequest(req.body)
     if (input.error) return json(res, input.status || 400, input.error)
