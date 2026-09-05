@@ -14,13 +14,13 @@ values('cccccccc-0000-4000-8000-000000000000',repeat('legacy-',60),'legacy-categ
 
 insert into public.trade_up_goals(id,user_id,name,goal_type,target_amount,status,client_mutation_id)
 values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','88888888-8888-4888-8888-888888888888','Real truck goal','amount',15000,'active','goal-realistic');
-insert into public.projects(id,user_id,title,category,status,purchase_price,purchase_date,sale_price,sold_at,photo,before_photo,after_photo,notes,
+insert into public.projects(id,user_id,title,category,status,purchase_price,sale_price,sold_at,photo,before_photo,after_photo,notes,
  model_number,serial_number,engine_model,engine_serial,vin,hull_number,vehicle_year,vehicle_make,vehicle_model,goal_id,goal_funding_amount,out_of_pocket_amount,trade_credit_amount)
 values
-('80000000-0000-4000-8000-000000000001','88888888-8888-4888-8888-888888888888','Project Truck','truck','sold',1234.50,'2024-02-03',9999,'2026-01-01Z','main.jpg','before.jpg','after.jpg','private note','M1','S1','E1','ES1','VIN1','H1',2020,'Maker','Model X','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',700,534.50,111),
-('80000000-0000-4000-8000-000000000002','88888888-8888-4888-8888-888888888888','Second Project','generator','active',50,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,50,0),
-('90000000-0000-4000-8000-000000000001','99999999-9999-4999-8999-999999999999','Pro One','tool','active',10,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,10,0),
-('90000000-0000-4000-8000-000000000002','99999999-9999-4999-8999-999999999999','Pro Two','boat','active',20,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,20,0);
+('80000000-0000-4000-8000-000000000001','88888888-8888-4888-8888-888888888888','Project Truck','truck','sold',1234.50,9999,'2026-01-01Z','main.jpg','before.jpg','after.jpg','private note','M1','S1','E1','ES1','VIN1','H1',2020,'Maker','Model X','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',700,534.50,111),
+('80000000-0000-4000-8000-000000000002','88888888-8888-4888-8888-888888888888','Second Project','generator','active',50,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,50,0),
+('90000000-0000-4000-8000-000000000001','99999999-9999-4999-8999-999999999999','Pro One','tool','active',10,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,10,0),
+('90000000-0000-4000-8000-000000000002','99999999-9999-4999-8999-999999999999','Pro Two','boat','active',20,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,20,0);
 insert into public.expenses(id,project_id,user_id,description,amount,category,labor_hours,created_at) values
 ('e0000000-0000-4000-8000-000000000001','80000000-0000-4000-8000-000000000001','88888888-8888-4888-8888-888888888888','Oil and filter',79.95,'maintenance',1.25,'2025-04-01Z'),
 ('e0000000-0000-4000-8000-000000000002','80000000-0000-4000-8000-000000000001','88888888-8888-4888-8888-888888888888','Paint supplies',200,'cosmetic',2,'2025-05-01Z');

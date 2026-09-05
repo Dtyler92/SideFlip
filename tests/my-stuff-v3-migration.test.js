@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const migrationUrl = new URL('../supabase/migrations/20260905120000_add_my_stuff_expenses_research_v3.sql', import.meta.url)
+const transferFixUrl = new URL('../supabase/migrations/20260905190000_fix_v3_project_transfer_purchase_date.sql', import.meta.url)
 
 function migration() { return readFileSync(migrationUrl, 'utf8') }
+function transferFix() { return readFileSync(transferFixUrl, 'utf8') }
 
 function functionBody(sql, name, schema = 'public') {
   const start = sql.indexOf(`create function ${schema}.${name}(`)
@@ -51,6 +53,8 @@ test('expense identities, immutable revisions, atomic service costs, and transfe
   assert.doesNotMatch(transfer, /transfer_project_to_my_stuff_v2\s*\(/i)
   assert.match(transfer, /insert into public\.my_stuff_items\s*\(/i)
   assert.match(transfer, /insert into public\.my_stuff_project_transfers\s*\(/i)
+  assert.doesNotMatch(transfer, /\bp\.purchase_date\b|\bv_project\.purchase_date\b/i)
+  assert.match(transfer, /values\(v_user,trim\(v_project\.title\),v_category,null,/i)
   const service = functionBody(sql, 'record_my_stuff_service_with_expense_v3')
   assert.match(service, /materialize_my_stuff_next_occurrence_v3\s*\(\s*p_definition_id\s*\)/i)
   const voidExpense = functionBody(sql, 'void_my_stuff_expense_v3')
@@ -92,4 +96,15 @@ test('research state is installed but enqueue and provider execution remain disa
   for (const table of ['my_stuff_research_jobs','my_stuff_research_attempts','my_stuff_research_evidence','my_stuff_research_candidates','my_stuff_research_approvals','my_stuff_research_apply_records','my_stuff_research_budget_ledger','my_stuff_research_dead_letters']) {
     assert.match(sql, new RegExp(`revoke all on table private\\.${table} from public,anon,authenticated`, 'i'))
   }
+})
+
+test('Production transfer correction replaces only the V3 RPC without inventing an acquisition date', () => {
+  const sql = transferFix()
+  assert.match(sql, /to_regprocedure\('public\.transfer_project_to_my_stuff_v3\(uuid,jsonb,text\)'\)/i)
+  assert.match(sql, /create or replace function public\.transfer_project_to_my_stuff_v3\(/i)
+  assert.doesNotMatch(sql, /\bp\.purchase_date\b|\bv_project\.purchase_date\b|transfer_project_to_my_stuff_v2\s*\(/i)
+  assert.match(sql, /values\(v_user,trim\(v_project\.title\),v_category,null,/i)
+  assert.doesNotMatch(sql, /to_jsonb\s*\(\s*(?:p|e|project|expense)\s*\)/i)
+  assert.match(sql, /revoke all on function public\.transfer_project_to_my_stuff_v3\(uuid,jsonb,text\) from public,anon/i)
+  assert.match(sql, /grant execute on function public\.transfer_project_to_my_stuff_v3\(uuid,jsonb,text\) to authenticated/i)
 })

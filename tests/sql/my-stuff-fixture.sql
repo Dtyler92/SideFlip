@@ -35,7 +35,7 @@ create table public.trade_up_goals(
 create table public.projects(
  id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,
  title text not null,category text not null default 'other',status text not null default 'active',purchase_price numeric(14,2),
- purchase_date date,sale_price numeric(14,2),sold_at timestamptz,photo text,before_photo text,after_photo text,notes text,
+ sale_price numeric(14,2),sold_at timestamptz,photo text,before_photo text,after_photo text,notes text,
  model_number text,serial_number text,engine_model text,engine_serial text,vin text,hull_number text,
  vehicle_year integer,vehicle_make text,vehicle_model text,goal_id uuid references public.trade_up_goals(id) on delete set null,
  goal_funding_amount numeric(14,2) not null default 0,out_of_pocket_amount numeric(14,2) not null default 0,
