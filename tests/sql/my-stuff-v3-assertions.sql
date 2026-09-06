@@ -54,7 +54,7 @@ reset role;
 alter table public.projects add column review_secret text;
 alter table public.expenses add column review_secret text;
 select public._test_raises_v3(format('insert into public.projects(user_id,title,category,transmission) values(%L,%L,%L,%L)','44444444-4444-4444-8444-444444444444','Invalid transmission','car',repeat('x',201)),'projects_transmission_length');
-insert into public.projects(id,user_id,title,category,transmission,review_secret) values('10000000-0000-4000-8000-000000000003','44444444-4444-4444-8444-444444444444','V3 direct transfer','car','Automatic','project-secret');
+insert into public.projects(id,user_id,title,category,vehicle_year,transmission,review_secret) values('10000000-0000-4000-8000-000000000003','44444444-4444-4444-8444-444444444444','V3 direct transfer','car','2012','Automatic','project-secret');
 insert into public.expenses(id,project_id,user_id,description,amount,category,review_secret) values('20000000-0000-4000-8000-000000000003','10000000-0000-4000-8000-000000000003','44444444-4444-4444-8444-444444444444','V3 direct expense',45,'parts','expense-secret');
 set role authenticated;
 select set_config('request.jwt.claim.sub','44444444-4444-4444-8444-444444444444',false);
@@ -62,7 +62,35 @@ select public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000
 select public._test_assert_v3((select item_id=:'direct_v3_item' and project_snapshot->>'transmission'='Automatic' and 'transmission'=any(copied_fields) and not project_snapshot ? 'review_secret' and not selected_expense_snapshot::text like '%review_secret%' and not selected_expense_snapshot::text like '%expense-secret%' from public.my_stuff_project_transfers where project_id='10000000-0000-4000-8000-000000000003'),'V3 direct transfer snapshots are allowlisted and include transmission');
 select public._test_assert_v3(public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000003','{}','direct-v3')=:'direct_v3_item','V3 direct transfer retry is idempotent');
 reset role;
-select public._test_assert_v3((select client_mutation_id='transfer-v3:10000000-0000-4000-8000-000000000003' and acquired_on is null and transmission='Automatic' from public.my_stuff_items where id=:'direct_v3_item') and (select count(*)=0 from public.my_stuff_v2_mutations where user_id='44444444-4444-4444-8444-444444444444'),'V3 creates its item with transmission without delegating to V2 or inventing an acquisition date');
+select public._test_assert_v3((select client_mutation_id='transfer-v3:10000000-0000-4000-8000-000000000003' and acquired_on is null and model_year=2012 and transmission='Automatic' from public.my_stuff_items where id=:'direct_v3_item') and (select count(*)=0 from public.my_stuff_v2_mutations where user_id='44444444-4444-4444-8444-444444444444'),'V3 converts the text Project year to an integer, includes transmission, does not delegate to V2, and does not invent an acquisition date');
+-- Missing, blank, nonnumeric, and out-of-range Project years remain unknown.
+insert into public.projects(id,user_id,title,category,vehicle_year) values
+ ('10000000-0000-4000-8000-000000000004','55555555-5555-4555-8555-555555555555','Blank year','car','  '),
+ ('10000000-0000-4000-8000-000000000005','66666666-6666-4666-8666-666666666666','Nonnumeric year','car','unknown'),
+ ('10000000-0000-4000-8000-000000000006','77777777-7777-4777-8777-777777777777','Out of range year','car','9999'),
+ ('10000000-0000-4000-8000-000000000007','99999999-9999-4999-8999-999999999999','Missing year','car',null);
+set role authenticated;
+select set_config('request.jwt.claim.sub','55555555-5555-4555-8555-555555555555',false);
+select public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000004','{}','blank-year') as blank_year_item \gset
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','66666666-6666-4666-8666-666666666666',false);
+select public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000005','{}','nonnumeric-year') as nonnumeric_year_item \gset
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','77777777-7777-4777-8777-777777777777',false);
+select public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000006','{}','out-of-range-year') as out_of_range_year_item \gset
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','99999999-9999-4999-8999-999999999999',false);
+select public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000007','{}','missing-year') as missing_year_item \gset
+reset role;
+select public._test_assert_v3(
+ (select model_year is null from public.my_stuff_items where id=:'blank_year_item') and
+ (select model_year is null from public.my_stuff_items where id=:'nonnumeric_year_item') and
+ (select model_year is null from public.my_stuff_items where id=:'out_of_range_year_item') and
+ (select model_year is null from public.my_stuff_items where id=:'missing_year_item'),
+ 'invalid or missing Project years remain unknown instead of failing or being invented');
 select public._test_raises_v3(format('insert into public.my_stuff_expense_audit(user_id,item_id,expense_id,action,actor_id,reason) values(%L,%L,%L,%L,%L,%L)', '11111111-1111-4111-8111-111111111111', :'item', :'expense', 'voided', '11111111-1111-4111-8111-111111111111', repeat('x',1001)), 'my_stuff_expense_audit_reason_check');
 -- Exactly one owned immutable revision must be targeted by attachment metadata.
 select public._test_raises_v3(format('insert into public.my_stuff_attachments(user_id,item_id,storage_path,media_type,byte_size,sha256,state) values(%L,%L,%L,%L,1,%L,%L)', '11111111-1111-4111-8111-111111111111', :'item', 'disabled', 'image/jpeg', repeat('a',64), 'reserved'), 'my_stuff_attachment_exactly_one_target_v3');

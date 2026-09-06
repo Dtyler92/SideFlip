@@ -37,7 +37,7 @@ create table public.projects(
  title text not null,category text not null default 'other',status text not null default 'active',purchase_price numeric(14,2),
  sale_price numeric(14,2),sold_at timestamptz,photo text,before_photo text,after_photo text,notes text,
  model_number text,serial_number text,engine_model text,engine_serial text,vin text,hull_number text,
- vehicle_year integer,vehicle_make text,vehicle_model text,goal_id uuid references public.trade_up_goals(id) on delete set null,
+ vehicle_year text,vehicle_make text,vehicle_model text,goal_id uuid references public.trade_up_goals(id) on delete set null,
  goal_funding_amount numeric(14,2) not null default 0,out_of_pocket_amount numeric(14,2) not null default 0,
  trade_credit_amount numeric(14,2) not null default 0,traded_from_project_id uuid references public.projects(id) on delete set null,
  trade_up_mutation_id text,created_at timestamptz not null default now()
