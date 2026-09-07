@@ -99,6 +99,9 @@ export async function getEntitlement() {
   })
   if (!response.ok) throw new Error('Could not resolve your plan.')
   const data = await response.json()
-  return data.entitlement || null
+  if (data?.plan !== 'free' && data?.plan !== 'pro') {
+    throw new Error('Could not resolve your plan.')
+  }
+  return data
 }
 

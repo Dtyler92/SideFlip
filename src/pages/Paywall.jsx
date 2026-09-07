@@ -5,7 +5,7 @@ import { captureEvent, getStoredAttribution } from '../analytics'
 import { useAuth } from '../context/AuthContext'
 import { getStoredReferral } from '../pwa'
 
-export default function Paywall({ trialExpired }) {
+export default function Paywall() {
   const { user, signOut } = useAuth()
   const [selected, setSelected] = useState('annual')
   const [loading, setLoading] = useState(false)

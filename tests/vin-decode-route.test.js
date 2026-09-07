@@ -9,7 +9,6 @@ process.env.VIN_CACHE_HMAC_KEY_VERSION ||= '2'
 const {
   createDecodeVinHandler,
   isValidVinCheckDigit,
-  maskVin,
   normalizeVin,
 } = await import('../api/decode-vin.js')
 
@@ -141,7 +140,7 @@ test('normalizes VINs and validates both known-good check digits', () => {
   assert.equal(isValidVinCheckDigit(VALID_VIN), true)
   assert.equal(isValidVinCheckDigit(OTHER_VALID_VIN), true)
   assert.equal(isValidVinCheckDigit('1HGCM82643A004352'), false)
-  assert.equal(maskVin(VALID_VIN), '1HG**********4352')
+
 })
 
 test('requires authentication and explicit supported subject domain', async () => {

@@ -62,26 +62,6 @@ export function calculateGoalSummary(goal, projects = [], ledger = []) {
   }
 }
 
-export function splitSaleProceeds(salePrice, keepAmount) {
-  const sale = number(salePrice)
-  const keep = number(keepAmount)
-  if (sale < 0 || keep < 0 || keep > sale) {
-    throw new Error('Amount kept must be between zero and the sale price')
-  }
-  const entries = [{ type: 'sale_proceeds', amount: sale }]
-  const cashOut = sale - keep
-  if (cashOut > 0) entries.push({ type: 'cash_out', amount: -cashOut })
-  return entries
-}
-
-export function calculateTradeBasis({ tradeCredit, cashDirection = 'none', cashAmount = 0 }) {
-  const credit = number(tradeCredit)
-  const cash = number(cashAmount)
-  if (credit < 0 || cash < 0) throw new Error('Trade values cannot be negative')
-  if (cashDirection === 'paid') return credit + cash
-  if (cashDirection === 'received') return Math.max(0, credit - cash)
-  return credit
-}
 
 export function calculateProjectLinkFunding(purchasePrice, goalFunding, availableTowardGoal) {
   const purchase = number(purchasePrice)

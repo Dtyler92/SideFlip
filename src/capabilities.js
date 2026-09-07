@@ -10,7 +10,6 @@ const PRO_CAPABILITIES = new Set([
   'portfolio_analytics',
   'additional_goals',
   'ai_listings',
-  'receipt_scanning',
   'reports',
   'exports',
   'public_shares',
@@ -38,6 +37,7 @@ function hasActiveAppleEntitlement(entitlement, now = Date.now()) {
 }
 
 export function getPlan(profile, entitlement, now = Date.now()) {
+  if (entitlement?.plan === 'free' || entitlement?.plan === 'pro') return entitlement.plan
   if (hasActiveLegacyStripeSubscription(profile)) return 'pro'
   if (hasActiveAppleEntitlement(entitlement, now)) return 'pro'
   return 'free'

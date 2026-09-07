@@ -61,11 +61,6 @@ export function isValidVinCheckDigit(vin) {
   return vin[8] === (remainder === 10 ? 'X' : String(remainder))
 }
 
-export function maskVin(vin) {
-  const normalized = normalizeVin(vin)
-  if (normalized.length < 8) return '***'
-  return `${normalized.slice(0, 3)}${'*'.repeat(Math.max(1, normalized.length - 7))}${normalized.slice(-4)}`
-}
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'private, no-store, no-cache, max-age=0, must-revalidate')

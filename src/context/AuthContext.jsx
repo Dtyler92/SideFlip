@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { supabase, onAuthChange, getProfile, getEntitlement, signOut as supabaseSignOut } from '../supabase'
 import {
   identifyAnalytics,
@@ -75,7 +75,7 @@ export function AuthProvider({ children }) {
     if (enabled) identifyAnalytics(nextUserId, {
       plan: serverEntitlement?.plan || 'free',
       status: nextProfile?.subscription_status || 'none',
-      is_pro: Boolean(serverEntitlement?.isPro),
+      is_pro: serverEntitlement?.plan === 'pro',
     })
     setAnalyticsReady(isAnalyticsRuntimeReady(nextUserId))
     setLoading(false)
@@ -95,7 +95,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  async function refreshProfile() {
+  const refreshProfile = useCallback(async () => {
     if (!user) return
     const [nextProfile, serverEntitlement] = await Promise.all([
       getProfile(user.id),
@@ -104,7 +104,8 @@ export function AuthProvider({ children }) {
     if (analyticsIdentityRef.current !== user.id) return
     setProfile(nextProfile)
     setEntitlement(serverEntitlement)
-  }
+    return { profile: nextProfile, entitlement: serverEntitlement }
+  }, [user])
 
   return (
     <AuthContext.Provider value={{ user, profile, entitlement, loading, analyticsReady, refreshProfile, signOut }}>

@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "description": "",
-  "main": "index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,7 +16,6 @@
   "license": "ISC",
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
-    "@stripe/stripe-js": "^9.12.0",
     "@supabase/supabase-js": "^2.110.8",
     "@vitejs/plugin-react": "^6.0.3",
     "posthog-js": "^1.414.0",

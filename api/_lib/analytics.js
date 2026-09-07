@@ -85,9 +85,6 @@ async function deliverServerEvent(input) {
   }
 }
 
-export async function captureServerEvent(input) {
-  return deliverServerEvent(input)
-}
 
 export async function enqueueServerEvent(supabase, { dedupeKey, distinctId, event, occurredAt = new Date(), properties = {} }) {
   if (!SERVER_EVENTS.has(event)) throw new Error('Invalid durable analytics event')

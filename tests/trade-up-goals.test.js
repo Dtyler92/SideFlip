@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateGoalSummary, splitSaleProceeds, calculateTradeBasis, calculateProjectLinkFunding, shouldShowGoalOnboarding } from '../src/goals.js'
+import { calculateGoalSummary, calculateProjectLinkFunding, shouldShowGoalOnboarding } from '../src/goals.js'
 
 test('shows the goal onboarding panel only before the first goal is created', () => {
   assert.equal(shouldShowGoalOnboarding([]), true)
@@ -51,18 +51,6 @@ test('reusing sale proceeds does not increase personal cash invested', () => {
   assert.equal(summary.realizedProfit, 300)
 })
 
-test('sale split returns all proceeds then records the amount taken out', () => {
-  assert.deepEqual(splitSaleProceeds(1200, 800), [
-    { type: 'sale_proceeds', amount: 1200 },
-    { type: 'cash_out', amount: -400 },
-  ])
-  assert.throws(() => splitSaleProceeds(100, 101), /between zero and the sale price/)
-})
-
-test('direct trade basis includes cash paid and subtracts cash received', () => {
-  assert.equal(calculateTradeBasis({ tradeCredit: 1500, cashDirection: 'paid', cashAmount: 500 }), 2000)
-  assert.equal(calculateTradeBasis({ tradeCredit: 1500, cashDirection: 'received', cashAmount: 300 }), 1200)
-})
 
 test('linking an existing project splits its original purchase between goal and personal funding', () => {
   assert.deepEqual(calculateProjectLinkFunding(500, 300, 400), {

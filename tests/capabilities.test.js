@@ -23,14 +23,20 @@ test('new accounts receive the useful Free core without a payment record', () =>
   assert.equal(can({}, null, 'one_goal'), true)
   assert.equal(can({}, null, 'portfolio_analytics'), false)
   assert.equal(can({}, null, 'ai_listings'), false)
-  assert.equal(can({}, null, 'receipt_scanning'), false)
   assert.equal(can({}, null, 'additional_goals'), false)
 })
 
 test('an active legacy Stripe subscription keeps Pro access', () => {
   assert.equal(getPlan(LEGACY_STRIPE_PRO, null), 'pro')
   assert.equal(can(LEGACY_STRIPE_PRO, null, 'portfolio_analytics'), true)
-  assert.equal(can(LEGACY_STRIPE_PRO, null, 'receipt_scanning'), true)
+})
+
+test('server-authoritative plan envelope overrides stale legacy profile mirrors', () => {
+  assert.equal(getPlan(LEGACY_STRIPE_PRO, { plan: 'free', entitlement: null }), 'free')
+  assert.equal(getPlan({}, {
+    plan: 'pro',
+    entitlement: { source: 'stripe', status: 'active', expires_at: null },
+  }), 'pro')
 })
 
 test('a verified active Apple entitlement grants Pro access', () => {
