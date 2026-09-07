@@ -2,6 +2,16 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { CATEGORIES, getExtraFields, getProjectPhotoPair, shouldDeleteReplacedProjectPhoto } from '../src/store.js'
 
+test('Airplane Project is available with model and engine identification but no automotive VIN', () => {
+  assert.ok(CATEGORIES.some(category => category.value === 'airplane' && category.label.includes('Airplane')))
+  assert.deepEqual(getExtraFields('airplane'), {
+    hasEngine: true,
+    hasVin: false,
+    hasHull: false,
+    hasModel: true,
+  })
+})
+
 test('House Project is available without vehicle or equipment identifier fields', () => {
   assert.ok(CATEGORIES.some(category => category.value === 'house' && category.label === '🏠 House Project'))
   assert.deepEqual(getExtraFields('house'), {

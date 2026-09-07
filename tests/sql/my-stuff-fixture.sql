@@ -54,6 +54,22 @@ create table public.goal_ledger(
 );
 grant select on public.projects,public.expenses,public.trade_up_goals,public.goal_ledger to authenticated;
 
+create function public.delete_trade_up_project(p_project_id uuid)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_user_id uuid:=auth.uid(); v_project public.projects%rowtype;
+begin
+ if v_user_id is null then raise exception 'Authentication required'; end if;
+ select * into v_project from public.projects where id=p_project_id and user_id=v_user_id for update;
+ if v_project.id is null then raise exception 'Project not found'; end if;
+ if v_project.goal_id is not null and v_project.status<>'active' then raise exception 'Undo this project''s sale or trade before deleting it'; end if;
+ if v_project.traded_from_project_id is not null then raise exception 'Undo the direct trade from the previous item instead of deleting the received item'; end if;
+ if exists(select 1 from public.projects where traded_from_project_id=p_project_id and user_id=v_user_id) then raise exception 'Undo this project''s direct trade before deleting it'; end if;
+ delete from public.goal_ledger where project_id=p_project_id and user_id=v_user_id;
+ delete from public.projects where id=p_project_id and user_id=v_user_id;
+end$$;
+revoke all on function public.delete_trade_up_project(uuid) from public,anon;
+grant execute on function public.delete_trade_up_project(uuid) to authenticated;
+
 -- Store stable catalog signatures before V1; V1 must not touch these domains.
 create table public._my_stuff_legacy_object_snapshot(object_oid oid primary key,schema_name name not null,object_name name not null,signature jsonb not null);
 insert into public._my_stuff_legacy_object_snapshot

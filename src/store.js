@@ -35,6 +35,7 @@ export const CATEGORIES = [
   { value: 'motorcycle', label: '🏍️ Motorcycle' },
   { value: 'atv', label: '🏎️ ATV / Powersports' },
   { value: 'boat', label: '⛵ Boat' },
+  { value: 'airplane', label: '✈️ Airplane' },
   { value: 'bicycle', label: '🚲 Bicycle / E-Bike' },
   { value: 'watch', label: '⌚ Watch' },
   { value: 'electronics', label: '📱 Electronics' },
@@ -88,8 +89,8 @@ export function expenseIcon(value) {
 export function getExtraFields(category) {
   const hasVin    = ['car', 'motorcycle', 'atv'].includes(category)
   const hasHull   = ['boat'].includes(category)
-  const hasEngine = ['car', 'mower', 'boat', 'motorcycle', 'atv'].includes(category)
-  const hasModel  = ['car', 'mower', 'boat', 'motorcycle', 'atv', 'bicycle',
+  const hasEngine = ['car', 'mower', 'boat', 'airplane', 'motorcycle', 'atv'].includes(category)
+  const hasModel  = ['car', 'mower', 'boat', 'airplane', 'motorcycle', 'atv', 'bicycle',
                      'electronics', 'gaming', 'tool', 'exercise', 'instrument'].includes(category)
   return { hasEngine, hasVin, hasHull, hasModel }
 }

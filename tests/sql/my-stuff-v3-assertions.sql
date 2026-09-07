@@ -1,7 +1,14 @@
 create function public._test_assert_v3(ok boolean,msg text) returns void language plpgsql as $$begin if ok is not true then raise exception 'assertion failed: %',msg; end if; end$$;
 create function public._test_raises_v3(statement text,expected text) returns void language plpgsql as $$
-begin execute statement; raise exception 'assertion failed: expected %',expected;
-exception when others then if sqlerrm not like '%'||expected||'%' then raise exception 'assertion failed: expected %, got %',expected,sqlerrm; end if; end$$;
+begin
+  begin
+    execute statement;
+  exception when others then
+    if sqlerrm not like '%'||expected||'%' then raise exception 'assertion failed: expected %, got %',expected,sqlerrm; end if;
+    return;
+  end;
+  raise exception 'assertion failed: statement did not raise expected error: %',expected;
+end$$;
 select public._test_assert_v3(not has_table_privilege('authenticated','public.my_stuff_expenses','insert,update,delete'),'direct expense writes denied');
 select public._test_assert_v3(not has_table_privilege('authenticated','public.my_stuff_to_project_transfers','insert,update,delete'),'direct item transfer provenance writes denied');
 select public._test_assert_v3(not has_table_privilege('authenticated','public.my_stuff_to_project_expense_copies','select,insert,update,delete'),'expense-copy provenance is server-only');
@@ -14,7 +21,10 @@ select public._test_assert_v3(not has_function_privilege('authenticated','public
 select public._test_assert_v3(not has_function_privilege('authenticated','public.finalize_my_stuff_attachment_v3(uuid,text,text,text)','execute'),'attachment finalize disabled');
 set role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
-select public.create_my_stuff_item_v2('{"name":"V3 car","item_type":"car","purchase_price":1000,"purchase_currency":"USD"}','v3-item') as item \gset
+select public._test_raises_v3($q$select public.create_my_stuff_item_v2('{"name":"Missing tracking","item_type":"car","purchase_price":1000}','required-missing-tracking')$q$, 'Usage tracking is required');
+select public._test_raises_v3($q$select public.create_my_stuff_item_v2('{"name":"Missing reading","item_type":"car","usage_dimensions":["mileage"],"purchase_price":1000}','required-missing-reading')$q$, 'Current mileage is required');
+select public._test_raises_v3($q$select public.create_my_stuff_item_v2('{"name":"Missing purchase","item_type":"car","usage_dimensions":["mileage"],"current_mileage":0}','required-missing-purchase')$q$, 'Purchase price is required');
+select public.create_my_stuff_item_v2('{"name":"V3 car","item_type":"car","usage_dimensions":["mileage"],"current_mileage":0,"origin_mileage":0,"purchase_price":1000,"purchase_currency":"USD"}','v3-item') as item \gset
 select public.confirm_my_stuff_vehicle_identity_v3(:'item','{"model_year":2020,"make":"Honda","model":"Civic","engine_model":"L15B7","engine_displacement_liters":1.5,"engine_cylinders":4,"vehicle_market":"US"}','confirm-1');
 select public.create_my_stuff_expense_v3(:'item','{"description":"Custom","category":"other","custom_category":"Detailing","amount":25,"currency":"USD","incurred_on":"2026-09-05","mileage":12345,"hours":678}','expense-1') as expense \gset
 select public.record_my_stuff_service_with_expense_v3(:'item',null,null,'{"service_name":"Oil change","completed_at":"2026-09-05T12:00:00Z","parts":[],"labor":[],"vendor":{},"warranty":{}}','{"description":"Oil change","category":"maintenance","amount":75,"currency":"USD","incurred_on":"2026-09-05"}','service-cost-1') as linked \gset
@@ -129,7 +139,6 @@ select public._test_assert_v3((select count(*)=3 and count(distinct source_expen
 select public._test_assert_v3((select count(*) from public.my_stuff_to_project_expense_copies c join public.my_stuff_expenses e on e.id=c.source_expense_id where c.project_id=:'selling_project' and e.linked_occurrence_id is not null)=(select count(*) from public.my_stuff_expenses where item_id=:'item' and linked_occurrence_id is not null and voided_at is null),'linked maintenance expenses are copied once, not duplicated');
 select public._test_assert_v3((select archived_at is not null from public.my_stuff_items where id=:'item'),'source item is archived');
 select public._test_assert_v3((select count(*)>=2 from public.my_stuff_service_occurrences where item_id=:'item'),'source maintenance history is retained');
-select public._test_raises_v3(format('delete from public.projects where id=%L', :'selling_project'), 'my_stuff_to_project_transfers_project_id_fkey');
 set role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select public._test_assert_v3(public.transfer_my_stuff_to_project_v1(:'item','item-to-project-1')=:'selling_project','identical retry returns the same Project');
@@ -140,6 +149,19 @@ reset role;
 select project_expense_id as deletable_project_expense,source_expense_id as deletable_source_expense from public.my_stuff_to_project_expense_copies where project_id=:'selling_project' order by created_at,id limit 1 \gset
 delete from public.expenses where id=:'deletable_project_expense';
 select public._test_assert_v3((select project_expense_id is null from public.my_stuff_to_project_expense_copies where source_expense_id=:'deletable_source_expense'),'deleting an imported Project expense retains source provenance without blocking normal expense management');
+set role authenticated;
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
+select public._test_raises_v3(format('select public.delete_trade_up_project(%L)', :'selling_project'), 'Project not found');
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
+select public.delete_trade_up_project(:'selling_project');
+reset role;
+select public._test_assert_v3(not exists(select 1 from public.projects where id=:'selling_project'),'owner can delete a Project created from My Stuff');
+select public._test_assert_v3(not exists(select 1 from public.expenses where project_id=:'selling_project'),'deleting the transferred Project removes its live copied expenses');
+select public._test_assert_v3((select count(*)=1 and bool_and(project_id=:'selling_project') from public.my_stuff_to_project_transfers where item_id=:'item'),'deleting the Project preserves immutable item-transfer provenance');
+select public._test_assert_v3((select count(*)=3 and bool_and(project_id=:'selling_project') and bool_and(project_expense_id is null) from public.my_stuff_to_project_expense_copies where item_id=:'item'),'deleting the Project preserves source expense provenance and clears live expense pointers');
+select public._test_assert_v3((select archived_at is not null from public.my_stuff_items where id=:'item') and (select count(*)>=2 from public.my_stuff_service_occurrences where item_id=:'item'),'Project deletion preserves the archived source item and maintenance history');
 set role authenticated;
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
 select public._test_raises_v3(format('select public.transfer_my_stuff_to_project_v1(%L,%L)', :'item', 'cross-owner-item-transfer'), 'Item not found');
@@ -165,6 +187,30 @@ select public.transfer_my_stuff_to_project_v1('50000000-0000-0000-0000-000000000
 reset role;
 select public._test_assert_v3(not exists(select 1 from public.projects where trade_up_mutation_id in ('my-stuff-transfer:50000000-0000-0000-0000-000000000091','my-stuff-transfer:50000000-0000-0000-0000-000000000092','my-stuff-transfer:50000000-0000-0000-0000-000000000093')),'rejected accounting transfers create no Projects');
 select public._test_assert_v3((select vin is null and model_number='M1' and serial_number='S1' from public.projects where id=:'non_vin_project'),'non-VIN transfer keeps model and serial but drops stale hidden VIN');
+
+-- Airplane remains an airplane through both transfer directions and never gains
+-- automotive VIN semantics.
+set role authenticated;
+select set_config('request.jwt.claim.sub','aaaaaaaa-0000-4000-8000-000000000000',false);
+select public.create_my_stuff_item_v2('{"name":"Direct airplane","item_type":"airplane","usage_dimensions":["hours"],"current_hours":100,"purchase_price":10000,"vin":"1HGCM82633A004352"}','direct-airplane-vin') as direct_airplane \gset
+select public._test_assert_v3((select vin is null from public.my_stuff_items where id=:'direct_airplane'),'direct Airplane create drops automotive VIN data');
+select public.update_my_stuff_item_v2(:'direct_airplane','{"vin":"1HGCM82633A004352"}','direct-airplane-vin-update');
+select public._test_assert_v3((select vin is null from public.my_stuff_items where id=:'direct_airplane'),'direct Airplane update cannot add automotive VIN data');
+select public.update_my_stuff_item_v2(:'direct_airplane','{"item_type":"car","vin":"1HGCM82633A004352"}','airplane-transition-vin');
+select public._test_assert_v3((select item_type='car' and vin='1HGCM82633A004352' from public.my_stuff_items where id=:'direct_airplane'),'VIN-capable transition accepts automotive VIN data');
+select public.update_my_stuff_item_v2(:'direct_airplane','{"item_type":"airplane"}','airplane-transition');
+select public._test_assert_v3((select item_type='airplane' and vin is null from public.my_stuff_items where id=:'direct_airplane'),'changing an automotive item to Airplane clears stale VIN data');
+delete from public.my_stuff_items where id=:'direct_airplane';
+reset role;
+insert into public.projects(id,user_id,title,category,purchase_price,model_number,serial_number,engine_model,vin)
+values('10000000-0000-4000-8000-000000000098','aaaaaaaa-0000-4000-8000-000000000000','Cessna project','airplane',50000,'172N','AIRFRAME-1','O-320','1HGCM82633A004352');
+set role authenticated;
+select set_config('request.jwt.claim.sub','aaaaaaaa-0000-4000-8000-000000000000',false);
+select public.transfer_project_to_my_stuff_v3('10000000-0000-4000-8000-000000000098','{"usage_dimensions":["hours","cycles"],"current_hours":2500,"current_cycles":4000}','airplane-project-to-item') as airplane_item \gset
+select public._test_assert_v3((select item_type='airplane' and vin is null and model_number='172N' and serial_number='AIRFRAME-1' and engine_model='O-320' from public.my_stuff_items where id=:'airplane_item'),'Project airplane transfers to My Stuff without category degradation or automotive VIN data');
+select public.transfer_my_stuff_to_project_v1(:'airplane_item','airplane-item-to-project') as airplane_project \gset
+reset role;
+select public._test_assert_v3((select category='airplane' and purchase_price=50000 and vin is null and model_number='172N' and serial_number='AIRFRAME-1' from public.projects where id=:'airplane_project'),'My Stuff airplane transfers back to Projects without automotive VIN data');
 
 insert into public.my_stuff_items(id,user_id,name,item_type,category,purchase_price,purchase_currency,usage_profile,usage_dimensions,client_mutation_id)
 values('50000000-0000-0000-0000-000000000099','88888888-8888-4888-8888-888888888888','Limit test item','mower','equipment',25,'USD','normal','{}','limit-item');

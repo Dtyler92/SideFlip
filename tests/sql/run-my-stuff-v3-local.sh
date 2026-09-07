@@ -17,5 +17,6 @@ sudo -u postgres createdb "$DB"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260905202000_transfer_my_stuff_to_project.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260905202000_transfer_my_stuff_to_project.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260906010000_fix_project_transfer_model_year.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260906150000_add_airplanes_and_fix_transferred_project_delete.sql"
 "${PSQL[@]}" < "$ROOT/tests/sql/my-stuff-v3-assertions.sql"
 printf 'PostgreSQL My Stuff V3 behavior passed\n'

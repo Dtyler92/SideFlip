@@ -4,6 +4,7 @@ import {
   buildAnthropicRequest,
   createListingFacts,
   normalizeGenerationOptions,
+  normalizeSellerBrief,
   parseGeneratedDescription,
   validateGeneratedDescriptionGrounding,
 } from './_lib/listing-description-prompts.js'
@@ -57,7 +58,7 @@ function json(res, status, body) {
   return res.status(status).json(body)
 }
 
-async function loadOwnedListingFacts(client, userId, projectId, existingDescription = '') {
+async function loadOwnedListingFacts(client, userId, projectId, existingDescription = '', sellerBrief = '') {
   if (!PROJECT_ID_PATTERN.test(projectId || '')) return { error: 'invalid' }
   const [projectResult, expenseResult] = await Promise.all([
     client.from('projects').select('id,title,category,notes').eq('id', projectId).eq('user_id', userId).maybeSingle(),
@@ -65,7 +66,7 @@ async function loadOwnedListingFacts(client, userId, projectId, existingDescript
   ])
   if (projectResult.error || expenseResult.error) return { error: 'lookup' }
   if (!projectResult.data) return { error: 'not_found' }
-  return { facts: createListingFacts(projectResult.data, expenseResult.data || [], existingDescription) }
+  return { facts: createListingFacts(projectResult.data, expenseResult.data || [], existingDescription, sellerBrief) }
 }
 
 function legacyListingFacts(body) {
@@ -73,7 +74,7 @@ function legacyListingFacts(body) {
     title: body?.title,
     category: body?.category,
     notes: body?.notes,
-  }, body?.expenses, body?.existingDescription)
+  }, body?.expenses, body?.existingDescription, body?.sellerBrief)
 }
 
 export function createGenerateListingHandler({ client = supabase, fetchImpl = fetch } = {}) {
@@ -112,6 +113,13 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
       return json(res, 400, { error: 'Project information is invalid.' })
     }
 
+    let sellerBrief
+    try {
+      sellerBrief = normalizeSellerBrief(req.body?.sellerBrief)
+    } catch (error) {
+      return json(res, 400, { error: error.message })
+    }
+
     const requestKey = `user:${user.id}`
     if (IN_FLIGHT.has(requestKey)) {
       return json(res, 409, { error: 'A description is already being written.' })
@@ -131,14 +139,14 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
     try {
       let facts
       if (!legacyRequest) {
-        const owned = await loadOwnedListingFacts(client, user.id, req.body.projectId, req.body.existingDescription)
+        const owned = await loadOwnedListingFacts(client, user.id, req.body.projectId, req.body.existingDescription, sellerBrief)
         if (owned.error === 'not_found') return json(res, 404, { error: 'Project not found.' })
         if (owned.error) return json(res, 500, { error: 'Could not load project information.' })
         facts = owned.facts
       } else {
         // Compatibility for already-released clients. New clients send projectId so
         // the server can load canonical owner-scoped project facts.
-        facts = legacyListingFacts(req.body)
+        facts = legacyListingFacts({ ...req.body, sellerBrief })
       }
 
       let prompt
