@@ -1,0 +1,2 @@
+[functions.maintenance-research-worker]
+verify_jwt = false
