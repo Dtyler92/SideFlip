@@ -219,11 +219,44 @@ test('prompt architecture composes core and one style module while treating sell
   const unhinged = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'unhinged' })
   assert.match(unhinged.system, /energetic, exaggerated, absurd humor throughout/i)
   assert.match(unhinged.system, /punchy, surprising, and slightly chaotic/i)
-  assert.match(unhinged.system, /at least four distinct comedic beats/i)
+  assert.match(unhinged.system, /at least five distinct comedic beats/i)
   assert.match(unhinged.system, /commit to the bit/i)
   assert.match(unhinged.system, /fill-in-the-blank skit/i)
   assert.match(unhinged.system, /Do not create random nonsense/i)
   assert.doesNotMatch(unhinged.system, /Subtle humor level|Balanced humor level/i)
+})
+
+test('Unhinged requires a materially bolder comic structure while Subtle stays restrained', () => {
+  const facts = createListingFacts(project, expenses)
+  const subtle = buildAnthropicRequest(facts, { style: 'funny', humorLevel: 'subtle' }).system
+  const unhinged = buildAnthropicRequest(facts, { style: 'funny', humorLevel: 'unhinged' }).system
+
+  assert.match(subtle, /mostly practical/i)
+  assert.match(subtle, /two restrained, item-specific comedic beats/i)
+  assert.doesNotMatch(subtle, /comic arc|five distinct comedic beats|9\/10/i)
+
+  assert.match(unhinged, /unmistakable step up from Balanced/i)
+  assert.match(unhinged, /at least five distinct comedic beats/i)
+  assert.match(unhinged, /mini comic arc/i)
+  assert.match(unhinged, /opening premise.*escalation.*callback/i)
+  assert.match(unhinged, /three different comic techniques/i)
+  assert.match(unhinged, /9\/10/i)
+})
+
+test('Unhinged example demonstrates escalation and a grounded callback without loosening factual rules', () => {
+  const system = buildAnthropicRequest(createListingFacts(project, expenses), {
+    style: 'funny',
+    humorLevel: 'unhinged',
+  }).system
+
+  assert.match(system, /Unhinged example[^]*opening premise[^]*escalat[^]*callback/i)
+  assert.match(system, /Keep the literal fact adjacent to its joke/i)
+  assert.match(system, /never turn figurative intensity into a condition, repair, safety, reliability, or transaction claim/i)
+  assert.match(system, /180,000 miles/i)
+  assert.match(system, /5-speed manual/i)
+  assert.match(system, /new clutch/i)
+  assert.match(system, /rust is present over the rear wheel wells/i)
+  assert.match(system, /runs and drives/i)
 })
 
 test('all five generation modes have separate recognizable instructions and item-grounded examples', () => {
