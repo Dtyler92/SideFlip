@@ -17,6 +17,6 @@
     { "source": "/api/analytics-dispatch", "destination": "/api/analytics/dispatch" },
     { "source": "/api/analytics-preference", "destination": "/api/analytics/preference" },
     { "source": "/api/analytics-readiness", "destination": "/api/analytics/readiness" },
-    { "source": "/((?!api|privacy|terms|support|assets|_next).*)", "destination": "/index.html" }
+    { "source": "/((?!api|privacy|terms|support|pricing|assets|_next).*)", "destination": "/index.html" }
   ]
 }

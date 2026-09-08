@@ -20,6 +20,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [portalMessage, setPortalMessage] = useState('')
   const [analyticsEnabled, setAnalyticsPreference] = useState(isAnalyticsEnabled(user?.id))
   const [analyticsSaving, setAnalyticsSaving] = useState(false)
   const [analyticsError, setAnalyticsError] = useState('')
@@ -46,6 +47,7 @@ export default function Settings() {
   }
 
   async function handleManageSub() {
+    setPortalMessage('')
     setPortalLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -59,6 +61,10 @@ export default function Settings() {
         },
       })
       const { url, error } = await res.json()
+      if (res.status === 404) {
+        setPortalMessage(error || 'No web subscription was found for this login.')
+        return
+      }
       if (!res.ok || error) throw new Error(error || 'Could not open the billing portal.')
       window.location.href = url
     } catch (err) {
@@ -99,6 +105,33 @@ export default function Settings() {
         {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
       </button>
 
+      <div style={sectionLabel}>Web Subscription</div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        {profile?.stripe_customer_id || profile?.subscription_id ? (
+          <>
+            <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+              Manage or cancel the SideFlip web subscription linked to this account.
+            </p>
+            <button className="btn btn-secondary" onClick={handleManageSub} disabled={portalLoading}>
+              {portalLoading ? 'Loading…' : 'Manage Web Subscription'}
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+              No active web subscription is linked to this account. SideFlip Free remains available.
+            </p>
+            <a className="btn btn-secondary" href="/pricing" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+              View Pro Plans
+            </a>
+            <button className="btn btn-secondary" onClick={handleManageSub} disabled={portalLoading} style={{ marginTop: 10 }}>
+              {portalLoading ? 'Checking…' : 'Already subscribed on web? Find Web Subscription'}
+            </button>
+            {portalMessage && <p role="status" style={{ margin: '10px 0 0', color: 'var(--muted)', fontSize: 12 }}>{portalMessage}</p>}
+          </>
+        )}
+      </div>
+
       <div style={sectionLabel}>Privacy</div>
       <label className="card" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20, cursor: 'pointer' }}>
         <input
@@ -127,9 +160,7 @@ export default function Settings() {
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
         <a href="/support" style={{ color: 'var(--muted)', fontSize: 12 }}>Support</a>
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
-        <button onClick={handleManageSub} disabled={portalLoading} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
-          {portalLoading ? 'Loading…' : 'Manage Subscription'}
-        </button>
+        <a href="/pricing" style={{ color: 'var(--muted)', fontSize: 12 }}>Plans</a>
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
         <a href="/privacy" style={{ color: 'var(--muted)', fontSize: 12 }}>Privacy Policy</a>
       </div>
