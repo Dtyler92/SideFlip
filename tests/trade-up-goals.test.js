@@ -30,6 +30,9 @@ test('keeps multiple goals financially isolated', () => {
     totalProjectExpenses: 50,
     realizedProfit: 0,
     takenOut: 0,
+    outOfPocket: 650,
+    grossFlipped: 0,
+    flipped: 0,
     activeCount: 1,
     soldCount: 0,
   })

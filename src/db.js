@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { createMutationId } from './goals'
+import { createMutationId, normalizeMoney, validateGoalDraft } from './goals'
 
 // ── Project helpers (Supabase) ────────────────────────────────
 
@@ -123,13 +123,14 @@ export async function getGoals(userId) {
 }
 
 export async function createGoal(userId, goal) {
+  const validated = validateGoalDraft(goal)
   const { data: goalId, error } = await supabase.rpc('create_trade_up_goal', {
-    p_name: goal.name,
-    p_goal_type: goal.goalType,
-    p_target_item: goal.targetItem || null,
-    p_target_amount: Number(goal.targetAmount) || 0,
-    p_description: goal.description || null,
-    p_starting_amount: Number(goal.startingAmount) || 0,
+    p_name: validated.name,
+    p_goal_type: validated.goalType,
+    p_target_item: validated.goalType === 'item' ? validated.targetItem : null,
+    p_target_amount: validated.targetAmount,
+    p_description: validated.description || null,
+    p_starting_amount: validated.startingAmount,
     p_mutation_id: goal.mutationId || createMutationId(),
   })
   if (error) throw error
@@ -141,9 +142,19 @@ export async function createGoal(userId, goal) {
 
 export async function updateGoal(userId, goalId, updates) {
   const row = {}
-  if (updates.status !== undefined) row.status = updates.status
-  if (updates.name !== undefined) row.name = updates.name.trim()
-  if (updates.targetAmount !== undefined) row.target_amount = Number(updates.targetAmount) || 0
+  if (updates.status !== undefined) {
+    if (!['active', 'completed'].includes(updates.status)) throw new Error('Invalid goal status')
+    row.status = updates.status
+  }
+  if (updates.name !== undefined) {
+    row.name = String(updates.name).trim()
+    if (!row.name) throw new Error('Goal name is required')
+  }
+  if (updates.targetAmount !== undefined) {
+    const targetAmount = Number(updates.targetAmount)
+    if (!Number.isFinite(targetAmount) || targetAmount <= 0) throw new Error('Target amount must be greater than zero')
+    row.target_amount = normalizeMoney(updates.targetAmount)
+  }
   if (updates.completedAt !== undefined) row.completed_at = updates.completedAt
   const { data, error } = await supabase.from('trade_up_goals').update(row)
     .eq('id', goalId).eq('user_id', userId).select('*, goal_ledger(*)').single()
@@ -157,10 +168,13 @@ export async function deleteGoal(userId, goalId) {
 }
 
 export async function adjustGoalBalance(goalId, type, amount, note, mutationId = createMutationId()) {
+  if (!['personal_contribution', 'cash_out'].includes(type)) throw new Error('Invalid adjustment type')
+  const normalizedAmount = normalizeMoney(amount)
+  if (normalizedAmount <= 0) throw new Error('Adjustment amount must be greater than zero')
   const { data, error } = await supabase.rpc('adjust_trade_up_goal', {
     p_goal_id: goalId,
     p_type: type,
-    p_amount: Number(amount),
+    p_amount: normalizedAmount,
     p_note: note || null,
     p_mutation_id: mutationId,
   })
@@ -169,10 +183,12 @@ export async function adjustGoalBalance(goalId, type, amount, note, mutationId =
 }
 
 export async function linkProjectToGoal(userId, projectId, goalId, goalFundingAmount, mutationId = createMutationId()) {
+  const normalizedGoalFunding = normalizeMoney(goalFundingAmount || 0)
+  if (normalizedGoalFunding < 0) throw new Error('Goal funding cannot be negative')
   const { data: linkedId, error } = await supabase.rpc('link_trade_up_project', {
     p_project_id: projectId,
     p_goal_id: goalId,
-    p_goal_funding: Number(goalFundingAmount) || 0,
+    p_goal_funding: normalizedGoalFunding,
     p_mutation_id: mutationId,
   })
   if (error) throw error
@@ -189,15 +205,29 @@ export async function recordProjectSale(userId, project, salePrice, keepAmount) 
 }
 
 export async function recordDirectTrade(userId, outgoing, trade) {
+  const incomingTitle = String(trade.incomingTitle || '').trim()
+  const cashDirection = trade.cashDirection || 'none'
+  const tradeCredit = normalizeMoney(trade.tradeCredit)
+  const cashAmount = normalizeMoney(cashDirection === 'none' ? 0 : trade.cashAmount)
+  const goalCashAmount = normalizeMoney(cashDirection === 'paid' ? (trade.goalCashAmount || 0) : 0)
+  const keepCashAmount = normalizeMoney(cashDirection === 'received' ? (trade.keepCashAmount || 0) : 0)
+  if (!outgoing?.id) throw new Error('Outgoing project is required')
+  if (!incomingTitle) throw new Error('Incoming item is required')
+  if (!['none', 'paid', 'received'].includes(cashDirection)) throw new Error('Invalid cash direction')
+  if (tradeCredit <= 0) throw new Error('Trade credit must be greater than zero')
+  if (cashAmount < 0 || goalCashAmount < 0 || keepCashAmount < 0) throw new Error('Trade amounts cannot be negative')
+  if (cashDirection !== 'none' && cashAmount <= 0) throw new Error('Cash amount must be greater than zero')
+  if (goalCashAmount > cashAmount) throw new Error('Goal cash cannot exceed cash paid')
+  if (keepCashAmount > cashAmount) throw new Error('Cash kept cannot exceed cash received')
   const { data: incomingId, error } = await supabase.rpc('record_trade_up_direct_trade', {
     p_outgoing_id: outgoing.id,
-    p_incoming_title: trade.incomingTitle,
+    p_incoming_title: incomingTitle,
     p_category: trade.category || 'other',
-    p_trade_credit: Number(trade.tradeCredit) || 0,
-    p_cash_direction: trade.cashDirection,
-    p_cash_amount: Number(trade.cashAmount) || 0,
-    p_goal_cash: Number(trade.goalCashAmount) || 0,
-    p_keep_cash: Number(trade.keepCashAmount) || 0,
+    p_trade_credit: tradeCredit,
+    p_cash_direction: cashDirection,
+    p_cash_amount: cashAmount,
+    p_goal_cash: goalCashAmount,
+    p_keep_cash: keepCashAmount,
     p_notes: trade.notes || null,
     p_mutation_id: trade.mutationId || createMutationId(),
   })
