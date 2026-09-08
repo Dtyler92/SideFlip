@@ -18,7 +18,7 @@ export default function NewProject() {
   const [photos, setPhotos] = useState([])
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    title: '', category: 'mower', purchasePrice: '', notes: '',
+    title: '', category: '', purchasePrice: '', notes: '',
     modelNumber: '', serialNumber: '',
     engineModel: '', engineSerial: '',
     vin: '', hullNumber: '', vehicleYear: '', vehicleMake: '', vehicleModel: '', transmission: '',
@@ -31,11 +31,27 @@ export default function NewProject() {
   const selectedGoal = activeGoals.find(goal => goal.id === form.goalId)
   const goalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const selectCategory = category => setForm(current => {
+    const nextFields = getExtraFields(category)
+    return {
+      ...current,
+      category,
+      vin: nextFields.hasVin ? current.vin : '',
+      hullNumber: nextFields.hasHull ? current.hullNumber : '',
+      vehicleYear: nextFields.hasVehicleDetails ? current.vehicleYear : '',
+      vehicleMake: nextFields.hasVehicleDetails ? current.vehicleMake : '',
+      vehicleModel: nextFields.hasVehicleDetails ? current.vehicleModel : '',
+      transmission: nextFields.hasVehicleDetails ? current.transmission : '',
+      engineModel: nextFields.hasEngine ? current.engineModel : '',
+      engineSerial: nextFields.hasEngine ? current.engineSerial : '',
+    }
+  })
 
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.title.trim()) return alert('Give your project a name')
+    if (!form.category) return alert('Select a category')
     if (form.goalId && !selectedGoal) return alert('That Trade-Up Goal is no longer active. Choose another goal or create this project without one.')
     const purchase = Number(form.purchasePrice) || 0
     const goalFunding = Number(form.goalFundingAmount) || 0
@@ -90,8 +106,9 @@ export default function NewProject() {
 
           {/* Category */}
           <div className="form-group">
-            <label>Category</label>
-            <select value={form.category} onChange={e => set('category', e.target.value)}>
+            <label>Category *</label>
+            <select value={form.category} onChange={e => selectCategory(e.target.value)} required>
+              <option value="" disabled>Select a category</option>
               {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
@@ -138,7 +155,7 @@ export default function NewProject() {
             </div>
           )}
 
-          {fields.hasVin && (
+          {fields.hasVehicleDetails && (
             <>
               <section aria-label="Unconfirmed editable review"><VinDecodePanel values={form} onChange={setForm} /></section>
               <div className="card" style={{ marginBottom: 18 }}>

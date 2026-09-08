@@ -9,16 +9,18 @@ test('Airplane Project is available with model and engine identification but no 
     hasVin: false,
     hasHull: false,
     hasModel: true,
+    hasVehicleDetails: false,
   })
 })
 
-test('House Project is available without vehicle or equipment identifier fields', () => {
-  assert.ok(CATEGORIES.some(category => category.value === 'house' && category.label === '🏠 House Project'))
+test('Home Improvement is available with Android model and serial identifier fields', () => {
+  assert.ok(CATEGORIES.some(category => category.value === 'house' && category.label === '🏠 Home Improvement'))
   assert.deepEqual(getExtraFields('house'), {
     hasEngine: false,
     hasVin: false,
     hasHull: false,
-    hasModel: false,
+    hasModel: true,
+    hasVehicleDetails: false,
   })
 })
 
