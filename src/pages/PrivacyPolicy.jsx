@@ -11,6 +11,7 @@ export default function PrivacyPolicy() {
       <p>We collect information you provide when you create an account (email address and authentication credentials) and when you use the app (project names, photos, purchase prices, expenses, and sale prices). Stripe processes web subscription payments and Apple processes in-app purchases; SideFlip never stores complete payment-card details or raw Apple purchase payloads.</p>
       <p>When usage analytics are enabled, we collect pseudonymous product-interaction events such as app opens, screen and feature usage, signup and onboarding progress, paywall and plan selection, and purchase or restore outcomes. These events may include a generated device or session identifier, your SideFlip account ID after sign-in, app/platform version, and campaign parameters such as UTM source or referral code. For verified web subscription payments, analytics may include the subscription plan, status, amount, and currency. Analytics never include project titles or descriptions, listing text, photos, project purchase or sale prices, expense amounts, card details, credentials, or signed purchase data. Session replay and advertising tracking are disabled.</p>
       <p>When you request a generated listing description, SideFlip sends the project details needed for that request—including your seller brief, relevant project notes, existing listing description, and relevant work, parts, and expense descriptions—to xAI to generate the draft. Do not include information you do not want processed for listing generation. Generated drafts remain editable and should be reviewed before use.</p>
+      <p>When you start manufacturer maintenance research, SideFlip sends only the vehicle or item type and available confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market details to xAI so Grok can search approved manufacturer or authorized-dealer sources. SideFlip does not send the VIN, serial number, notes, location, costs, or expenses for this research. You must review cited source links and select suggestions before anything is added to a maintenance schedule.</p>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>2. How We Use Your Information</h2>
       <p>We use your information to:</p>
@@ -33,8 +34,7 @@ export default function PrivacyPolicy() {
         <li><strong>Resend</strong> — transactional email (<a href="https://resend.com/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
         <li><strong>Vercel</strong> — hosting (<a href="https://vercel.com/legal/privacy-policy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
         <li><strong>PostHog</strong> — privacy-conscious product analytics with session replay disabled (<a href="https://posthog.com/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
-        <li><strong>xAI</strong> — user-requested listing-description generation (<a href="https://x.ai/legal/privacy-policy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
-        <li><strong>Anthropic</strong> — user-requested manufacturer maintenance research (<a href="https://www.anthropic.com/legal/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
+        <li><strong>xAI</strong> — user-requested listing-description generation and manufacturer maintenance research (<a href="https://x.ai/legal/privacy-policy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
       </ul>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>5. Data Retention</h2>

@@ -11,3 +11,11 @@ test('privacy policy discloses listing-generation data sent to xAI', () => {
   assert.match(privacy, /expense descriptions/i)
   assert.match(privacy, /listing description/i)
 })
+
+test('privacy policy discloses bounded Grok maintenance research and no stale provider', () => {
+  assert.match(privacy, /manufacturer maintenance research/i)
+  assert.match(privacy, /confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market/i)
+  assert.match(privacy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
+  assert.match(privacy, /review cited source links/i)
+  assert.doesNotMatch(privacy, /Anthropic/i)
+})
