@@ -3,13 +3,15 @@ import { useAuth } from '../context/AuthContext'
 import { can } from '../capabilities'
 import ProFeatureGate from '../components/ProFeatureGate'
 import { calculateRealizedROI, getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
+import { calculatePortfolioMetrics, formatLaborHours } from '../analyticsMetrics'
 
 const GREEN = 'var(--green)'
 const ACCENT = 'var(--accent)'
 
 function StatCard({ label, value, sub, color }) {
+  const accessibilityLabel = `${label}: ${value}${sub ? `. ${sub}` : ''}`
   return (
-    <div style={{ flex: 1, background: '#fff', borderRadius: 14, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+    <div role="group" aria-label={accessibilityLabel} style={{ flex: 1, background: '#fff', borderRadius: 14, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
       <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: color || 'var(--text)' }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{sub}</div>}
@@ -60,10 +62,11 @@ export default function Analytics() {
   const sold = projects.filter(p => p.status === 'sold')
   const active = projects.filter(p => p.status === 'active')
 
-  const totalProfit = sold.reduce((s, p) => s + getProfit(p), 0)
+  const { totalProfit, totalRevenue, avgProfit, totalLaborHours, hourlyEarnings } = calculatePortfolioMetrics(projects)
   const totalInvestedActive = active.reduce((s, p) => s + getTotalInvested(p), 0)
   const winRate = sold.length > 0 ? (sold.filter(p => (getProfit(p) || 0) > 0).length / sold.length * 100).toFixed(0) : 0
   const roi = calculateRealizedROI(projects)
+  const laborHoursLabel = formatLaborHours(totalLaborHours)
 
   // Days to sell
   const withDays = sold.filter(p => p.createdAt && p.soldAt).map(p => ({
@@ -117,8 +120,16 @@ export default function Analytics() {
             <StatCard label="Total Profit" value={fmt(totalProfit)} color={totalProfit >= 0 ? GREEN : ACCENT} sub={roi !== null ? `${roi.toFixed(1)}% realized ROI` : null} />
           </div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <StatCard label="Avg Profit / Flip" value={fmt(avgProfit)} color={avgProfit >= 0 ? GREEN : ACCENT} />
             <StatCard label="Win Rate" value={`${winRate}%`} color={GREEN} sub={`${sold.filter(p => (getProfit(p)||0) > 0).length} of ${sold.length} sold`} />
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <StatCard label="Total Revenue" value={fmt(totalRevenue)} />
             <StatCard label="Capital Active" value={fmt(totalInvestedActive)} sub={`across ${active.length} projects`} />
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <StatCard label="Profit per Labor Hour" value={hourlyEarnings === null ? '—' : fmt(hourlyEarnings)} color={hourlyEarnings === null || hourlyEarnings >= 0 ? GREEN : ACCENT} sub="sold projects with labor" />
+            <StatCard label="Labor Recorded" value={`${laborHoursLabel}h`} sub="sold projects with labor" />
           </div>
           {avgDays !== null && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
