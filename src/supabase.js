@@ -81,11 +81,13 @@ export async function resetPassword(email) {
 
 
 export async function getProfile(userId) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .single()
+  if (error) throw error
+  if (!data) throw new Error('Could not load your profile.')
   return data
 }
 

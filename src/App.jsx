@@ -16,14 +16,28 @@ const Calculator = lazy(() => import('./pages/Calculator'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Goals = lazy(() => import('./pages/Goals'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const DeleteAccount = lazy(() => import('./pages/DeleteAccount'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const Paywall = lazy(() => import('./pages/Paywall'))
 
+// These optional modules are deliberate replacement hooks. Adding
+// pages/MyStuff.jsx or pages/Analyze.jsx replaces the placeholder automatically.
+const optionalProductPages = import.meta.glob('./pages/{FeaturePlaceholder,MyStuff,Analyze}.jsx')
+function optionalProductPage(path, title) {
+  const loader = optionalProductPages[path] || (() => import('./pages/FeaturePlaceholder').then(({ default: Placeholder }) => ({
+    default: () => <Placeholder title={title} />,
+  })))
+  return lazy(loader)
+}
+const MyStuff = optionalProductPage('./pages/MyStuff.jsx', 'My Stuff')
+const Analyze = optionalProductPage('./pages/Analyze.jsx', 'Analyze')
+
 function analyticsScreen(pathname) {
   if (/^\/project\/[^/]+\/sell$/.test(pathname)) return 'sell_project'
   if (/^\/project\/[^/]+$/.test(pathname)) return 'project_detail'
-  return ({ '/': 'home', '/new': 'new_project', '/calculator': 'calculator', '/analytics': 'analytics', '/goals': 'goals', '/settings': 'settings', '/upgrade': 'paywall', '/privacy': 'privacy', '/terms': 'terms' })[pathname] || 'unknown'
+  return ({ '/': 'home', '/new': 'new_project', '/calculator': 'calculator', '/analytics': 'analytics', '/my-stuff': 'my_stuff', '/analyze': 'analyze', '/goals': 'goals', '/settings': 'settings', '/delete-account': 'delete_account', '/upgrade': 'paywall', '/privacy': 'privacy', '/terms': 'terms' })[pathname] || 'unknown'
 }
 
 function LoadingScreen({ message }) {
@@ -46,7 +60,7 @@ function LoadingScreen({ message }) {
 }
 
 function AppRoutes() {
-  const { user, profile, loading, analyticsReady, refreshProfile } = useAuth()
+  const { user, profile, profileStatus, needsOnboarding, loading, analyticsReady, refreshProfile } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [polling, setPolling] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
@@ -122,12 +136,18 @@ function AppRoutes() {
   if (window.location.pathname === '/privacy') return <Suspense fallback={<LoadingScreen />}><PrivacyPolicy /></Suspense>
   if (window.location.pathname === '/terms') return <Suspense fallback={<LoadingScreen />}><TermsOfService /></Suspense>
 
-  if (loading || polling || (user && !profile)) {
+  if (loading || polling || (user && profileStatus === 'loading')) {
     return <LoadingScreen message={polling ? 'Activating your account…' : undefined} />
   }
 
   // Not logged in
   if (!user) return <Suspense fallback={<LoadingScreen />}><AuthScreen /></Suspense>
+
+  if (profileStatus === 'unavailable' || !profile) return (
+    <LoadingScreen message="Your account details are temporarily unavailable. Check your connection and reload to try again." />
+  )
+
+  if (needsOnboarding) return <Suspense fallback={<LoadingScreen />}><Onboarding /></Suspense>
 
   // Authenticated users always receive the Free core. Individual Pro features
   // are gated by their own capability checks inside those screens.
@@ -142,8 +162,11 @@ function AppRoutes() {
           <Route path="/project/:id/sell" element={<SellProject />} />
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/my-stuff" element={<MyStuff />} />
+          <Route path="/analyze" element={<Analyze />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/delete-account" element={<DeleteAccount />} />
           <Route path="/upgrade" element={<Paywall />} />
         </Routes>
       </Suspense>

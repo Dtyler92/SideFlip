@@ -10,20 +10,26 @@ export function DataProvider({ children }) {
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [migrating, setMigrating] = useState(false)
+  const [error, setError] = useState('')
 
   const refresh = useCallback(async () => {
     if (!user) return
+    setLoading(true)
+    setError('')
     try {
       const [projectData, goalData] = await Promise.all([getProjects(user.id), getGoals(user.id)])
       setProjects(projectData)
       setGoals(goalData)
     } catch (err) {
       console.error('Failed to load projects:', err)
+      setError('Your data could not be loaded. Check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
   }, [user])
 
   useEffect(() => {
-    if (!user) { setProjects([]); setGoals([]); setLoading(false); return }
+    if (!user) { setProjects([]); setGoals([]); setError(''); setLoading(false); return }
 
     async function init() {
       setLoading(true)
@@ -40,14 +46,13 @@ export function DataProvider({ children }) {
       }
 
       await refresh()
-      setLoading(false)
     }
 
     init()
-  }, [user])
+  }, [user, refresh])
 
   return (
-    <DataContext.Provider value={{ projects, goals, loading, migrating, refresh }}>
+    <DataContext.Provider value={{ projects, goals, loading, migrating, error, refresh }}>
       {children}
     </DataContext.Provider>
   )

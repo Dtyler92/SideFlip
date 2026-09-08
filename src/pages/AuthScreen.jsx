@@ -3,16 +3,19 @@ import { signIn, signUp, resetPassword } from '../supabase'
 import { captureEvent } from '../analytics'
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState('signup') // signup | signin | forgot
+  const [mode, setMode] = useState('signin') // signup | signin | forgot
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setNotice('')
+    const normalizedEmail = email.trim().toLowerCase()
 
     if (mode === 'signup' && password !== confirmPassword) {
       setError('Passwords do not match')
@@ -25,10 +28,9 @@ export default function AuthScreen() {
     setLoading(true)
     try {
       if (mode === 'forgot') {
-        const { error: err } = await resetPassword(email)
+        const { error: err } = await resetPassword(normalizedEmail)
         if (err) throw err
-        setError('')
-        alert(`Password reset email sent to ${email}. Check your inbox!`)
+        setNotice('Check your email for a reset link, then return here to sign in.')
         setMode('signin')
         setLoading(false)
         return
@@ -36,20 +38,20 @@ export default function AuthScreen() {
 
       if (mode === 'signup') {
         captureEvent('signup_started', { source: 'web_auth' })
-        const { data, error: err } = await signUp(email, password)
+        const { data, error: err } = await signUp(normalizedEmail, password)
         if (err) throw err
         captureEvent('signup_completed', { source: 'web_auth' })
 
         // Supabase may require email confirmation before it issues a session.
         // Either way, Free accounts never enter checkout during signup.
         if (!data?.session) {
-          alert(`Check ${email} to confirm your account, then sign in to start using SideFlip Free.`)
+          setNotice(`Check ${normalizedEmail} to confirm your account, then sign in to start using SideFlip Free.`)
           setMode('signin')
           setLoading(false)
         }
 
       } else {
-        const { error: err } = await signIn(email, password)
+        const { error: err } = await signIn(normalizedEmail, password)
         if (err) throw err
         captureEvent('signin_completed', { source: 'web_auth' })
       }
@@ -80,6 +82,11 @@ export default function AuthScreen() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+        {notice && (
+          <div role="status" className="card" style={{ marginBottom: 16, fontSize: 14, color: 'var(--body)' }}>
+            {notice}
+          </div>
+        )}
         {error && (
           <div style={{ background: 'var(--accent-soft)', border: '1px solid rgba(200,64,47,0.25)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 14, color: 'var(--accent)' }}>
             {error}

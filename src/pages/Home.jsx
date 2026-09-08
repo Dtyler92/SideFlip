@@ -2,12 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { signOut } from '../supabase'
-import { getTotalInvested, getProfit, fmt, categoryIcon } from '../store'
+import { getTotalInvested, getProfit, categoryIcon } from '../store'
 
-function AccountMenu({ user, profile }) {
+function AccountMenu({ user, signOut }) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [portalLoading, setPortalLoading] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -17,25 +16,6 @@ function AccountMenu({ user, profile }) {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
-
-  async function handleManageSub() {
-    setPortalLoading(true)
-    setOpen(false)
-    try {
-      const res = await fetch('/api/create-portal-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: profile?.stripe_customer_id })
-      })
-      const { url, error } = await res.json()
-      if (error) throw new Error(error)
-      window.location.href = url
-    } catch (err) {
-      alert('Could not open billing portal: ' + err.message)
-    } finally {
-      setPortalLoading(false)
-    }
-  }
 
   const initial = user?.email?.[0]?.toUpperCase() || '?'
 
@@ -47,7 +27,7 @@ function AccountMenu({ user, profile }) {
         fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(200,64,47,0.25)'
       }}>
-        {portalLoading ? '…' : initial}
+        {initial}
       </button>
       {open && (
         <div style={{
@@ -61,6 +41,9 @@ function AccountMenu({ user, profile }) {
           </div>
           <button onClick={() => { setOpen(false); window.location.href = '/support' }} style={menuItem}>
             <span>💬</span> Help & Support
+          </button>
+          <button onClick={() => { setOpen(false); navigate('/settings') }} style={menuItem}>
+            <span>⚙️</span> Settings
           </button>
           <div style={{ height: 1, background: 'var(--border)' }} />
           <button onClick={() => { setOpen(false); signOut() }} style={{ ...menuItem, color: 'var(--accent)' }}>
@@ -81,8 +64,8 @@ const menuItem = {
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user, profile } = useAuth()
-  const { projects, goals, loading, migrating } = useData()
+  const { user, formatMoney, signOut } = useAuth()
+  const { projects, goals, loading, migrating, error, refresh } = useData()
   const [tab, setTab] = useState('active')
   const [search, setSearch] = useState('')
 
@@ -116,6 +99,17 @@ export default function Home() {
     </div>
   )
 
+  if (error) return (
+    <main className="page" style={{ paddingTop: 48, textAlign: 'center' }}>
+      <div className="empty">
+        <div className="empty-icon">⚠️</div>
+        <h3>Couldn&apos;t load your projects</h3>
+        <p>{error}</p>
+        <button type="button" className="btn btn-primary" onClick={refresh}>Retry</button>
+      </div>
+    </main>
+  )
+
   return (
     <>
       <div className="page-header">
@@ -123,7 +117,7 @@ export default function Home() {
           <span className="wordmark-side">Side</span>
           <span className="wordmark-flip">Flip</span>
         </div>
-        <AccountMenu user={user} profile={profile} />
+        <AccountMenu user={user} signOut={signOut} />
       </div>
 
       <div className="summary-bar">
@@ -133,11 +127,11 @@ export default function Home() {
         </div>
         <div className="summary-item">
           <div className="summary-label">In Projects</div>
-          <div className="summary-value accent">{fmt(totalInvested)}</div>
+          <div className="summary-value accent">{formatMoney(totalInvested)}</div>
         </div>
         <div className="summary-item">
           <div className="summary-label">Total Profit</div>
-          <div className={`summary-value ${totalProfit >= 0 ? 'green' : 'accent'}`}>{fmt(totalProfit)}</div>
+          <div className={`summary-value ${totalProfit >= 0 ? 'green' : 'accent'}`}>{formatMoney(totalProfit)}</div>
         </div>
       </div>
 
@@ -185,9 +179,9 @@ export default function Home() {
                   <div className="project-category">{p.category}</div>
                   <div className="project-title">{p.title}</div>
                   <div className="project-meta">
-                    <span className="invested">{fmt(getTotalInvested(p))} in</span>
+                    <span className="invested">{formatMoney(getTotalInvested(p))} in</span>
                     {p.status === 'sold' && profit !== null && (
-                      <span className={`sold-badge ${profit < 0 ? 'loss' : ''}`}>{profit >= 0 ? '+' : ''}{fmt(profit)}</span>
+                      <span className={`sold-badge ${profit < 0 ? 'loss' : ''}`}>{profit >= 0 ? '+' : ''}{formatMoney(profit)}</span>
                     )}
                   </div>
                 </div>
