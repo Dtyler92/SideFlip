@@ -31,7 +31,8 @@ export async function uploadPhoto(userId, file) {
   // Compress/resize before upload if large
   const compressed = await compressImage(file)
   const ext = file.name.split('.').pop().toLowerCase().replace('heic', 'jpg') || 'jpg'
-  const path = `${userId}/${Date.now()}.${ext}`
+  const objectId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const path = `${userId}/${objectId}.${ext}`
 
   const { error } = await supabase.storage
     .from('project-photos')
@@ -43,11 +44,19 @@ export async function uploadPhoto(userId, file) {
   return data.publicUrl
 }
 
-export async function deletePhoto(url) {
-  if (!url || url.startsWith('data:')) return // skip base64
-  const path = url.split('/project-photos/')[1]
-  if (!path) return
-  await supabase.storage.from('project-photos').remove([path])
+export async function deletePhoto(userId, url) {
+  if (!userId || !url || url.startsWith('data:') || url.startsWith('blob:')) return
+  let path
+  try {
+    const marker = '/project-photos/'
+    const pathname = new URL(url).pathname
+    const markerIndex = pathname.indexOf(marker)
+    if (markerIndex < 0) return
+    path = decodeURIComponent(pathname.slice(markerIndex + marker.length))
+  } catch { return }
+  if (!path.startsWith(`${userId}/`) || path.includes('../') || path.includes('\\')) return
+  const { error } = await supabase.storage.from('project-photos').remove([path])
+  if (error) throw error
 }
 
 async function compressImage(file) {

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   fmt, categoryIcon, expenseIcon, EXPENSE_CATEGORIES, getExtraFields,
-  getProjectPhotoPair, shouldDeleteReplacedProjectPhoto,
 } from '../store'
 import {
   addExpense, deleteExpense, deleteProject, getProject, linkProjectToGoal,
@@ -10,8 +9,7 @@ import {
 } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { uploadPhoto, deletePhoto } from '../supabase'
-import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
+import ProjectPhotoGallery from '../components/ProjectPhotoGallery'
 import SalesListingGenerator from '../components/SalesListingGenerator'
 import ProjectReportPanel from '../components/ProjectReportPanel'
 import { ProjectToMyStuffAction } from '../components/ProjectIntegrationActions'
@@ -20,8 +18,8 @@ import { captureEvent } from '../analytics'
 import { accessibleActiveGoalsAfterProLoss, calculateGoalSummary, createMutationId } from '../goals'
 import { can, getPlan } from '../capabilities'
 import {
-  buildExpenseWrite, centsToAmount, parseMoneyToCents, projectCostCents,
-  projectProfitCents, resolveNotesSave,
+  buildExpenseWrite, buildProjectGalleryUpdate, centsToAmount, mergeProjectGallery,
+  parseMoneyToCents, projectCostCents, projectProfitCents, resolveNotesSave,
 } from '../projectParity'
 
 const emptyExpense = () => ({ description: '', amount: '', category: 'parts', laborHours: '' })
@@ -38,7 +36,7 @@ export default function ProjectDetail() {
   const { goals, projects, refresh: refreshList } = useData()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [uploadingSlot, setUploadingSlot] = useState(null)
+
   const [showExpense, setShowExpense] = useState(false)
   const [editingExpenseId, setEditingExpenseId] = useState(null)
   const [expense, setExpense] = useState(emptyExpense)
@@ -83,7 +81,7 @@ export default function ProjectDetail() {
   if (!project) return <div className="page" style={{ paddingTop: 40 }}><p style={{ color: 'var(--muted)' }}>Project not found.</p></div>
 
   const fields = getExtraFields(project.category)
-  const { beforePhoto, afterPhoto } = getProjectPhotoPair(project)
+  const gallery = mergeProjectGallery(project)
   const totalInvestedCents = projectCostCents(project)
   const totalInvested = centsToAmount(totalInvestedCents)
   const partsTotal = centsToAmount((project.expenses || []).reduce((sum, item) => sum + (parseMoneyToCents(item.amount) ?? Math.round(Number(item.amount || 0) * 100)), 0))
@@ -95,26 +93,12 @@ export default function ProjectDetail() {
   const isPro = can(profile, entitlement, 'ai_listings')
   const upgrade = () => navigate('/paywall')
 
-  async function handlePhotoChange(slot, event) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    const pair = getProjectPhotoPair(project)
-    const previousPhoto = slot === 'before' ? pair.beforePhoto : pair.afterPhoto
-    setUploadingSlot(slot)
-    let uploadedUrl = null
-    try {
-      uploadedUrl = await uploadPhoto(user.id, file)
-      const updates = slot === 'before'
-        ? { photo: uploadedUrl, beforePhoto: uploadedUrl }
-        : { afterPhoto: uploadedUrl, ...(pair.beforePhoto ? {} : { photo: uploadedUrl }) }
-      const next = await updateProject(user.id, id, updates)
-      setProject(next)
-      if (previousPhoto && previousPhoto !== uploadedUrl && shouldDeleteReplacedProjectPhoto(project, slot, previousPhoto)) await deletePhoto(previousPhoto)
-      await refreshList()
-    } catch (error) {
-      if (uploadedUrl) await deletePhoto(uploadedUrl).catch(() => {})
-      alert('Photo upload failed: ' + error.message)
-    } finally { setUploadingSlot(null) }
+  async function handleGalleryUpdate(urls) {
+    const targetProjectId = id
+    const updates = buildProjectGalleryUpdate(project, urls)
+    const next = await updateProject(user.id, targetProjectId, updates)
+    if (activeProjectRef.current === targetProjectId) setProject(next)
+    await refreshList().catch(() => {})
   }
 
   function openExpense(item = null) {
@@ -245,10 +229,7 @@ export default function ProjectDetail() {
   return <>
     <div className="page" style={{ paddingBottom: 0 }}>
       <div className="section-title" style={{ marginTop: 0 }}>Project Photos</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
-        <ProjectPhotoSlot label="Before" photo={beforePhoto} uploading={uploadingSlot === 'before'} onFile={event => handlePhotoChange('before', event)} />
-        <ProjectPhotoSlot label="After" photo={afterPhoto} uploading={uploadingSlot === 'after'} onFile={event => handlePhotoChange('after', event)} />
-      </div>
+      <ProjectPhotoGallery userId={user.id} photos={gallery} project={project} plan={getPlan(profile, entitlement)} onUpdate={handleGalleryUpdate} onUpgrade={() => navigate('/paywall')} />
     </div>
 
     <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>

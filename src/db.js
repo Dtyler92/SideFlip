@@ -47,8 +47,10 @@ export async function createProject(userId, data) {
       p_mutation_id: data.mutationId || createMutationId(),
     })
     if (error) throw error
-    if (data.beforePhoto !== undefined || data.afterPhoto !== undefined) {
+    if (data.photos !== undefined || data.beforePhoto !== undefined || data.afterPhoto !== undefined) {
       return updateProject(userId, projectId, {
+        photo: data.photo ?? null,
+        photos: data.photos ?? [],
         beforePhoto: data.beforePhoto ?? null,
         afterPhoto: data.afterPhoto ?? null,
         transmission: data.transmission || null,
@@ -381,6 +383,7 @@ function toRow(userId, data) {
   if (data.salePrice !== undefined) row.sale_price = data.salePrice ? Number(data.salePrice) : null
   if (data.soldAt !== undefined) row.sold_at = data.soldAt
   if (data.photo !== undefined) row.photo = data.photo
+  if (data.photos !== undefined) row.photos = Array.isArray(data.photos) ? data.photos : []
 
   if (data.beforePhoto !== undefined) row.before_photo = data.beforePhoto
   if (data.afterPhoto !== undefined) row.after_photo = data.afterPhoto

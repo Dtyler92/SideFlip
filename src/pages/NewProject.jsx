@@ -4,10 +4,9 @@ import { CATEGORIES, getExtraFields, fmt } from '../store'
 import { createProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { uploadPhoto } from '../supabase'
 import { accessibleActiveGoalsAfterProLoss, calculateGoalSummary, createMutationId } from '../goals'
 import { getPlan } from '../capabilities'
-import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
+import ProjectPhotoGallery from '../components/ProjectPhotoGallery'
 import { captureEvent } from '../analytics'
 import VinDecodePanel from '../components/VinDecodePanel'
 
@@ -16,9 +15,7 @@ export default function NewProject() {
   const [searchParams] = useSearchParams()
   const { user, profile, entitlement } = useAuth()
   const { refresh, goals, projects } = useData()
-  const [beforePhoto, setBeforePhoto] = useState(null)
-  const [afterPhoto, setAfterPhoto] = useState(null)
-  const [uploadingSlot, setUploadingSlot] = useState(null)
+  const [photos, setPhotos] = useState([])
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     title: '', category: 'mower', purchasePrice: '', notes: '',
@@ -29,25 +26,12 @@ export default function NewProject() {
   })
 
   const fields = getExtraFields(form.category)
-  const activeGoals = accessibleActiveGoalsAfterProLoss(goals, getPlan(profile, entitlement))
+  const plan = getPlan(profile, entitlement)
+  const activeGoals = accessibleActiveGoalsAfterProLoss(goals, plan)
   const selectedGoal = activeGoals.find(goal => goal.id === form.goalId)
   const goalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  async function handlePhotoFile(slot, e) {
-    const file = e.target.files[0]
-    if (!file) return
-    setUploadingSlot(slot)
-    try {
-      const url = await uploadPhoto(user.id, file)
-      if (slot === 'before') setBeforePhoto(url)
-      else setAfterPhoto(url)
-    } catch (err) {
-      alert('Photo upload failed: ' + err.message)
-    } finally {
-      setUploadingSlot(null)
-    }
-  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -61,9 +45,8 @@ export default function NewProject() {
     try {
       await createProject(user.id, {
         ...form,
-        photo: beforePhoto || afterPhoto,
-        beforePhoto,
-        afterPhoto,
+        photo: photos[0] || null,
+        photos,
         goalId: form.goalId || null,
         goalFundingAmount: goalFunding,
         outOfPocketAmount: Math.max(0, purchase - goalFunding),
@@ -91,11 +74,7 @@ export default function NewProject() {
           {/* Project photos */}
           <div className="form-group">
             <label>Project Photos (optional)</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <ProjectPhotoSlot label="Before" photo={beforePhoto} uploading={uploadingSlot === 'before'} onFile={e => handlePhotoFile('before', e)} />
-              <ProjectPhotoSlot label="After" photo={afterPhoto} uploading={uploadingSlot === 'after'} onFile={e => handlePhotoFile('after', e)} />
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>Show the starting condition and the finished result for this flip.</div>
+            <ProjectPhotoGallery userId={user.id} photos={photos} project={{ photo: photos[0] }} plan={plan} onUpdate={async next => setPhotos(next)} onUpgrade={() => navigate('/paywall')} />
           </div>
 
           {/* Title */}

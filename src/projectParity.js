@@ -97,8 +97,35 @@ export function mergeProjectGallery(project = {}) {
     project.photo,
     project.beforePhoto || project.before_photo,
     project.afterPhoto || project.after_photo,
-  ].filter(Boolean)
+  ].map(url => typeof url === 'string' ? url.trim() : '').filter(Boolean)
   return [...new Set(urls)]
+}
+
+export const FREE_PROJECT_PHOTO_LIMIT = 5
+export const PRO_PROJECT_PHOTO_LIMIT = 25
+
+export function photoLimitForPlan(plan) {
+  return plan === 'pro' ? PRO_PROJECT_PHOTO_LIMIT : FREE_PROJECT_PHOTO_LIMIT
+}
+
+export function buildProjectGalleryUpdate(project = {}, orderedUrls = []) {
+  const photos = [...new Set(orderedUrls.map(url => typeof url === 'string' ? url.trim() : '').filter(Boolean))]
+  const beforePhoto = project.beforePhoto || project.before_photo || null
+  const afterPhoto = project.afterPhoto || project.after_photo || null
+  return {
+    photos,
+    photo: photos[0] || null,
+    beforePhoto: beforePhoto && photos.includes(beforePhoto) ? beforePhoto : null,
+    afterPhoto: afterPhoto && photos.includes(afterPhoto) ? afterPhoto : null,
+  }
+}
+
+export function projectPhotoRoles(project = {}, url) {
+  const roles = []
+  if (project.photo === url) roles.push('Main')
+  if ((project.beforePhoto || project.before_photo) === url) roles.push('Before')
+  if ((project.afterPhoto || project.after_photo) === url) roles.push('After')
+  return roles
 }
 
 export function buildProjectTransferRequest(projectId, mutationId) {

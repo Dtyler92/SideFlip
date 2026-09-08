@@ -8,8 +8,11 @@ import {
   buildExpenseWrite,
   buildListingRequest,
   buildProjectTransferRequest,
+  buildProjectGalleryUpdate,
   centsToAmount,
   mergeProjectGallery,
+  photoLimitForPlan,
+  projectPhotoRoles,
   parseMoneyToCents,
   projectCostCents,
   projectProfitCents,
@@ -19,6 +22,9 @@ import {
 
 const detailSource = readFileSync(new URL('../src/pages/ProjectDetail.jsx', import.meta.url), 'utf8')
 const createSource = readFileSync(new URL('../src/pages/NewProject.jsx', import.meta.url), 'utf8')
+const gallerySource = readFileSync(new URL('../src/components/ProjectPhotoGallery.jsx', import.meta.url), 'utf8')
+const dbSource = readFileSync(new URL('../src/db.js', import.meta.url), 'utf8')
+const quotaMigration = readFileSync(new URL('../supabase/migrations/20260807220000_enforce_project_photo_quota.sql', import.meta.url), 'utf8')
 
 test('labor is required and rounded upward to the next quarter hour', () => {
   assert.equal(roundLaborHours('0.001'), 0.25)
@@ -72,6 +78,42 @@ test('race-safe notes resolution never replaces a newer draft or another project
 test('gallery preserves dedicated photos and existing backend attachment capacity', () => {
   assert.deepEqual(mergeProjectGallery({ photos: ['a', 'b'], beforePhoto: 'a', afterPhoto: 'c' }), ['a', 'b', 'c'])
   assert.deepEqual(mergeProjectGallery({ photo: 'legacy' }), ['legacy'])
+  assert.deepEqual(mergeProjectGallery({ photos: [' ', 'a', 'a', null], photo: 'b', before_photo: 'c', after_photo: 'b' }), ['a', 'b', 'c'])
+  assert.equal(photoLimitForPlan('free'), 5)
+  assert.equal(photoLimitForPlan('pro'), 25)
+})
+
+test('gallery writes preserve order, synchronize main, and safely retain or clear legacy roles', () => {
+  const existing = { photos: ['gallery', 'shared'], photo: 'legacy', beforePhoto: 'legacy', afterPhoto: 'shared' }
+  assert.deepEqual(buildProjectGalleryUpdate(existing, ['shared', 'legacy', 'gallery']), {
+    photos: ['shared', 'legacy', 'gallery'], photo: 'shared', beforePhoto: 'legacy', afterPhoto: 'shared',
+  })
+  assert.deepEqual(buildProjectGalleryUpdate(existing, ['gallery']), {
+    photos: ['gallery'], photo: 'gallery', beforePhoto: null, afterPhoto: null,
+  })
+  assert.deepEqual(buildProjectGalleryUpdate({ photo: 'legacy' }, []), {
+    photos: [], photo: null, beforePhoto: null, afterPhoto: null,
+  })
+  assert.deepEqual(projectPhotoRoles(existing, 'legacy'), ['Main', 'Before'])
+  assert.deepEqual(projectPhotoRoles(existing, 'shared'), ['After'])
+})
+
+test('project gallery UI supports multi-select, preview, ordered controls, deletion, and plan limits', () => {
+  assert.match(gallerySource, /multiple/)
+  assert.match(gallerySource, /URL\.createObjectURL/)
+  assert.match(gallerySource, /URL\.revokeObjectURL/)
+  assert.match(gallerySource, /Move .* left|Move .* right/)
+  assert.match(gallerySource, /Remove photo/)
+  assert.match(gallerySource, /photoLimitForPlan/)
+  assert.match(gallerySource, /deletePhoto\(userId/)
+  assert.match(dbSource, /row\.photos =/)
+  assert.match(createSource, /photos,/)
+})
+
+test('database remains authoritative for the same 5 Free and 25 Pro total-photo quota', () => {
+  assert.match(quotaMigration, /verified_pro_entitlement\(new\.user_id\)[\s\S]*then 25[\s\S]*else 5/i)
+  assert.match(quotaMigration, /new\.photos[\s\S]*new\.photo, new\.before_photo, new\.after_photo/i)
+  assert.match(quotaMigration, /before insert or update of photos, photo, before_photo, after_photo, user_id/i)
 })
 
 test('V3 transfer request is idempotent and excludes attachments', () => {
@@ -86,6 +128,5 @@ test('project UI exposes VIN review, expense edit, listing, report, goal, integr
   }
   assert.match(createSource, /Unconfirmed editable review/)
   assert.match(createSource, /manual entry/i)
-  assert.match(createSource, /ProjectPhotoSlot label="Before"/)
-  assert.match(createSource, /ProjectPhotoSlot label="After"/)
+  assert.match(createSource, /ProjectPhotoGallery/)
 })
