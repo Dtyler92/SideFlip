@@ -47,6 +47,20 @@ test('ownership validation requires identity, usage and purchase fields by exact
   assert.deepEqual(removed.currentUsage, {})
 })
 
+test('leaving a VIN-capable type clears hidden automotive identity', () => {
+  const vinIdentity = {
+    vin:'1HGCM82633A004352', trim:'EX', series:'Accord', manufacturer:'Honda',
+    vehicleType:'Passenger Car', bodyStyle:'Sedan', plantName:'Marysville',
+    plantCountry:'United States', vehicleMarket:'US', engineModel:'J30A4',
+    engineDisplacementLiters:3, engineCylinders:6, transmission:'Automatic',
+    drivetrain:'FWD',
+  }
+  const next = selectItemType({ ...vinIdentity, itemType:'motorcycle', category:'motorcycle', measurements:['miles'] }, 'boat')
+  for (const field of Object.keys(vinIdentity)) assert.equal(next[field], '', `${field} should be cleared`)
+  assert.equal(next.itemType, 'boat')
+  assert.equal(next.category, 'boat')
+})
+
 test('adapters preserve rich identity, ownership, acquisition and purchase fields while patches exclude readings', () => {
   const values = { name:' Truck ', itemType:'truck', category:'vehicle', year:'2021', make:' Ford ', model:'F-150', trim:'XLT', modelNumber:' M1 ', serialNumber:' S1 ', vin:'VIN', engine:'V6', transmission:'Auto', drivetrain:'4WD', fuelType:'Gas', acquiredOn:'2026-09-01', manufacturedOn:'2021-01-01', inServiceOn:'2021-02-01', purchasePrice:'25000.50', purchaseCurrency:'usd', purchaseVendor:'Dealer', usageProfile:'severe', measurements:['miles','hours'], currentUsage:{miles:12000,hours:50}, notes:' kept ' }
   const row = adaptItemDraftToSql(values)

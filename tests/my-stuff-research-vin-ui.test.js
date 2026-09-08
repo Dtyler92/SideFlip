@@ -53,9 +53,12 @@ test('VIN request gate aborts stale work and item type helpers fail closed', () 
   gate.invalidate()
   assert.equal(first.controller.signal.aborted, true)
   assert.equal(gate.isCurrent(first, VIN), false)
-  assert.equal(supportsVinDecoder('car'), true)
-  assert.equal(supportsVinDecoder('truck'), true)
-  assert.equal(supportsVinDecoder('mower'), false)
+  for (const itemType of ['car', 'truck', 'motorcycle', 'atv', 'side_by_side', 'trailer', 'rv']) {
+    assert.equal(supportsVinDecoder(itemType), true, `${itemType} should support VIN decoding`)
+  }
+  for (const itemType of ['boat', 'airplane', 'mower', 'equipment', 'other']) {
+    assert.equal(supportsVinDecoder(itemType), false, `${itemType} should not support automotive VIN decoding`)
+  }
   assert.equal(requiresResearchIdentityReconfirmation('car', 'truck'), true)
   assert.equal(requiresResearchIdentityReconfirmation('truck', 'truck'), false)
 })
@@ -120,4 +123,18 @@ test('reusable PWA panels expose explicit VIN confirmation and research review g
   assert.match(research, /Approve cited suggestions/)
   assert.match(research, /Apply approved schedules/)
   assert.match(research, /Manual schedule entry stays available/)
+})
+
+test('My Stuff create uses the reusable VIN decoder in pre-save review mode', () => {
+  const create = source('src/pages/MyStuffCreate.jsx')
+  const vin = source('src/components/MyStuffVinDecodePanel.jsx')
+  assert.match(create, /MyStuffVinDecodePanel/)
+  assert.match(create, /preSave/)
+  assert.match(create, /supportsVinDecoder\(draft\.itemType\)/)
+  assert.doesNotMatch(create, /<Field label="VIN"/)
+  assert.match(vin, /Apply reviewed values/)
+  assert.match(vin, /if\(!preSave\)decodeBody\.subjectId=itemId/)
+  assert.match(vin, /preSave\s*\?/)
+  assert.match(vin, /never save automatically/i)
+  assert.match(vin, /full VIN is sent to NHTSA/i)
 })

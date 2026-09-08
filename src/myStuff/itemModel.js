@@ -26,8 +26,10 @@ export const MAX_USAGE_READING=1_000_000_000
 const key=value=>String(value||'').trim().toLowerCase().replace(/[-_]+/g,' ').replace(/\s+/g,' ')
 export function getItemTypeOption(value){return TYPE_BY_VALUE[key(value).replace(/ /g,'_')]||null}
 export function deriveItemCategory(value){return getItemTypeOption(value)?.category||'other'}
-const VIN_ITEM_TYPES=new Set(['car','truck'])
-export function supportsVinDecoder(value){return VIN_ITEM_TYPES.has(getItemTypeOption(value)?.value||'')}
+export const VIN_ITEM_TYPES=Object.freeze(['car','truck','motorcycle','atv','side_by_side','trailer','rv'])
+const VIN_ITEM_TYPE_SET=new Set(VIN_ITEM_TYPES)
+const VIN_IDENTITY_FIELDS=Object.freeze(['vin','trim','series','manufacturer','vehicleType','bodyStyle','plantName','plantCountry','vehicleMarket','engineModel','engineDisplacementLiters','engineCylinders','transmission','drivetrain'])
+export function supportsVinDecoder(value){return VIN_ITEM_TYPE_SET.has(getItemTypeOption(value)?.value||'')}
 export function requiresResearchIdentityReconfirmation(previousType,nextType){return previousType!==nextType&&supportsVinDecoder(previousType)&&supportsVinDecoder(nextType)}
 export function requiresUsageAndPurchase(value){return REQUIRED_TYPES.has(getItemTypeOption(value)?.value||'')}
 export function getItemCategoryContract(value){const normalized=key(value);return CONTRACTS[normalized]||CONTRACTS[ALIASES[normalized]]||null}
@@ -37,6 +39,7 @@ export function selectItemType(draft={},value){
   const measurements=(Array.isArray(draft.measurements)?draft.measurements:[]).filter(axis=>allowed.has(axis))
   const currentUsage={};for(const axis of measurements)if(Object.hasOwn(draft.currentUsage||{},axis))currentUsage[axis]=draft.currentUsage[axis]
   const next={...draft,itemType:option.value,category:option.category,measurements,currentUsage}
+  if(!VIN_ITEM_TYPE_SET.has(option.value))for(const field of VIN_IDENTITY_FIELDS)next[field]=''
   for(const axis of MEASUREMENT_TYPES)if(!allowed.has(axis))delete next[axis]
   return next
 }

@@ -22,7 +22,7 @@ const ALWAYS_EDITABLE=['transmission']
 function ensureEditable(review,values){const fields={...(review?.fields||{})};for(const field of ALWAYS_EDITABLE)fields[field]||={status:'manual',existing:values[field]??''};return {...review,fields}}
 function suggestionsFromFields(fields){return Object.fromEntries(Object.entries(fields).filter(([,detail])=>detail?.suggestion!=null).map(([field,detail])=>[field,detail.suggestion]))}
 
-export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIdentity,onIdentityConfirmed,operationLock,disabled=false,fieldLabels={},suggestionFields,initiallyExpanded=false}) {
+export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIdentity,onIdentityConfirmed,operationLock,disabled=false,fieldLabels={},suggestionFields,initiallyExpanded=false,preSave=false}) {
   const [expanded,setExpanded]=useState(initiallyExpanded)
   const [decoding,setDecoding]=useState(false)
   const [confirming,setConfirming]=useState(false)
@@ -41,9 +41,32 @@ export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIde
   function update(next){valuesRef.current=next;confirmationGeneration.current+=1;setConfirmed(false);onChange?.(next)}
   function editVin(vin){gate.current.invalidate();setDecoding(false);update({...valuesRef.current,vin});setPreview(null);setWarnings([]);setMessage('')}
   function refreshPreview(next){setPreview(current=>current?{...ensureEditable(mergeDecodedSuggestions(next,suggestionsFromFields(current.fields)),next),requestVin:current.requestVin}:null)}
-  function editReviewField(field,value){const next={...valuesRef.current,[field]:value};update(next);refreshPreview(next)}
-  function fillBlanks(){if(!preview||preview.requestVin!==normalizeVin(valuesRef.current?.vin))return;const next=applyVinSuggestions(valuesRef.current,preview.fields,{mode:'fill_blanks'});update(next);refreshPreview(next)}
-  function useSuggestion(field){if(!preview||preview.requestVin!==normalizeVin(valuesRef.current?.vin))return;const next=applyVinSuggestions(valuesRef.current,preview.fields,{fields:[field]});update(next);refreshPreview(next)}
+  function editReviewField(field,value){
+    if(preSave){setPreview(current=>current?{...current,values:{...current.values,[field]:value}}:null);return}
+    const next={...valuesRef.current,[field]:value};update(next);refreshPreview(next)
+  }
+  function fillBlanks(){
+    if(!preview||preview.requestVin!==normalizeVin(valuesRef.current?.vin))return
+    if(preSave){setPreview(current=>current?{...current,values:applyVinSuggestions(current.values,current.fields,{mode:'fill_blanks'})}:null);return}
+    const next=applyVinSuggestions(valuesRef.current,preview.fields,{mode:'fill_blanks'});update(next);refreshPreview(next)
+  }
+  function useSuggestion(field){
+    if(!preview||preview.requestVin!==normalizeVin(valuesRef.current?.vin))return
+    if(preSave){setPreview(current=>current?{...current,values:{...current.values,[field]:current.fields[field]?.suggestion}}:null);return}
+    const next=applyVinSuggestions(valuesRef.current,preview.fields,{fields:[field]});update(next);refreshPreview(next)
+  }
+  function applyPreSaveReview(){
+    if(!preSave||!preview||preview.requestVin!==normalizeVin(valuesRef.current?.vin))return
+    const reviewed={}
+    for(const [field,detail] of Object.entries(preview.fields)){
+      const isVisibleReviewField=detail?.suggestion!=null||ALWAYS_EDITABLE.includes(field)
+      if(isVisibleReviewField&&Object.hasOwn(preview.values||{},field))reviewed[field]=preview.values[field]
+    }
+    const next={...valuesRef.current,...reviewed,vin:preview.requestVin}
+    update(next)
+    setMessage('Reviewed values applied to this draft. They are not saved until you select Add item.')
+    refreshPreview(next)
+  }
 
   async function decode(){
     if(!vinState.canDecode){setMessage(vinState.reason||'Enter a standard 17-character VIN, or continue with manual entry.');return}
@@ -51,7 +74,9 @@ export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIde
     try{
       const {data,error:authError}=await supabase.auth.getSession();const token=data?.session?.access_token
       if(authError||!token)throw new Error('Please sign in again.')
-      const response=await fetch('/api/decode-vin',{method:'POST',signal:request.controller.signal,headers:{'Content-Type':'application/json',Authorization:['Bearer',token].join(' ')},body:JSON.stringify({vin:request.normalizedVin,subjectType:'my_stuff_item',subjectId:itemId})})
+      const decodeBody={vin:request.normalizedVin,subjectType:'my_stuff_item'}
+      if(!preSave)decodeBody.subjectId=itemId
+      const response=await fetch('/api/decode-vin',{method:'POST',signal:request.controller.signal,headers:{'Content-Type':'application/json',Authorization:['Bearer',token].join(' ')},body:JSON.stringify(decodeBody)})
       const payload=await response.json().catch(()=>({}))
       if(!gate.current.isCurrent(request,valuesRef.current?.vin))return
       if(!response.ok)throw new Error(payload.error||'VIN decoding failed.')
@@ -96,8 +121,8 @@ export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIde
       {!!message&&<p className="mystuff-tool-message" role="status">{message}</p>}
       {warnings.map(warning=><p className="mystuff-tool-warning" key={warning.code}>NHTSA warning: {warning.message}</p>)}
       {preview&&<div className="mystuff-tool-review"><h3>Unconfirmed editable review for {maskVin(preview.requestVin)}</h3>{entries.length===0?<p>No additional vehicle details were returned.</p>:entries.map(([field,detail])=><div className="mystuff-vin-suggestion" key={field}><div><label htmlFor={`vin-review-${field}`}>{fieldLabels[field]||FIELD_LABELS[field]||field}</label><input id={`vin-review-${field}`} value={String(preview.values?.[field]??detail.suggestion??'')} onChange={event=>editReviewField(field,event.target.value)}/>{detail.status==='conflicting'&&<small className="mystuff-tool-error">Decoder: {String(detail.suggestion)} · Unconfirmed</small>}{detail.status==='suggested'&&<small>NHTSA suggestion · Unconfirmed</small>}{detail.status==='verified'&&<small className="mystuff-tool-ok">Verified match with current value</small>}{detail.status==='manual'&&<small>Not returned by NHTSA · enter and verify manually</small>}</div>{detail.status==='conflicting'&&<button type="button" className="mystuff-link" onClick={()=>useSuggestion(field)}>Use suggestion</button>}</div>)}
-        {entries.some(([,detail])=>detail.status==='suggested')&&<button type="button" className="btn" onClick={fillBlanks}>Fill blank fields</button>}
-        <button type="button" className="btn btn-primary" disabled={blocked} onClick={confirmVehicle}>{confirming?'Confirming…':confirmed?'Vehicle Confirmed':'Confirm Vehicle'}</button>
+        {!preSave&&entries.some(([,detail])=>detail.status==='suggested')&&<button type="button" className="btn" onClick={fillBlanks}>Fill blank fields</button>}
+        {preSave ? <><button type="button" className="btn btn-primary" disabled={blocked} onClick={applyPreSaveReview}>Apply reviewed values</button><p className="mystuff-tool-muted">Applying updates this form only. Nothing is saved until you select Add item.</p></> : <button type="button" className="btn btn-primary" disabled={blocked} onClick={confirmVehicle}>{confirming?'Confirming…':confirmed?'Vehicle Confirmed':'Confirm Vehicle'}</button>}
       </div>}
     </div>}
   </section>
