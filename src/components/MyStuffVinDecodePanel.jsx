@@ -89,7 +89,7 @@ export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIde
   return <section className="mystuff-tool" aria-labelledby={`vin-decoder-${itemId||'new'}`}>
     <button type="button" className="mystuff-tool-toggle" onClick={()=>setExpanded(value=>!value)} aria-expanded={expanded}><span id={`vin-decoder-${itemId||'new'}`}>VIN Decoder <small>BASIC</small></span><span aria-hidden="true">{expanded?'⌃':'⌄'}</span></button>
     {expanded&&<div className="mystuff-tool-body">
-      <p>Basic NHTSA decode is available to signed-in Free and Pro accounts. Decoded values are an unconfirmed editable review and never save automatically.</p>
+      <p>Basic decode is available to signed-in Free and Pro accounts. To decode vehicle details, your full VIN is sent to NHTSA. Decoded values are an unconfirmed editable review and never save automatically.</p>
       <label htmlFor={`mystuff-vin-${itemId||'new'}`}>VIN / identifier</label><input id={`mystuff-vin-${itemId||'new'}`} value={values?.vin||''} onChange={event=>editVin(event.target.value)} maxLength="64" autoCapitalize="characters" autoCorrect="off" placeholder="17-character VIN or manual identifier"/>
       {!!values?.vin&&!vinState.canDecode&&<p className="mystuff-tool-muted">{vinState.reason}</p>}
       <button type="button" className="btn btn-secondary" disabled={blocked||!vinState.canDecode} onClick={decode}>{decoding?'Decoding…':'Decode VIN'}</button>

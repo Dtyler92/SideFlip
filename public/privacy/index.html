@@ -40,6 +40,7 @@
     <p>Usage analytics may use a generated device or session identifier and your SideFlip account ID after sign-in. For verified web subscription payments, analytics may include the subscription plan, status, amount, and currency. They never include project titles or descriptions, listing text, photos, project purchase or sale prices, expense amounts, card details, credentials, or signed purchase data. Session replay and advertising tracking are disabled.</p>
     <p>When you request a generated listing description, SideFlip sends the project details needed for that request—including your seller brief, relevant project notes, existing listing description, and relevant work, parts, and expense descriptions—to xAI to generate the draft. Do not include information you do not want processed for listing generation. Generated drafts remain editable and should be reviewed before use.</p>
     <p>When you start manufacturer maintenance research, SideFlip sends only the vehicle or item type and available confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market details to xAI so Grok can search approved manufacturer or authorized-dealer sources. SideFlip does not send the VIN, serial number, notes, location, costs, or expenses for this research. You must review cited source links and select suggestions before anything is added to a maintenance schedule.</p>
+    <p>When you choose Decode VIN, SideFlip sends your full VIN to the U.S. Department of Transportation’s National Highway Traffic Safety Administration (NHTSA) vPIC service solely to decode vehicle details. SideFlip’s VIN decode service does not store or log the full VIN. SideFlip may cache the decoded vehicle fields and NHTSA warning codes for up to 30 days under an HMAC-derived lookup key instead of the full VIN. VIN-request rate-limit records contain an account ID, request count, and timestamps—not the VIN—and are eligible for cleanup after seven days without an update. NHTSA processes the request under its own policies; SideFlip does not control or promise NHTSA’s retention period.</p>
 
     <h2>How we use it</h2>
     <ul>
@@ -56,6 +57,7 @@
       <li><strong>Stripe</strong> — processes subscription payments (<a href="https://stripe.com/privacy" target="_blank">privacy policy</a>)</li>
       <li><strong>Resend</strong> — delivers transactional emails (<a href="https://resend.com/privacy" target="_blank">privacy policy</a>)</li>
       <li><strong>xAI</strong> — provides user-requested listing-description generation and manufacturer maintenance research (<a href="https://x.ai/legal/privacy-policy" target="_blank">privacy policy</a>)</li>
+      <li><strong>National Highway Traffic Safety Administration (NHTSA)</strong> — provides user-requested full-VIN decoding through vPIC (<a href="https://www.transportation.gov/dot-website-privacy-policy" target="_blank">U.S. Department of Transportation privacy policy</a>)</li>
       <li><strong>PostHog</strong> — measures product usage, conversion, and retention with session replay disabled (<a href="https://posthog.com/privacy" target="_blank">privacy policy</a>)</li>
     </ul>
     <p>Each of these services has their own privacy policy. We only share the minimum data needed for them to do their job.</p>
@@ -64,7 +66,7 @@
     <p>Photos you add to projects and receipts are stored in Supabase Storage. SideFlip serves these images through public, non-expiring URLs. The URLs are designed to be unguessable, but they are not access-controlled; anyone who has or obtains an image URL can view the image without signing in. We do not use your photos for advertising or sell them.</p>
 
     <h2>Data retention</h2>
-    <p>Your account data is kept as long as your account is active. Product analytics events are automatically deleted after 12 months. If you delete your account, your account data is permanently removed within 30 days. You can request deletion at any time by emailing us.</p>
+    <p>Your account data is kept as long as your account is active. Product analytics events are automatically deleted after 12 months. VIN decode cache entries expire after 30 days; the cache contains decoded fields, NHTSA warning codes, and an HMAC-derived lookup key, not the full VIN. VIN-request rate-limit records are eligible for cleanup after seven days without an update. If you delete your account, your account data is permanently removed within 30 days. You can request deletion at any time by emailing us.</p>
 
     <h2>Your rights</h2>
     <p>You can disable product analytics in SideFlip Settings. You can also request a copy of your data, ask us to delete it, or ask any questions about how it's used by contacting us below. We'll respond within 5 business days. We do not sell personal information or use product analytics for cross-app advertising.</p>

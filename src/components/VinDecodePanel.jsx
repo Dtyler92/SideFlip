@@ -59,7 +59,7 @@ export default function VinDecodePanel({ values, onChange }) {
 
   return <div className="card" style={{ marginBottom: 18 }}>
     <div style={{ fontWeight: 800, marginBottom: 5 }}>VIN Decoder <span style={{ color: 'var(--green)', fontSize: 11 }}>BASIC</span></div>
-    <div style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5 }}>Decode with NHTSA or enter every vehicle field manually.</div>
+    <div style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5 }}>To decode vehicle details, your full VIN is sent to NHTSA. You can enter every vehicle field manually instead.</div>
     <button type="button" className="btn btn-secondary" disabled={decoding || !values.vin?.trim()} onClick={decode}>{decoding ? 'Decoding…' : 'Decode VIN'}</button>
     {message && <div role="status" style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>{message}</div>}
     {review && <div style={{ marginTop: 12 }}>

@@ -5,6 +5,7 @@ const TABS = [
   { path: '/my-stuff', label: 'My Stuff', emoji: '🧰' },
   { path: '/goals', label: 'Goals', emoji: '🎯' },
   { path: '/analyze', label: 'Analyze', emoji: '📈' },
+  { path: '/analytics', label: 'Analytics', emoji: '📊' },
 ]
 
 export default function BottomNav() {

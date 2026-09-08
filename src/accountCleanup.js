@@ -3,6 +3,7 @@ const SIDEFLIP_STORAGE_PREFIXES = Object.freeze([
   'sf_',
   'flipledger_',
   'ph_sideflip',
+  'sideflip:saved-analyses:',
 ])
 
 function clearOwnedKeys(storage) {

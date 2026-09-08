@@ -33,3 +33,19 @@ test('public privacy route matches the xAI listing and maintenance disclosures',
     assert.doesNotMatch(policy, /Anthropic/i)
   }
 })
+
+test('VIN decode UI and policies disclose full-VIN transmission to NHTSA and bounded handling', () => {
+  for (const panelPath of ['src/components/VinDecodePanel.jsx', 'src/components/MyStuffVinDecodePanel.jsx']) {
+    const panel = readFileSync(new URL(`../${panelPath}`, import.meta.url), 'utf8')
+    assert.match(panel, /full VIN is sent to NHTSA/i)
+    assert.ok(panel.indexOf('full VIN is sent to NHTSA') < panel.indexOf('Decode VIN'))
+  }
+  for (const policy of [privacy, publicPrivacy]) {
+    assert.match(policy, /National Highway Traffic Safety Administration \(NHTSA\)/i)
+    assert.match(policy, /full VIN/i)
+    assert.match(policy, /decode vehicle details/i)
+    assert.match(policy, /30 days/i)
+    assert.match(policy, /HMAC/i)
+    assert.match(policy, /does not store or log the full VIN/i)
+  }
+})

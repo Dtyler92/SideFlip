@@ -9,7 +9,7 @@ const source = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 
 test('PWA bottom navigation exposes the Android product-tab contract without Settings', () => {
   const nav = source('src/components/BottomNav.jsx')
-  for (const [path, label] of [['/', 'Projects'], ['/my-stuff', 'My Stuff'], ['/goals', 'Goals'], ['/analyze', 'Analyze']]) {
+  for (const [path, label] of [['/', 'Projects'], ['/my-stuff', 'My Stuff'], ['/goals', 'Goals'], ['/analyze', 'Analyze'], ['/analytics', 'Analytics']]) {
     assert.match(nav, new RegExp(`path: '${path.replace('/', '\\/')}'.*label: '${label}'`))
   }
   assert.doesNotMatch(nav, /label: 'Settings'/)
@@ -50,7 +50,7 @@ test('browser cleanup removes SideFlip-owned keys but not unrelated storage', as
     key: index => [...values.keys()][index] ?? null,
     removeItem: key => values.delete(key),
   })
-  const localValues = new Map([['flipledger_projects', 'x'], ['sideflip_analytics_x', 'x'], ['unrelated', 'keep']])
+  const localValues = new Map([['flipledger_projects', 'x'], ['sideflip_analytics_x', 'x'], ['sideflip:saved-analyses:real-user-id', 'private'], ['unrelated', 'keep']])
   const sessionValues = new Map([['sideflip_referral_v1', 'x'], ['other', 'keep']])
   await clearSideFlipBrowserData({ localStorage: storage(localValues), sessionStorage: storage(sessionValues) })
   assert.deepEqual([...localValues], [['unrelated', 'keep']])

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { captureEvent } from '../analytics'
 import { centsToAmount, parseMoneyToCents, projectCostCents } from '../projectParity'
+import { validateProjectSalePrice } from '../projectSale'
 
 export default function SellProject() {
   const { id } = useParams()
@@ -37,6 +38,8 @@ export default function SellProject() {
   async function handleSell(e) {
     e.preventDefault()
     if (!hasSalePrice) return alert('Enter a valid sale price')
+    const salePriceError = validateProjectSalePrice(project, saleCents)
+    if (salePriceError) return alert(salePriceError)
     const sale = centsToAmount(saleCents)
     if (project.goalId && disposition === 'split' && keepAmount.trim() === '') return alert('Enter the amount to keep toward the goal')
     const keepCents = disposition === 'split' ? parseMoneyToCents(keepAmount) : null

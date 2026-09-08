@@ -141,13 +141,13 @@ export function createReportRequestGate() {
   let generation = 0
   let active = null
   return {
-    begin(subjectType) {
+    begin(requestKey) {
       active?.controller.abort()
-      const request = { generation: ++generation, subjectType, controller: new AbortController() }
+      const request = { generation: ++generation, requestKey, controller: new AbortController() }
       active = request
       return request
     },
-    isCurrent(request) { return active === request && request.generation === generation && !request.controller.signal.aborted },
+    isCurrent(request, requestKey = request?.requestKey) { return active === request && request.generation === generation && request.requestKey === requestKey && !request.controller.signal.aborted },
     finish(request) { if (active !== request) return false; active = null; return true },
     invalidate() { generation += 1; active?.controller.abort(); active = null },
   }

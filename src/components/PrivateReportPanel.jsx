@@ -30,7 +30,8 @@ export default function PrivateReportPanel({ subjectType, subjectId, isPro, onUp
   }, [subjectType, subjectId])
 
   function toggleOption(key) {
-    if (generating) return
+    gate.current.invalidate()
+    setGenerating(false)
     setOptions(current => ({ ...current, [key]: !current[key] }))
     setHtml('')
     setMessage('')
@@ -39,18 +40,19 @@ export default function PrivateReportPanel({ subjectType, subjectId, isPro, onUp
   async function generate() {
     if (generating) return
     if (!isPro) return onUpgrade?.()
-    const request = gate.current.begin(subjectType)
     const selectedOptions = { ...options }
+    const requestKey = JSON.stringify({ subjectType, subjectId, options: selectedOptions })
+    const request = gate.current.begin(requestKey)
     setGenerating(true)
     setHtml('')
     setMessage('')
     try {
       const payload = await client.current.load({ subjectType, subjectId, options: selectedOptions, signal: request.controller.signal })
-      if (!gate.current.isCurrent(request)) return
+      if (!gate.current.isCurrent(request, requestKey)) return
       setHtml(renderCanonicalReportHtml(payload, { generatedAt: new Date().toISOString() }))
       setMessage('Private report prepared. Review your selections before printing or downloading it.')
     } catch (error) {
-      if (!gate.current.isCurrent(request)) return
+      if (!gate.current.isCurrent(request, requestKey)) return
       if (error?.proRequired) onUpgrade?.()
       setMessage(error?.message || 'The report could not be created. Your records were not changed.')
     } finally {
@@ -86,7 +88,7 @@ export default function PrivateReportPanel({ subjectType, subjectId, isPro, onUp
       <p className="mystuff-help">Photos and documents are not included. Identifiers and detailed costs are excluded by default; turn on only what you intend to share. The authenticated report service enforces Pro access and returns canonical bounded data.</p>
       <p className="mystuff-help">The report includes its creation date. Creating, printing, or downloading it never changes this record.</p>
       {OPTION_ROWS.map(option => <label key={option.key} style={{ display: 'block', margin: '12px 0' }} title={option.detail}>
-        <input type="checkbox" checked={options[option.key]} disabled={generating} onChange={() => toggleOption(option.key)} /> {option.label}
+        <input type="checkbox" checked={options[option.key]} onChange={() => toggleOption(option.key)} /> {option.label}
         <small className="mystuff-help" style={{ display: 'block', marginLeft: 22 }}>{option.detail}</small>
       </label>)}
       <div className="mystuff-actions">
