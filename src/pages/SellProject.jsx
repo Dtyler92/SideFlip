@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getTotalInvested, fmt, parseSalePrice } from '../store'
+import { fmt } from '../store'
 import { getProject, recordProjectSale } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { captureEvent } from '../analytics'
+import { centsToAmount, parseMoneyToCents, projectCostCents } from '../projectParity'
 
 export default function SellProject() {
   const { id } = useParams()
@@ -23,21 +24,24 @@ export default function SellProject() {
 
   if (!project) return null
 
-  const totalInvested = getTotalInvested(project)
-  const parsedSalePrice = parseSalePrice(salePrice)
-  const hasSalePrice = parsedSalePrice !== null
-  const preview = hasSalePrice ? parsedSalePrice - totalInvested : null
-  const previewROI = hasSalePrice && totalInvested > 0
-    ? (((parsedSalePrice - totalInvested) / totalInvested) * 100).toFixed(1)
+  const totalInvestedCents = projectCostCents(project)
+  const totalInvested = centsToAmount(totalInvestedCents)
+  const saleCents = parseMoneyToCents(salePrice)
+  const hasSalePrice = saleCents !== null
+  const previewCents = hasSalePrice ? saleCents - totalInvestedCents : null
+  const preview = previewCents === null ? null : centsToAmount(previewCents)
+  const previewROI = hasSalePrice && totalInvestedCents > 0
+    ? ((previewCents / totalInvestedCents) * 100).toFixed(1)
     : null
 
   async function handleSell(e) {
     e.preventDefault()
     if (!hasSalePrice) return alert('Enter a valid sale price')
-    const sale = parsedSalePrice
+    const sale = centsToAmount(saleCents)
     if (project.goalId && disposition === 'split' && keepAmount.trim() === '') return alert('Enter the amount to keep toward the goal')
-    const amountKept = !project.goalId ? 0 : disposition === 'keep' ? sale : disposition === 'take' ? 0 : Number(keepAmount)
-    if (project.goalId && disposition === 'split' && (!Number.isFinite(amountKept) || amountKept < 0 || amountKept > sale)) return alert('Enter an amount between zero and the sale price')
+    const keepCents = disposition === 'split' ? parseMoneyToCents(keepAmount) : null
+    const amountKept = !project.goalId ? 0 : disposition === 'keep' ? sale : disposition === 'take' ? 0 : keepCents === null ? null : centsToAmount(keepCents)
+    if (project.goalId && disposition === 'split' && (keepCents === null || keepCents > saleCents)) return alert('Enter an amount between zero and the sale price')
     setSaving(true)
     try {
       await recordProjectSale(user.id, project, sale, amountKept)
@@ -72,7 +76,7 @@ export default function SellProject() {
           <div className="form-group">
             <label>Sale Price</label>
             <input
-              type="number" inputMode="decimal" placeholder="0.00"
+              type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
               value={salePrice} onChange={e => setSalePrice(e.target.value)}
               autoFocus
               style={{ fontSize: 32, fontWeight: 700, textAlign: 'center', padding: '20px', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}

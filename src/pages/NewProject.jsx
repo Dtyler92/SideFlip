@@ -8,6 +8,7 @@ import { uploadPhoto } from '../supabase'
 import { calculateGoalSummary, createMutationId } from '../goals'
 import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
 import { captureEvent } from '../analytics'
+import VinDecodePanel from '../components/VinDecodePanel'
 
 export default function NewProject() {
   const navigate = useNavigate()
@@ -22,7 +23,7 @@ export default function NewProject() {
     title: '', category: 'mower', purchasePrice: '', notes: '',
     modelNumber: '', serialNumber: '',
     engineModel: '', engineSerial: '',
-    vin: '', hullNumber: '',
+    vin: '', hullNumber: '', vehicleYear: '', vehicleMake: '', vehicleModel: '', transmission: '',
     goalId: searchParams.get('goal') || '', goalFundingAmount: '', mutationId: createMutationId(),
   })
 
@@ -154,6 +155,21 @@ export default function NewProject() {
                 onChange={e => set(fields.hasVin ? 'vin' : 'hullNumber', e.target.value)}
               />
             </div>
+          )}
+
+          {fields.hasVin && (
+            <>
+              <section aria-label="Unconfirmed editable review"><VinDecodePanel values={form} onChange={setForm} /></section>
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Vehicle details (manual entry)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group"><label>Year</label><input inputMode="numeric" value={form.vehicleYear} onChange={e => set('vehicleYear', e.target.value)} /></div>
+                  <div className="form-group"><label>Make</label><input value={form.vehicleMake} onChange={e => set('vehicleMake', e.target.value)} /></div>
+                  <div className="form-group"><label>Model</label><input value={form.vehicleModel} onChange={e => set('vehicleModel', e.target.value)} /></div>
+                  <div className="form-group"><label>Transmission type</label><input value={form.transmission} onChange={e => set('transmission', e.target.value)} /></div>
+                </div>
+              </div>
+            </>
           )}
 
           {fields.hasModel && (

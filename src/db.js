@@ -51,6 +51,7 @@ export async function createProject(userId, data) {
       return updateProject(userId, projectId, {
         beforePhoto: data.beforePhoto ?? null,
         afterPhoto: data.afterPhoto ?? null,
+        transmission: data.transmission || null,
       })
     }
     return getProject(userId, projectId)
@@ -92,7 +93,8 @@ export async function addExpense(userId, projectId, expense) {
       user_id: userId,
       description: expense.description,
       amount: Number(expense.amount),
-      category: expense.category || 'other'
+      category: expense.category || 'other',
+      labor_hours: Number(expense.laborHours),
     })
     .select()
     .single()
@@ -100,6 +102,16 @@ export async function addExpense(userId, projectId, expense) {
   return data
 }
 
+export async function updateExpense(userId, projectId, expenseId, expense) {
+  const { data, error } = await supabase.from('expenses').update({
+    description: expense.description,
+    amount: Number(expense.amount),
+    category: expense.category || 'other',
+    labor_hours: Number(expense.laborHours),
+  }).eq('id', expenseId).eq('project_id', projectId).eq('user_id', userId).select().single()
+  if (error) throw error
+  return data
+}
 
 export async function deleteExpense(userId, expenseId) {
   const { error } = await supabase
@@ -202,6 +214,21 @@ export async function recordProjectSale(userId, project, salePrice, keepAmount) 
     p_keep_amount: Number(keepAmount),
   })
   if (error) throw error
+}
+
+export async function undoProjectSale(projectId) {
+  const { error } = await supabase.rpc('undo_goal_project_outcome', { p_project_id: projectId })
+  if (error) throw error
+}
+
+export async function transferProjectToMyStuff(projectId, options, mutationId) {
+  const { data, error } = await supabase.rpc('transfer_project_to_my_stuff_v3', {
+    p_project_id: projectId,
+    p_options: { service_expense_ids: options?.serviceExpenseIds || [] },
+    p_mutation_id: mutationId,
+  })
+  if (error) throw error
+  return data
 }
 
 export async function recordDirectTrade(userId, outgoing, trade) {
@@ -318,6 +345,10 @@ function normalizeProject(p) {
     photos: Array.isArray(p.photos) ? p.photos : [],
     beforePhoto: p.before_photo || (p.after_photo ? null : p.photo || null),
     afterPhoto: p.after_photo || null,
+    vehicleYear: p.vehicle_year,
+    vehicleMake: p.vehicle_make,
+    vehicleModel: p.vehicle_model,
+    transmission: p.transmission,
     notes: p.notes,
     modelNumber: p.model_number,
     serialNumber: p.serial_number,
@@ -335,7 +366,8 @@ function normalizeProject(p) {
       createdAt: e.created_at,
       description: e.description,
       amount: e.amount,
-      category: e.category
+      category: e.category,
+      laborHours: e.labor_hours,
     }))
   }
 }
@@ -349,6 +381,7 @@ function toRow(userId, data) {
   if (data.salePrice !== undefined) row.sale_price = data.salePrice ? Number(data.salePrice) : null
   if (data.soldAt !== undefined) row.sold_at = data.soldAt
   if (data.photo !== undefined) row.photo = data.photo
+
   if (data.beforePhoto !== undefined) row.before_photo = data.beforePhoto
   if (data.afterPhoto !== undefined) row.after_photo = data.afterPhoto
   if (data.notes !== undefined) row.notes = data.notes
@@ -358,6 +391,10 @@ function toRow(userId, data) {
   if (data.engineSerial !== undefined) row.engine_serial = data.engineSerial
   if (data.vin !== undefined) row.vin = data.vin
   if (data.hullNumber !== undefined) row.hull_number = data.hullNumber
+  if (data.vehicleYear !== undefined) row.vehicle_year = data.vehicleYear === '' || data.vehicleYear == null ? null : Number(data.vehicleYear)
+  if (data.vehicleMake !== undefined) row.vehicle_make = data.vehicleMake || null
+  if (data.vehicleModel !== undefined) row.vehicle_model = data.vehicleModel || null
+  if (data.transmission !== undefined) row.transmission = data.transmission || null
   if (data.goalId !== undefined) row.goal_id = data.goalId || null
   if (data.goalFundingAmount !== undefined) row.goal_funding_amount = Number(data.goalFundingAmount) || 0
   if (data.outOfPocketAmount !== undefined) row.out_of_pocket_amount = Number(data.outOfPocketAmount) || 0
