@@ -1,0 +1,18 @@
+import { supabase } from '../supabase.js'
+import { createMyStuffClient, createMyStuffV3Client } from './client.js'
+const core=createMyStuffClient(supabase)
+const v3=createMyStuffV3Client(supabase)
+export const listMyStuffItemsV2=(...args)=>core.listItems(...args)
+export const getMyStuffItemV2=(...args)=>core.getItem(...args)
+export const createMyStuffItemV2=(...args)=>core.createItemV2(...args)
+export const updateMyStuffItemV2=(...args)=>core.updateItemV2(...args)
+export const setMyStuffItemArchivedV2=(...args)=>core.setArchivedV2(...args)
+export const recordMyStuffReadingV2=(...args)=>core.recordReadingV2(...args)
+export const deleteMyStuffItem=(...args)=>core.deleteItem(...args)
+export const createMyStuffExpenseV3=(...args)=>v3.createExpense(...args)
+export const reviseMyStuffExpenseV3=(...args)=>v3.reviseExpense(...args)
+export const voidMyStuffExpenseV3=(...args)=>v3.voidExpense(...args)
+export const getMyStuffExpensesV3=(...args)=>v3.getExpenses(...args)
+export const getMyStuffFinancialSummaryV3=(...args)=>v3.getFinancialSummary(...args)
+export const transferProjectToMyStuffV3=(...args)=>v3.transferProject(...args)
+export const transferMyStuffToProjectV1=(...args)=>v3.transferItemToProject(...args)
