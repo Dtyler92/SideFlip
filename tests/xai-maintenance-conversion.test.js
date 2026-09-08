@@ -213,6 +213,8 @@ test('additive conversion migration disables first, supersedes work, and gates e
   assert.match(source, /status in \('queued','running','awaiting_review','approved'\)/i)
   assert.match(source, /reservation_month[\s\S]+reserved_cents-coalesce\([^)]*actual_cents/i)
   assert.match(source, /provider_name='xai'[\s\S]+provider_model='grok-4\.6'[\s\S]+retention_policy='standard-30-days-store-false'/i)
+  assert.match(source, /add column if not exists manufacturer_aliases text\[\]/i)
+  assert.match(source, /unnest\(d\.manufacturer_aliases\)[\s\S]+request_snapshot->>'make'/i)
   assert.match(source, /per_job_budget_cents=2500[\s\S]+monthly_user_budget_cents=2500/i)
   assert.match(source, /my_stuff_research_one_global_running_idx[\s\S]+where status='running'/i)
   assert.match(source, /p_cost_ticks::numeric\/100000000/i)

@@ -48,6 +48,12 @@ alter table private.my_stuff_research_evidence
   add constraint my_stuff_research_evidence_verification_status_check
   check(verification_status in ('independently_verified','provider_citation_unconfirmed'));
 
+alter table private.my_stuff_research_source_domains
+  add column if not exists manufacturer_aliases text[] not null default '{}'::text[];
+update private.my_stuff_research_source_domains
+set manufacturer_aliases=array[manufacturer]
+where cardinality(manufacturer_aliases)=0;
+
 do $$ declare c record; begin
   for c in
     select conname from pg_constraint
@@ -264,7 +270,8 @@ begin
   if v_job.id is null then return null; end if;
   select coalesce(jsonb_agg(jsonb_build_object('domain',d.domain,'source_class',d.source_class,'include_subdomains',d.include_subdomains,'allowed_path_prefixes',d.allowed_path_prefixes,'manufacturer',d.manufacturer,'terms_reviewed_on',d.terms_reviewed_on,'robots_reviewed_on',d.robots_reviewed_on) order by d.domain),'[]'::jsonb)
     into v_domains from private.my_stuff_research_source_domains d
-    where d.enabled and d.terms_reviewed_on between current_date-365 and current_date and d.robots_reviewed_on between current_date-30 and current_date and lower(d.manufacturer)=lower(v_job.request_snapshot->>'make');
+    where d.enabled and d.terms_reviewed_on between current_date-365 and current_date and d.robots_reviewed_on between current_date-30 and current_date
+      and exists(select 1 from unnest(d.manufacturer_aliases) alias(make_name) where lower(trim(alias.make_name))=lower(v_job.request_snapshot->>'make'));
   return jsonb_build_object('lease',to_jsonb(v_job),'config',jsonb_build_object('provider_name',v_cfg.provider_name,'provider_model',v_cfg.provider_model,'retention_policy',v_cfg.retention_policy,'policy_version',v_cfg.policy_version,'max_searches',v_cfg.max_searches,'max_fetches',v_cfg.max_fetches,'provider_timeout_seconds',v_cfg.provider_timeout_seconds),'domains',v_domains);
 end $$;
 create or replace function public.settle_my_stuff_research_worker_v2(p_job_id uuid,p_lease_token text,p_cost_ticks bigint,p_evidence jsonb,p_candidates jsonb,p_unresolved jsonb)
@@ -285,7 +292,11 @@ begin
   select count(*) into v_secret_count from vault.decrypted_secrets where name in ('maintenance_research_worker_url','maintenance_research_worker_secret') and nullif(decrypted_secret,'') is not null;
   if enabled_source_domains<1 or v_secret_count<>2 or exists(
     select 1 from private.my_stuff_research_source_domains
-    where enabled and (include_subdomains is not true or allowed_path_prefixes<>array['/']::text[])
+    where enabled and (
+      include_subdomains is not true or allowed_path_prefixes<>array['/']::text[]
+      or cardinality(manufacturer_aliases)<1 or cardinality(manufacturer_aliases)>50
+      or exists(select 1 from unnest(manufacturer_aliases) alias(make_name) where nullif(trim(alias.make_name),'') is null or length(alias.make_name)>80)
+    )
   ) then raise exception 'Research source policy or Vault configuration is incomplete'; end if;
   if not exists(select 1 from private.my_stuff_research_runtime_config where singleton and enabled=false and provider_name='xai' and provider_model='grok-4.6' and retention_policy='standard-30-days-store-false' and per_job_budget_cents=2500 and monthly_user_budget_cents=2500 and global_monthly_budget_cents=2500 and max_attempts * 1250=per_job_budget_cents) then raise exception 'Research provider configuration is incomplete'; end if;
   update private.my_stuff_research_runtime_config set enabled=true,updated_at=now() where singleton;
