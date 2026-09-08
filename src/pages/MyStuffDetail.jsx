@@ -14,6 +14,7 @@ import {
   getMyStuffItemV2,
   recordMyStuffReadingV2,
   reviseMyStuffExpenseV3,
+  reviseMyStuffServiceExpenseV3,
   setMyStuffItemArchivedV2,
   transferMyStuffToProjectV1,
   updateMyStuffItemV2,
@@ -21,7 +22,7 @@ import {
 } from '../myStuff/api.js'
 import { ITEM_TYPE_OPTIONS, getItemCategoryContract, selectItemType, supportsVinDecoder, validateItemDraft } from '../myStuff/itemModel.js'
 import { buildRecordMyStuffReadingV2WirePayload, buildUpdateMyStuffItemV2WirePayload } from '../myStuff/payloads.js'
-import { buildExpenseDraft, EXPENSE_CATEGORIES, expenseRevision } from '../myStuff/v3Model.js'
+import { buildExpenseDraft, EXPENSE_CATEGORIES, expenseRevision, reviseExpenseByLinkage } from '../myStuff/v3Model.js'
 import { createMutationAttemptState, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
 import './myStuff.css'
 
@@ -57,6 +58,7 @@ export default function MyStuffDetail() {
   const [expense, setExpense] = useState(emptyExpense)
   const [editingExpenseId, setEditingExpenseId] = useState(null)
   const [revisionReason, setRevisionReason] = useState('')
+  const [detailView, setDetailView] = useState('maintenance')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -168,9 +170,18 @@ export default function MyStuffDetail() {
     const descriptor = { expenseId: editingExpenseId, draft, revisionReason }
     const mutationId = mutationIdForPayload(expenseAttempt.current, descriptor)
     if (editingExpenseId && !revisionReason.trim()) { setError('A revision reason is required.'); return }
+    const editingRow = editingExpenseId ? expenses.find(row => row.id === editingExpenseId) : null
+    if (editingExpenseId && !editingRow) { setError('The expense could not be found. Refresh and try again.'); return }
     await run(
-      () => editingExpenseId
-        ? reviseMyStuffExpenseV3(editingExpenseId, draft, revisionReason.trim(), mutationId)
+      () => editingRow
+        ? reviseExpenseByLinkage({
+            row: editingRow,
+            patch: draft,
+            reason: revisionReason.trim(),
+            mutationId,
+            reviseExpense: reviseMyStuffExpenseV3,
+            reviseServiceExpense: reviseMyStuffServiceExpenseV3,
+          })
         : createMyStuffExpenseV3(id, draft, mutationId),
       async () => {
         resetMutationAttemptState(expenseAttempt.current)
@@ -271,14 +282,18 @@ export default function MyStuffDetail() {
       <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>
       <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => navigate('/paywall')} onApplied={load}/>
     </>}
-    <MyStuffMaintenancePanel item={item} onChanged={load}/>
+    <nav className="mystuff-tabs mystuff-primary-tabs" aria-label="Item record views">
+      {['maintenance', 'expenses', 'history'].map(view => <button type="button" key={view} aria-current={detailView === view ? 'page' : undefined} onClick={() => setDetailView(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}
+    </nav>
+    {detailView === 'maintenance' && <MyStuffMaintenancePanel item={item} onChanged={load}/>}
+    {detailView === 'history' && <MyStuffMaintenancePanel item={item} onChanged={load} mode="history"/>}
     <PrivateReportPanel subjectType="my_stuff_item" subjectId={id} isPro={isPro} onUpgrade={() => navigate('/paywall')}/>
 
-    <section className="mystuff-card" aria-labelledby="financial-heading"><div className="mystuff-section-heading"><h2 id="financial-heading">Expenses</h2><span className="mystuff-help">Total invested: {money(summary?.total_invested)}</span></div>
+    {detailView === 'expenses' && <section className="mystuff-card" aria-labelledby="financial-heading"><div className="mystuff-section-heading"><h2 id="financial-heading">Expenses</h2><span className="mystuff-help">Total invested: {money(summary?.total_invested)}</span></div>
       <div className="mystuff-stat-grid"><div className="mystuff-stat"><small>Purchase</small><strong>{money(summary?.purchase_price)}</strong></div><div className="mystuff-stat"><small>Expenses</small><strong>{money(summary?.expense_total)}</strong></div><div className="mystuff-stat"><small>Maintenance & repair</small><strong>{money(summary?.maintenance_repair_subtotal)}</strong></div><div className="mystuff-stat"><small>Upgrades</small><strong>{money(summary?.upgrades_subtotal)}</strong></div></div>
       <form className="mystuff-expense-form" onSubmit={saveExpense}><h3>{editingExpenseId ? 'Revise expense' : 'Add expense'}</h3><Field label="Description *" name="description" value={expense.description} onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/><div className="mystuff-columns"><div className="form-group"><label htmlFor="expense-category">Category *</label><select id="expense-category" value={expense.category} onChange={event => setExpense(current => ({ ...current, category: event.target.value }))}>{EXPENSE_CATEGORIES.map(value => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></div><Field label="Amount *" name="amount" type="number" min="0" step="0.01" value={expense.amount} onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/></div>{expense.category === 'other' && <Field label="Custom category *" name="customCategory" value={expense.customCategory} onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/>}<div className="mystuff-columns"><Field label="Currency *" name="currency" value={expense.currency} maxLength="3" onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/><Field label="Incurred on *" name="incurredOn" type="date" value={expense.incurredOn} onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/></div><Field label="Vendor" name="vendor" value={expense.vendor} onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/><Field label="Notes" name="notes" value={expense.notes} textarea onChange={(name, value) => setExpense(current => ({ ...current, [name]: value }))}/>{editingExpenseId && <Field label="Revision reason *" name="revisionReason" value={revisionReason} onChange={(_, value) => setRevisionReason(value)}/>}<div className="mystuff-actions"><button className="btn btn-primary" disabled={saving}>{editingExpenseId ? 'Save revision' : 'Add expense'}</button>{editingExpenseId && <button type="button" className="btn" onClick={() => { setEditingExpenseId(null); setRevisionReason(''); setExpense(emptyExpense()) }}>Cancel</button>}</div></form>
       {expenses.length ? <ul className="mystuff-history">{expenses.map(row => { const value = expenseRevision(row); return <li key={row.id}><div className="mystuff-history-row"><span><strong>{value.description}</strong><small>{value.incurred_on} · {value.category}{row.voided_at ? ' · Voided' : ''}</small></span><strong>{money(value.amount)}</strong></div>{!row.voided_at && <div className="mystuff-actions"><button type="button" className="mystuff-link" onClick={() => beginExpenseEdit(row)}>Revise</button><button type="button" className="mystuff-danger-link" onClick={() => void voidExpense(row)}>Void</button></div>}</li> })}</ul> : <p className="mystuff-help">No expenses recorded yet.</p>}
-    </section>
+    </section>}
 
     <section className="mystuff-card" aria-labelledby="item-actions"><h2 id="item-actions">Item actions</h2><p className="mystuff-help">Attachments are not available in My Stuff yet.</p><div className="mystuff-actions"><button type="button" className="btn" onClick={toggleArchive} disabled={saving}>{item.archived_at ? 'Restore item' : 'Archive item'}</button>{!item.archived_at && <button type="button" className="btn" onClick={transferAndOpenProject} disabled={saving}>Move to Projects</button>}<button type="button" className="btn mystuff-danger" onClick={removeItem} disabled={saving}>Delete permanently</button></div></section>
   </main>

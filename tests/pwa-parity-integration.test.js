@@ -22,7 +22,8 @@ test('My Stuff detail reaches Android maintenance, VIN, research, reminder, and 
   const maintenance = source('src/components/MyStuffMaintenancePanel.jsx')
   assert.match(maintenance, /createDefinition/)
   assert.match(maintenance, /updateDefinition/)
-  assert.match(maintenance, /recordServiceOccurrence/)
+  assert.match(maintenance, /recordMyStuffServiceWithExpenseV3/)
+  assert.match(maintenance, /setMyStuffOccurrenceStatusV3/)
   assert.match(maintenance, /MaintenanceReminderPanel/)
 })
 

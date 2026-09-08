@@ -43,6 +43,19 @@ export function createMyStuffV3Client(database){
     voidExpense:(expenseId,reason,mutationId)=>call('void_my_stuff_expense_v3',{p_expense_id:expenseId,p_reason:reason,p_mutation_id:mutationId}),
     getExpenses:async itemId=>normalizeExpenseRows((await call('get_my_stuff_expenses_v3',{p_item_id:itemId}))||[]),
     getFinancialSummary:itemId=>call('get_my_stuff_financial_summary_v3',{p_item_id:itemId}),
+    listScheduleGroups:itemId=>call('list_my_stuff_schedule_groups_v3',{p_item_id:itemId}),
+    getDueViews:(itemId,asOf=new Date().toISOString())=>call('get_my_stuff_due_views_v3',{p_item_id:itemId,p_as_of:asOf}),
+    recordServiceWithExpense:({itemId,plannedOccurrenceId=null,definitionId=null,service,expense=null,mutationId})=>call('record_my_stuff_service_with_expense_v3',{
+      p_item_id:itemId,p_planned_occurrence_id:plannedOccurrenceId,p_definition_id:definitionId,
+      p_service:service,p_expense:expense,p_mutation_id:mutationId,
+    }),
+    reviseServiceExpense:({occurrenceId,expenseId,servicePatch,expensePatch,reason,mutationId})=>call('revise_my_stuff_service_expense_v3',{
+      p_occurrence_id:occurrenceId,p_expense_id:expenseId,p_service_patch:servicePatch,
+      p_expense_patch:expensePatch,p_reason:reason,p_mutation_id:mutationId,
+    }),
+    transitionOccurrenceStatus:(occurrenceId,status,reason,mutationId)=>call('transition_my_stuff_occurrence_status_v3',{
+      p_occurrence_id:occurrenceId,p_status:status,p_reason:reason,p_mutation_id:mutationId,
+    }),
     transferProject:(projectId,options,mutationId)=>call('transfer_project_to_my_stuff_v3',{p_project_id:projectId,p_options:transferOptionsPayload(options),p_mutation_id:mutationId}),
     transferItemToProject:(itemId,mutationId)=>call('transfer_my_stuff_to_project_v1',{p_item_id:itemId,p_mutation_id:mutationId}),
   }
