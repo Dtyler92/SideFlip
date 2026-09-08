@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 process.env.VITE_SUPABASE_URL ||= 'https://example.supabase.co'
 process.env.SUPABASE_SERVICE_ROLE_KEY ||= ['synthetic', 'service', 'key'].join('-')
-process.env.ANTHROPIC_API_KEY ||= ['synthetic', 'anthropic', 'key'].join('-')
+process.env.XAI_API_KEY ||= ['synthetic', 'xai', 'key'].join('-')
 
 const { createGenerateListingHandler } = await import('../api/generate-listing.js')
 
@@ -60,8 +60,8 @@ function responseRecorder() {
   }
 }
 
-function anthropicResponse(text = 'Runs and drives.\n\nNew clutch; rust is visible over the rear wheel wells.', stopReason = 'end_turn') {
-  return { ok: true, status: 200, json: async () => ({ stop_reason: stopReason, content: [{ type: 'text', text }] }) }
+function grokResponse(text = 'Runs and drives.\n\nNew clutch; rust is visible over the rear wheel wells.', finishReason = 'stop') {
+  return { ok: true, status: 200, json: async () => ({ choices: [{ finish_reason: finishReason, message: { role: 'assistant', content: text } }] }) }
 }
 
 test('canonical read-mode failures fail closed before limiter, private project reads, or provider work', async () => {
@@ -82,7 +82,7 @@ test('canonical read-mode failures fail closed before limiter, private project r
         onRpc: name => rpcCalls.push(name),
         onEq: table => tableReads.push(table),
       }),
-      fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+      fetchImpl: async () => { providerCalls += 1; return grokResponse() },
     })
     const res = responseRecorder()
     await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -99,7 +99,7 @@ test('compatibility read mode preserves legacy profile Pro fallback', async () =
   let providerCalls = 0
   const handler = createGenerateListingHandler({
     client: clientFor({ stripeMode: 'compatibility', entitlements: [] }),
-    fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+    fetchImpl: async () => { providerCalls += 1; return grokResponse() },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -122,7 +122,7 @@ test('deletion tombstones and lookup errors stop listing work before entitlement
         onRead: table => tableReads.push(table),
         onRpc: name => rpcCalls.push(name),
       }),
-      fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+      fetchImpl: async () => { providerCalls += 1; return grokResponse() },
     })
     const res = responseRecorder()
     await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -134,11 +134,13 @@ test('deletion tombstones and lookup errors stop listing work before entitlement
 })
 
 test('new client request loads canonical owner-scoped project facts and returns new and legacy response keys', async () => {
+  let providerUrl
+  let providerHeaders
   let providerBody
   const filters = []
   const handler = createGenerateListingHandler({
     client: clientFor({ onEq: (table, column, value) => filters.push([table, column, value]) }),
-    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return anthropicResponse() },
+    fetchImpl: async (url, options) => { providerUrl = url; providerHeaders = options.headers; providerBody = JSON.parse(options.body); return grokResponse() },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'funny', humorLevel: 'balanced', existingDescription: 'Seller draft.', sellerBrief: 'Runs well; visible rust.' }), res)
@@ -148,15 +150,19 @@ test('new client request loads canonical owner-scoped project facts and returns 
   assert.match(res.headers['Cache-Control'], /private.*no-store/)
   assert.equal(res.headers['CDN-Cache-Control'], 'no-store')
   assert.equal(res.headers.Vary, 'Authorization')
-  assert.equal(providerBody.model, 'claude-haiku-4-5-20251001')
+  assert.equal(providerUrl, 'https://api.x.ai/v1/chat/completions')
+  assert.equal(providerHeaders.Authorization, `Bearer ${process.env.XAI_API_KEY}`)
+  assert.equal(providerHeaders['x-api-key'], undefined)
+  assert.equal(providerBody.model, 'grok-4.6')
+  assert.equal(providerBody.max_completion_tokens, 650)
+  assert.equal(providerBody.reasoning_effort, 'low')
   assert.deepEqual(filters.filter(([table, column]) => ['projects', 'expenses'].includes(table) && column === 'user_id'), [
     ['projects', 'user_id', 'user-1'],
     ['expenses', 'user_id', 'user-1'],
   ])
-  assert.match(providerBody.system, /Balanced humor level/)
-  assert.match(providerBody.system, /silently identify up to five comedy hooks/i)
-  assert.match(providerBody.system, /at least three distinct comedic beats/i)
-  assert.deepEqual(JSON.parse(providerBody.messages[0].content), {
+  assert.match(providerBody.messages[0].content, /Balanced humor level/)
+  assert.match(providerBody.messages[0].content, /Use conversational humor throughout the description/i)
+  assert.deepEqual(JSON.parse(providerBody.messages[1].content), {
     title: '1998 Ford Ranger',
     category: 'Vehicles',
     sellerNotes: '5-speed. Rust over rear wheel wells.',
@@ -196,7 +202,7 @@ test('instruction-shaped seller brief fails before limiter, private reads, or pr
     let providerCalls = 0
     const handler = createGenerateListingHandler({
       client: clientFor({ onRpc:name=>rpcCalls.push(name), onRead:table=>tableReads.push(table) }),
-      fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+      fetchImpl: async () => { providerCalls += 1; return grokResponse() },
     })
     const res = responseRecorder()
     await handler(request({
@@ -234,7 +240,7 @@ test('concurrent requests lock before project reads and spend on only one provid
   let providerCalls = 0
   const handler = createGenerateListingHandler({
     client,
-    fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+    fetchImpl: async () => { providerCalls += 1; return grokResponse() },
   })
   const firstRes = responseRecorder()
   const secondRes = responseRecorder()
@@ -253,7 +259,7 @@ test('durable limiter blocks cross-instance in-flight and rate-limited requests 
     let providerCalls = 0
     const handler = createGenerateListingHandler({
       client: clientFor({ userId: `user-${claimDecision}`, claimDecision }),
-      fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+      fetchImpl: async () => { providerCalls += 1; return grokResponse() },
     })
     const res = responseRecorder()
     await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -266,7 +272,7 @@ test('durable limiter failure fails closed before provider spend', async () => {
   let providerCalls = 0
   const handler = createGenerateListingHandler({
     client: clientFor({ userId: 'user-limiter-error', claimError: { message: 'synthetic failure' } }),
-    fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+    fetchImpl: async () => { providerCalls += 1; return grokResponse() },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -279,7 +285,7 @@ test('expired or superseded lease fails closed before provider spend', async () 
   let providerCalls = 0
   const handler = createGenerateListingHandler({
     client: clientFor({ userId: 'user-stale-lease', renewAllowed: false }),
-    fetchImpl: async () => { providerCalls += 1; return anthropicResponse() },
+    fetchImpl: async () => { providerCalls += 1; return grokResponse() },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -291,7 +297,7 @@ test('missing owned project fails before provider spend', async () => {
   let calls = 0
   const handler = createGenerateListingHandler({
     client: clientFor({ userId: 'user-2', project: null }),
-    fetchImpl: async () => { calls += 1; return anthropicResponse() },
+    fetchImpl: async () => { calls += 1; return grokResponse() },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '22222222-2222-4222-8222-222222222222', style: 'normal' }), res)
@@ -303,7 +309,7 @@ test('invalid style and humor combinations fail before provider spend', async ()
   let calls = 0
   const handler = createGenerateListingHandler({
     client: clientFor({ userId: 'user-3' }),
-    fetchImpl: async () => { calls += 1; return anthropicResponse() },
+    fetchImpl: async () => { calls += 1; return grokResponse() },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal', humorLevel: 'unhinged' }), res)
@@ -315,15 +321,15 @@ test('released-client payload remains supported and bounded by centralized promp
   let providerBody
   const handler = createGenerateListingHandler({
     client: clientFor({ userId: 'user-4' }),
-    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return anthropicResponse('A clean, editable description.') },
+    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return grokResponse('A clean, editable description.') },
   })
   const res = responseRecorder()
   await handler(request({ title: 'Desk', category: 'Furniture', notes: 'Solid wood.', expenses: [{ description: 'Refinished top', amount: 999 }] }), res)
   assert.equal(res.statusCode, 200)
   assert.equal(res.body.description, 'A clean, editable description.')
   assert.equal(res.body.listing, 'Desk\n\nA clean, editable description.')
-  assert.doesNotMatch(providerBody.messages[0].content, /999|amount/)
-  assert.match(providerBody.system, /Normal style/)
+  assert.doesNotMatch(providerBody.messages[1].content, /999|amount/)
+  assert.match(providerBody.messages[0].content, /Normal style/)
 })
 
 test('listing facts omit tax, tags, registration, and gas expenses without hiding repairs', async () => {
@@ -337,13 +343,13 @@ test('listing facts omit tax, tags, registration, and gas expenses without hidin
       { description: 'Gas tank repair', category: 'parts' },
       { description: 'New clutch', category: 'parts' },
     ] }),
-    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return anthropicResponse('Runs and drives.') },
+    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return grokResponse('Runs and drives.') },
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
 
   assert.equal(res.statusCode, 200)
-  const promptFacts = JSON.parse(providerBody.messages[0].content)
+  const promptFacts = JSON.parse(providerBody.messages[1].content)
   assert.deepEqual(promptFacts.workAndParts, ['Gas tank repair', 'New clutch'])
 })
 
@@ -351,7 +357,7 @@ test('released legacy bodies apply the same administrative filter and preserve f
   let providerBody
   const handler = createGenerateListingHandler({
     client: clientFor(),
-    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return anthropicResponse('Runs and drives.') },
+    fetchImpl: async (_url, options) => { providerBody = JSON.parse(options.body); return grokResponse('Runs and drives.') },
   })
   const res = responseRecorder()
   await handler(request({
@@ -376,7 +382,7 @@ test('released legacy bodies apply the same administrative filter and preserve f
   }), res)
 
   assert.equal(res.statusCode, 200)
-  const promptFacts = JSON.parse(providerBody.messages[0].content)
+  const promptFacts = JSON.parse(providerBody.messages[1].content)
   assert.deepEqual(promptFacts.workAndParts, [
     'Gas tank repair',
     'Fuel pump replacement',
@@ -398,8 +404,10 @@ test('provider failures return a friendly generic error without leaking provider
 
 test('truncated or malformed provider output is rejected instead of returned as a successful listing', async () => {
   for (const [index, response] of [
-    anthropicResponse('Incomplete sentence', 'max_tokens'),
-    { ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [] }) },
+    grokResponse('Incomplete sentence', 'length'),
+    grokResponse('Not final.', 'tool_calls'),
+    grokResponse('Not final.', null),
+    { ok: true, status: 200, json: async () => ({ choices: [] }) },
   ].entries()) {
     const handler = createGenerateListingHandler({
       client: clientFor({ userId: `user-provider-${index}` }),
@@ -419,7 +427,7 @@ test('unsupported transaction and paperwork claims are rejected before reaching 
       userId: 'user-grounding-guard',
       onRpc: name => { if (name === 'release_ai_generation_request') releaseCalls += 1 },
     }),
-    fetchImpl: async () => anthropicResponse('Runs and drives. Tax, tags, and title are already handled.'),
+    fetchImpl: async () => grokResponse('Runs and drives. Tax, tags, and title are already handled.'),
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'funny', humorLevel: 'balanced' }), res)
@@ -436,7 +444,7 @@ test('financial provider output variants are rejected before reaching the seller
         userId: `user-financial-${releaseCalls}`,
         onRpc: name => { if (name === 'release_ai_generation_request') releaseCalls += 1 },
       }),
-      fetchImpl: async () => anthropicResponse(generated),
+      fetchImpl: async () => grokResponse(generated),
     })
     const res = responseRecorder()
     await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)
@@ -453,7 +461,7 @@ test('directly supplied transaction and paperwork facts may be repeated', async 
       userId: 'user-grounding-supported',
       project: { id: '11111111-1111-4111-8111-111111111111', title: '1998 Ford Ranger', category: 'Vehicles', notes },
     }),
-    fetchImpl: async () => anthropicResponse(notes),
+    fetchImpl: async () => grokResponse(notes),
   })
   const res = responseRecorder()
   await handler(request({ projectId: '11111111-1111-4111-8111-111111111111', style: 'normal' }), res)

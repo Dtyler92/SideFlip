@@ -5,12 +5,12 @@ export default function PrivacyPolicy() {
         <span style={{ color: '#1A1917' }}>Side</span><span style={{ color: '#C8402F' }}>Flip</span>
       </div>
       <h1 style={{ fontSize: 28, fontWeight: 700, margin: '24px 0 8px' }}>Privacy Policy</h1>
-      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: September 7, 2026</p>
+      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: September 8, 2026</p>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>1. Information We Collect</h2>
       <p>We collect information you provide when you create an account (email address and authentication credentials) and when you use the app (project names, photos, purchase prices, expenses, and sale prices). Stripe processes web subscription payments and Apple processes in-app purchases; SideFlip never stores complete payment-card details or raw Apple purchase payloads.</p>
       <p>When usage analytics are enabled, we collect pseudonymous product-interaction events such as app opens, screen and feature usage, signup and onboarding progress, paywall and plan selection, and purchase or restore outcomes. These events may include a generated device or session identifier, your SideFlip account ID after sign-in, app/platform version, and campaign parameters such as UTM source or referral code. For verified web subscription payments, analytics may include the subscription plan, status, amount, and currency. Analytics never include project titles or descriptions, listing text, photos, project purchase or sale prices, expense amounts, card details, credentials, or signed purchase data. Session replay and advertising tracking are disabled.</p>
-      <p>When you request a generated listing description, SideFlip sends the project details needed for that request—including your seller brief, relevant project notes, existing listing description, and relevant work, parts, and expense descriptions—to Anthropic to generate the draft. Do not include information you do not want processed for listing generation. Generated drafts remain editable and should be reviewed before use.</p>
+      <p>When you request a generated listing description, SideFlip sends the project details needed for that request—including your seller brief, relevant project notes, existing listing description, and relevant work, parts, and expense descriptions—to xAI to generate the draft. Do not include information you do not want processed for listing generation. Generated drafts remain editable and should be reviewed before use.</p>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>2. How We Use Your Information</h2>
       <p>We use your information to:</p>
@@ -33,7 +33,8 @@ export default function PrivacyPolicy() {
         <li><strong>Resend</strong> — transactional email (<a href="https://resend.com/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
         <li><strong>Vercel</strong> — hosting (<a href="https://vercel.com/legal/privacy-policy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
         <li><strong>PostHog</strong> — privacy-conscious product analytics with session replay disabled (<a href="https://posthog.com/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
-        <li><strong>Anthropic</strong> — user-requested listing-description generation (<a href="https://www.anthropic.com/legal/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
+        <li><strong>xAI</strong> — user-requested listing-description generation (<a href="https://x.ai/legal/privacy-policy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
+        <li><strong>Anthropic</strong> — user-requested manufacturer maintenance research (<a href="https://www.anthropic.com/legal/privacy" style={{ color: '#C8402F' }}>Privacy Policy</a>)</li>
       </ul>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>5. Data Retention</h2>

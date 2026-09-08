@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadServerEntitlementState } from './_lib/entitlements.js'
 import {
-  buildAnthropicRequest,
+  buildListingRequest,
   createListingFacts,
   normalizeGenerationOptions,
   normalizeSellerBrief,
@@ -16,8 +16,8 @@ const supabase = createClient(
 
 const IN_FLIGHT = new Set()
 const PROJECT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const GENERATION_TIMEOUT_MS = 20_000
-const LISTING_MODEL = 'claude-haiku-4-5-20251001'
+const GENERATION_TIMEOUT_MS = 30_000
+const LISTING_MODEL = 'grok-4.6'
 
 async function claimGenerationSlot(client, userId) {
   const { data, error } = await client.rpc('claim_ai_generation_request', {
@@ -151,11 +151,11 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
 
       let prompt
       try {
-        prompt = buildAnthropicRequest(facts, options)
+        prompt = buildListingRequest(facts, options)
       } catch {
         return json(res, 400, { error: 'Add some useful project details before generating a description.' })
       }
-      if (!process.env.ANTHROPIC_API_KEY) {
+      if (!process.env.XAI_API_KEY) {
         return json(res, 503, { error: "Couldn't generate a description. Try again." })
       }
       if (!await renewGenerationSlot(client, user.id, claim.claimToken)) {
@@ -165,20 +165,24 @@ export function createGenerateListingHandler({ client = supabase, fetchImpl = fe
       const controller = new AbortController()
       timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS)
       try {
-        const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
+        const response = await fetchImpl('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
           signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': process.env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01',
+            Authorization: `Bearer ${process.env.XAI_API_KEY}`,
           },
           body: JSON.stringify({
             model: LISTING_MODEL,
-            max_tokens: 650,
+            max_completion_tokens: 650,
+            reasoning_effort: 'low',
+            n: 1,
+            stream: false,
             temperature: options.style === 'professional' ? 0.5 : options.style === 'normal' ? 0.7 : 0.9,
-            system: prompt.system,
-            messages: [{ role: 'user', content: prompt.user }],
+            messages: [
+              { role: 'system', content: prompt.system },
+              { role: 'user', content: prompt.user },
+            ],
           }),
         })
         if (!response.ok) throw new Error(`provider_status_${response.status}`)

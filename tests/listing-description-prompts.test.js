@@ -6,6 +6,7 @@ import {
   normalizeGenerationOptions,
   normalizeSellerBrief,
   parseGeneratedDescription,
+  USER_HUMOR_SYSTEM_PROMPT,
   validateGeneratedDescriptionGrounding,
 } from '../api/_lib/listing-description-prompts.js'
 
@@ -201,11 +202,8 @@ test('prompt architecture composes core and one style module while treating sell
   assert.match(funny.system, /Balanced humor level/i)
   assert.match(funny.system, /conversational humor throughout/i)
   assert.match(funny.system, /obviously figurative/i)
-  assert.match(funny.system, /silently identify up to five comedy hooks/i)
-  assert.match(funny.system, /opening hook/i)
-  assert.match(funny.system, /at least three distinct comedic beats/i)
-  assert.match(funny.system, /punchlines? short/i)
-  assert.match(funny.system, /do not explain.*joke/i)
+  assert.match(funny.system, /Base every joke on a supplied fact about this exact item/i)
+  assert.match(funny.system, /instead of attaching one generic closing joke/i)
   assert.doesNotMatch(funny.system, /flyest cat|your mama/i)
 
   const normal = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'normal' })
@@ -213,34 +211,33 @@ test('prompt architecture composes core and one style module while treating sell
   assert.doesNotMatch(normal.system, /Professional style|Funny style/i)
 
   const subtle = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'subtle' })
-  assert.match(subtle.system, /two restrained.*comedic beats.*otherwise use one rather than inventing/i)
+  assert.match(subtle.system, /one or two restrained, item-specific jokes/i)
   assert.doesNotMatch(subtle.system, /Balanced humor level|Unhinged humor level/i)
 
   const unhinged = buildAnthropicRequest(createListingFacts(project, expenses), { style: 'funny', humorLevel: 'unhinged' })
-  assert.match(unhinged.system, /energetic, exaggerated, absurd humor throughout/i)
-  assert.match(unhinged.system, /punchy, surprising, and slightly chaotic/i)
-  assert.match(unhinged.system, /at least five distinct comedic beats/i)
-  assert.match(unhinged.system, /commit to the bit/i)
-  assert.match(unhinged.system, /fill-in-the-blank skit/i)
-  assert.match(unhinged.system, /Do not create random nonsense/i)
+  assert.match(unhinged.system, /Use energetic, exaggerated, absurd humor throughout/i)
+  assert.match(unhinged.system, /remaining truthful, non-offensive, and suitable for Facebook Marketplace/i)
+  assert.match(unhinged.system, /Humor should be based on the actual item and information entered by the user/i)
+  assert.match(unhinged.system, /The funny styles should still help sell the item/i)
   assert.doesNotMatch(unhinged.system, /Subtle humor level|Balanced humor level/i)
 })
 
-test('Unhinged requires a materially bolder comic structure while Subtle stays restrained', () => {
+test('the seller-authored humor prompt is preserved verbatim and level modules stay distinct', () => {
   const facts = createListingFacts(project, expenses)
   const subtle = buildAnthropicRequest(facts, { style: 'funny', humorLevel: 'subtle' }).system
+  const balanced = buildAnthropicRequest(facts, { style: 'funny', humorLevel: 'balanced' }).system
   const unhinged = buildAnthropicRequest(facts, { style: 'funny', humorLevel: 'unhinged' }).system
 
-  assert.match(subtle, /mostly practical/i)
-  assert.match(subtle, /two restrained, item-specific comedic beats/i)
-  assert.doesNotMatch(subtle, /comic arc|five distinct comedic beats|9\/10/i)
-
-  assert.match(unhinged, /unmistakable step up from Balanced/i)
-  assert.match(unhinged, /at least five distinct comedic beats/i)
-  assert.match(unhinged, /mini comic arc/i)
-  assert.match(unhinged, /opening premise.*escalation.*callback/i)
-  assert.match(unhinged, /three different comic techniques/i)
-  assert.match(unhinged, /9\/10/i)
+  assert.match(USER_HUMOR_SYSTEM_PROMPT, /^Adjust the AI description generator’s humor system\./)
+  assert.match(USER_HUMOR_SYSTEM_PROMPT, /Subtle: Write a practical sales description with one or two restrained jokes\./)
+  assert.match(USER_HUMOR_SYSTEM_PROMPT, /Balanced: Use conversational humor throughout the description/)
+  assert.match(USER_HUMOR_SYSTEM_PROMPT, /Unhinged: Use energetic, exaggerated, absurd humor throughout/)
+  assert.match(USER_HUMOR_SYSTEM_PROMPT, /Only include that statement if it came directly from a user-entered field\./)
+  for (const system of [subtle, balanced, unhinged]) assert.equal(system.includes(USER_HUMOR_SYSTEM_PROMPT), true)
+  assert.match(subtle, /one or two restrained jokes/i)
+  assert.match(balanced, /conversational humor throughout/i)
+  assert.match(unhinged, /energetic, exaggerated, absurd humor throughout/i)
+  assert.doesNotMatch(unhinged, /five distinct comedic beats|mini comic arc|9\/10/i)
 })
 
 test('Unhinged example demonstrates escalation and a grounded callback without loosening factual rules', () => {
@@ -264,7 +261,7 @@ test('all five generation modes have separate recognizable instructions and item
   const modes = [
     ['professional', null, /polished and factual/i, /180,000 miles/i],
     ['normal', null, /casual and direct/i, /180,000 miles/i],
-    ['funny', 'subtle', /two restrained.*comedic beats/i, /rear wheel wells/i],
+    ['funny', 'subtle', /one or two restrained, item-specific jokes/i, /rear wheel wells/i],
     ['funny', 'balanced', /conversational humor throughout/i, /comma is load-bearing/i],
     ['funny', 'unhinged', /energetic, exaggerated, absurd humor throughout/i, /new clutch/i],
   ]
@@ -483,9 +480,12 @@ test('instruction-shaped text is removed from stored seller fields before provid
 })
 
 test('generated descriptions reject truncated provider output and accept complete bounded plain text', () => {
-  assert.throws(() => parseGeneratedDescription({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'Incomplete sentence' }] }), /complete description/i)
-  assert.equal(parseGeneratedDescription({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Complete description.' }] }), 'Complete description.')
-  assert.equal(parseGeneratedDescription({ content: [{ type: 'text', text: '  Runs and drives.\n\nNew clutch installed.  ' }] }), 'Runs and drives.\n\nNew clutch installed.')
-  assert.throws(() => parseGeneratedDescription({ content: [] }), /valid description/i)
-  assert.throws(() => parseGeneratedDescription({ content: [{ type: 'text', text: 'x'.repeat(6001) }] }), /valid description/i)
+  assert.throws(() => parseGeneratedDescription({ choices: [{ finish_reason: 'length', message: { content: 'Incomplete sentence' } }] }), /complete description/i)
+  assert.throws(() => parseGeneratedDescription({ choices: [{ finish_reason: null, message: { content: 'Not final.' } }] }), /complete description/i)
+  assert.throws(() => parseGeneratedDescription({ choices: [{ finish_reason: 'tool_calls', message: { content: 'Not final.' } }] }), /complete description/i)
+  assert.throws(() => parseGeneratedDescription({ choices: [{ finish_reason: 'unexpected', message: { content: 'Not final.' } }] }), /complete description/i)
+  assert.equal(parseGeneratedDescription({ choices: [{ finish_reason: 'stop', message: { content: 'Complete description.' } }] }), 'Complete description.')
+  assert.equal(parseGeneratedDescription({ choices: [{ finish_reason: 'stop', message: { content: '  Runs and drives.\n\nNew clutch installed.  ' } }] }), 'Runs and drives.\n\nNew clutch installed.')
+  assert.throws(() => parseGeneratedDescription({ choices: [] }), /complete description/i)
+  assert.throws(() => parseGeneratedDescription({ choices: [{ finish_reason: 'stop', message: { content: 'x'.repeat(6001) } }] }), /valid description/i)
 })

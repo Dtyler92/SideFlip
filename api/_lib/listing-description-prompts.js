@@ -23,31 +23,43 @@ Sound like a real person writing a good Facebook Marketplace description: casual
 
 Normal example — using the same sample facts: “Selling a 1998 Ford Ranger with 180,000 miles and a 5-speed. It runs and drives, and the clutch is new. There is rust over the rear wheel wells, so please keep that in mind. It’s an older manual truck with the main details laid out honestly.” Imitate only this everyday tone; never copy sample facts that are absent from the current seller data.`
 
+export const USER_HUMOR_SYSTEM_PROMPT = `Adjust the AI description generator’s humor system. The current “Funny” descriptions are too similar to the Normal or Professional styles and merely add a clever closing sentence.
+
+Make each humor level meaningfully different:
+
+Subtle: Write a practical sales description with one or two restrained jokes.
+
+Balanced: Use conversational humor throughout the description while still communicating the item’s features, condition, repairs, and selling points clearly.
+
+Unhinged: Use energetic, exaggerated, absurd humor throughout, while remaining truthful, non-offensive, and suitable for Facebook Marketplace or similar platforms.
+
+Humor should be based on the actual item and information entered by the user--not generic jokes that could apply to anything. Do not invent features, repairs, condition, ownership history, reliability claims, or paperwork details.
+
+The funny styles should still help sell the item. Include the most important factual details, keep the description readable, and avoid jokes that make the item sound unreliable, unsafe, worthless, or suspicious.
+
+Add separate system-prompt instructions and examples for each style and humor level. Test the generator with the same item data across Professional, Normal, Funny-Subtle, Funny-Balanced, and Funny-Unhinged, and confirm that each output has a clearly recognizable tone.
+
+Also inspect why the generator stated that “tax, tags, and title are already handled.” Only include that statement if it came directly from a user-entered field. The AI must never infer or invent transaction, title, inspection, warranty, repair, or condition details.`
+
 export const FUNNY_CORE_INSTRUCTIONS = `Funny style:
-Write like the funniest real seller in a local Marketplace group—not a brand, a stand-up comic, or an AI trying to sound quirky. The listing must be genuinely entertaining while still helping a serious buyer understand the item.
-
-Before writing, silently identify up to five comedy hooks found only in the supplied facts: an age, number, shape, color, specification, repair, upgrade, disclosed flaw, mismatch, or oddly specific detail. Use only the hooks that genuinely exist; one strong hook is enough when facts are sparse. Do not print this planning. Prefer specific comic mechanisms such as deadpan understatement, misdirection, personification, escalating comparisons, an oddly precise observation, or a callback to the opening hook. Vary sentence length. Keep punchlines short, and do not explain why a joke is funny.
-
-Put an item-specific opening hook in the first sentence. Weave jokes into factual sentences instead of bolting a generic punchline onto the end. Avoid tired Marketplace filler and canned AI humor such as “has personality,” “conversation starter,” “not your average,” “at no extra charge,” “surprises belong at birthday parties,” “modern art,” “trusty companion,” “ready for its next adventure,” or “it has seen some things.” Never use a joke that would work unchanged for a completely different item.
+Write like a genuinely funny real seller in a local Marketplace group—not a brand or an AI trying to sound quirky. Base every joke on a supplied fact about this exact item. Weave humor through the useful description instead of attaching one generic closing joke. Never use a joke that would work unchanged for a completely different item.
 
 Every funny version must still clearly communicate the item's important supplied features, condition, repairs or work, defects, and practical selling points. Never sacrifice readability or factual clarity for a joke. Avoid hateful, discriminatory, threatening, sexually explicit, harassing, or extremely vulgar content. Never imply an undisclosed dangerous condition, unreliability, illegality, hidden damage, or suspicious transaction.`
 
 export const SUBTLE_HUMOR_INSTRUCTIONS = `Subtle humor level:
-Keep the listing mostly practical. Include two restrained, item-specific comedic beats when the supplied facts provide two legitimate hooks; otherwise use one rather than inventing material. Weave them into useful sentences. Use a light deadpan voice rather than hype. The first joke should arrive early; the second may be a callback. A buyer should smile without feeling trapped in a comedy routine.
+Write a practical sales description with one or two restrained, item-specific jokes. Keep the facts and selling points in the foreground. A buyer should smile without feeling trapped in a comedy routine.
 
 Subtle example — using the same sample facts: “This 1998 Ford Ranger has 180,000 miles and a 5-speed manual. The comma in that mileage has put in a full shift. It runs and drives, and the clutch is new. Rust is present over the rear wheel wells, where oxygen has won two very specific arguments. The useful details are simple: manual transmission, new clutch, and disclosed wheel-well rust.” The humor uses the supplied mileage and rust while the facts remain literal and clear. Imitate the restraint, never the sample facts or jokes.`
 
 export const BALANCED_HUMOR_INSTRUCTIONS = `Balanced humor level:
-Use conversational humor throughout while communicating all supplied features, condition, repairs, defects, and selling points clearly. Start with an item-specific opening hook and, when enough legitimate hooks exist, include at least three distinct comedic beats distributed across the description. If facts are sparse, shorten the listing instead of manufacturing comedy. Use two or more techniques—such as deadpan observation, misdirection, personification, an oddly precise comparison, or a callback—so the copy does not feel like one repeated joke. Keep the punchlines short. A factual sentence may follow a playful one when clarity needs reinforcement.
+Use conversational, item-specific humor throughout the description while still communicating the supplied features, condition, repairs, defects, and selling points clearly. If facts are sparse, shorten the listing instead of manufacturing comedy.
 
 Balanced example — using the same sample facts: “This 1998 Ford Ranger has 180,000 miles, and yes, the comma is load-bearing. It has a 5-speed manual, so your left foot is officially part of the driving experience. It runs and drives, and the clutch is new. Rust is present over the rear wheel wells—oxygen has won two very specific rounds, and nobody is appealing the score. Straight facts: 5-speed manual, new clutch, runs and drives, and disclosed wheel-well rust.” The jokes repeatedly use supplied details and remain obviously figurative. Imitate the density and rhythm, never the sample facts or jokes.`
 
 export const UNHINGED_HUMOR_INSTRUCTIONS = `Unhinged humor level:
-This must be an unmistakable step up from Balanced, not Balanced with one extra wink. Use energetic, exaggerated, absurd humor throughout. The voice should be punchy, surprising, and slightly chaotic—but controlled. Push the figurative comic intensity to 9/10, find the item's strangest truthful angle, and commit to the bit completely. Sound like a sharp seller, not cautious ad copy with jokes sprinkled on top.
+Use energetic, exaggerated, absurd humor throughout, while remaining truthful, non-offensive, readable, and suitable for Facebook Marketplace or similar platforms. Make this clearly bolder than Balanced, but do not force a rigid joke count, scripted comic arc, or generic skit. If facts are sparse, write a shorter listing rather than inventing material.
 
-When the supplied facts offer enough legitimate hooks, use at least five distinct comedic beats and three different comic techniques. Build a mini comic arc: establish an item-specific opening premise in the first sentence, escalate it across two or more different supplied facts, make at least one abrupt hard pivot or short fragment land as a punchline, then pay off a callback near the end. Favor vivid but obviously impossible figurative images, mock-serious stakes, precise personification, escalating lists, reversals, and confident overstatement. Let nearly every paragraph carry a laugh. Do not explain, apologize for, or soften a punchline. If facts are sparse, deliver one short, fearless premise with a payoff instead of padding or inventing material.
-
-Keep the literal fact adjacent to its joke so the buyer never has to decode the listing. Never turn figurative intensity into a condition, repair, safety, reliability, or transaction claim. A disclosed defect may inspire a joke, but state the defect literally and never minimize it. Do not create fake capabilities, events, history, motives, dialogue presented as real, or unsupported comparisons. Do not turn the whole listing into a fake government notice, courtroom case, job interview, royal proclamation, nature documentary, or another fill-in-the-blank skit. Do not create random nonsense, all-caps spam, a wall of exclamation marks, or jokes that make the item sound unreliable, unsafe, worthless, or suspicious. It must still sell the item and help a real buyer evaluate it.
+Keep the literal fact adjacent to its joke so the buyer never has to decode the listing. Never turn figurative intensity into a condition, repair, safety, reliability, or transaction claim. A disclosed defect may inspire a joke, but state the defect literally and never minimize it. Do not create fake capabilities, events, history, motives, or dialogue presented as real. Do not create random nonsense, all-caps spam, or jokes that make the item sound unreliable, unsafe, worthless, or suspicious. It must still help sell the item and help a real buyer evaluate it.
 
 Unhinged example — using the same sample facts: “This 1998 Ford Ranger has 180,000 miles, which means the odometer comma has been promoted to upper management. The 5-speed manual has assigned your left foot a full-time position; the new clutch is the eager new hire and somehow already has a desk. It runs and drives. That is the entire sentence. The Ranger rejected a dramatic backstory and sent everyone back to the agenda. Rust is present over the rear wheel wells, where oxygen chose two very specific hills and launched a tiny, deeply underfunded empire. Five gears. New clutch. Runs and drives. Wheel-well rust disclosed. The Ranger has reviewed the minutes, approved the comma's promotion, and adjourned the meeting.” The opening premise comes directly from the supplied mileage, the escalation moves through the supplied transmission, clutch, running status, and rust, and the callback returns to that mileage premise. Every literal fact remains explicit beside the absurd framing. Imitate this level of commitment, escalation, varied technique, and grounded callback—never the sample facts or jokes.`
 
@@ -187,18 +199,25 @@ export function createListingFacts(project = {}, expenses = [], existingDescript
   return facts
 }
 
-export function buildAnthropicRequest(facts, inputOptions) {
+export function buildListingRequest(facts, inputOptions) {
   const options = normalizeGenerationOptions(inputOptions)
   if (!facts || typeof facts !== 'object' || !Object.values(facts).some(value => Array.isArray(value) ? value.length : Boolean(value))) {
     throw new Error('No useful listing information was found.')
   }
-  const modules = [CORE_LISTING_DESCRIPTION_INSTRUCTIONS, STYLE_INSTRUCTIONS[options.style]]
-  if (options.style === 'funny') modules.push(HUMOR_INSTRUCTIONS[options.humorLevel])
+  const modules = [CORE_LISTING_DESCRIPTION_INSTRUCTIONS]
+  if (options.style === 'funny') {
+    modules.push(USER_HUMOR_SYSTEM_PROMPT, FUNNY_CORE_INSTRUCTIONS, HUMOR_INSTRUCTIONS[options.humorLevel])
+  } else {
+    modules.push(STYLE_INSTRUCTIONS[options.style])
+  }
   return {
     system: modules.join('\n\n'),
     user: JSON.stringify(facts),
   }
 }
+
+// Internal compatibility alias for existing prompt-focused callers.
+export const buildAnthropicRequest = buildListingRequest
 
 const NUMBER_WORD = '(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)'
 const NUMBER_WORD_AMOUNT = `${NUMBER_WORD}(?:[ -]+${NUMBER_WORD}){0,8}`
@@ -311,11 +330,12 @@ export function validateGeneratedDescriptionGrounding(description, facts) {
 }
 
 export function parseGeneratedDescription(payload) {
-  if (payload?.stop_reason === 'max_tokens') {
+  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : null
+  if (choice?.finish_reason !== 'stop') {
     throw new Error('The model did not return a complete description.')
   }
-  const description = Array.isArray(payload?.content)
-    ? payload.content.filter(block => block?.type === 'text' && typeof block.text === 'string').map(block => block.text.trim()).filter(Boolean).join('\n\n').trim()
+  const description = typeof choice?.message?.content === 'string'
+    ? choice.message.content.trim()
     : ''
   if (!description || description.length > 6000) throw new Error('The model did not return a valid description.')
   return description
