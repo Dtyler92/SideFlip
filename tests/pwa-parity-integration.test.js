@@ -27,6 +27,16 @@ test('My Stuff detail reaches Android maintenance, VIN, research, reminder, and 
   assert.match(maintenance, /MaintenanceReminderPanel/)
 })
 
+test('all parity upgrade actions target the registered Stripe purchase route', () => {
+  const app = source('src/App.jsx')
+  assert.match(app, /<Route path="\/upgrade"/)
+  for (const page of ['src/pages/NewProject.jsx', 'src/pages/ProjectDetail.jsx', 'src/pages/MyStuffDetail.jsx']) {
+    const code = source(page)
+    assert.doesNotMatch(code, /['"]\/paywall['"]/, `${page} must not target an unregistered purchase route`)
+    assert.match(code, /navigate\('\/upgrade'\)/)
+  }
+})
+
 test('project goal pickers exclude goals locked after a Free downgrade', () => {
   for (const page of ['src/pages/NewProject.jsx', 'src/pages/ProjectDetail.jsx']) {
     const code = source(page)

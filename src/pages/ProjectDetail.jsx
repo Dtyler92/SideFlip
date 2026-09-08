@@ -91,7 +91,7 @@ export default function ProjectDetail() {
   const selectedGoal = activeGoals.find(goal => goal.id === goalId)
   const selectedGoalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const isPro = can(profile, entitlement, 'ai_listings')
-  const upgrade = () => navigate('/paywall')
+  const upgrade = () => navigate('/upgrade')
 
   async function handleGalleryUpdate(urls) {
     const targetProjectId = id
@@ -229,7 +229,7 @@ export default function ProjectDetail() {
   return <>
     <div className="page" style={{ paddingBottom: 0 }}>
       <div className="section-title" style={{ marginTop: 0 }}>Project Photos</div>
-      <ProjectPhotoGallery userId={user.id} photos={gallery} project={project} plan={getPlan(profile, entitlement)} onUpdate={handleGalleryUpdate} onUpgrade={() => navigate('/paywall')} />
+      <ProjectPhotoGallery userId={user.id} photos={gallery} project={project} plan={getPlan(profile, entitlement)} onUpdate={handleGalleryUpdate} onUpgrade={() => navigate('/upgrade')} />
     </div>
 
     <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>

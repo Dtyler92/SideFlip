@@ -280,14 +280,14 @@ export default function MyStuffDetail() {
 
     {supportsVinDecoder(item.itemType) && <>
       <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>
-      <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => navigate('/paywall')} onApplied={load}/>
+      <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => navigate('/upgrade')} onApplied={load}/>
     </>}
     <nav className="mystuff-tabs mystuff-primary-tabs" aria-label="Item record views">
       {['maintenance', 'expenses', 'history'].map(view => <button type="button" key={view} aria-current={detailView === view ? 'page' : undefined} onClick={() => setDetailView(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}
     </nav>
     {detailView === 'maintenance' && <MyStuffMaintenancePanel item={item} onChanged={load}/>}
     {detailView === 'history' && <MyStuffMaintenancePanel item={item} onChanged={load} mode="history"/>}
-    <PrivateReportPanel subjectType="my_stuff_item" subjectId={id} isPro={isPro} onUpgrade={() => navigate('/paywall')}/>
+    <PrivateReportPanel subjectType="my_stuff_item" subjectId={id} isPro={isPro} onUpgrade={() => navigate('/upgrade')}/>
 
     {detailView === 'expenses' && <section className="mystuff-card" aria-labelledby="financial-heading"><div className="mystuff-section-heading"><h2 id="financial-heading">Expenses</h2><span className="mystuff-help">Total invested: {money(summary?.total_invested)}</span></div>
       <div className="mystuff-stat-grid"><div className="mystuff-stat"><small>Purchase</small><strong>{money(summary?.purchase_price)}</strong></div><div className="mystuff-stat"><small>Expenses</small><strong>{money(summary?.expense_total)}</strong></div><div className="mystuff-stat"><small>Maintenance & repair</small><strong>{money(summary?.maintenance_repair_subtotal)}</strong></div><div className="mystuff-stat"><small>Upgrades</small><strong>{money(summary?.upgrades_subtotal)}</strong></div></div>

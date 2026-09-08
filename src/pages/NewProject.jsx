@@ -90,7 +90,7 @@ export default function NewProject() {
           {/* Project photos */}
           <div className="form-group">
             <label>Project Photos (optional)</label>
-            <ProjectPhotoGallery userId={user.id} photos={photos} project={{ photo: photos[0] }} plan={plan} onUpdate={async next => setPhotos(next)} onUpgrade={() => navigate('/paywall')} />
+            <ProjectPhotoGallery userId={user.id} photos={photos} project={{ photo: photos[0] }} plan={plan} onUpdate={async next => setPhotos(next)} onUpgrade={() => navigate('/upgrade')} />
           </div>
 
           {/* Title */}
