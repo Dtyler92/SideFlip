@@ -14,6 +14,18 @@ test('My Stuff core pages are all reachable from authenticated routing', () => {
   assert.match(app, /\/my-stuff\/[^/]+.*my_stuff_detail/)
 })
 
+test('My Stuff detail reaches Android maintenance, VIN, research, reminder, and report workflows', () => {
+  const detail = source('src/pages/MyStuffDetail.jsx')
+  for (const hook of ['MyStuffVinDecodePanel', 'ManufacturerMaintenanceResearch', 'MyStuffMaintenancePanel', 'PrivateReportPanel']) {
+    assert.match(detail, new RegExp(hook), `${hook} must be rendered from My Stuff detail`)
+  }
+  const maintenance = source('src/components/MyStuffMaintenancePanel.jsx')
+  assert.match(maintenance, /createDefinition/)
+  assert.match(maintenance, /updateDefinition/)
+  assert.match(maintenance, /recordServiceOccurrence/)
+  assert.match(maintenance, /MaintenanceReminderPanel/)
+})
+
 test('project goal pickers exclude goals locked after a Free downgrade', () => {
   for (const page of ['src/pages/NewProject.jsx', 'src/pages/ProjectDetail.jsx']) {
     const code = source(page)

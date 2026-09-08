@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { getPlan } from '../capabilities.js'
+import MyStuffMaintenancePanel from '../components/MyStuffMaintenancePanel.jsx'
+import MyStuffVinDecodePanel from '../components/MyStuffVinDecodePanel.jsx'
+import ManufacturerMaintenanceResearch from '../components/ManufacturerMaintenanceResearch.jsx'
+import PrivateReportPanel from '../components/PrivateReportPanel.jsx'
 import {
   createMyStuffExpenseV3,
   deleteMyStuffItem,
@@ -14,7 +19,7 @@ import {
   updateMyStuffItemV2,
   voidMyStuffExpenseV3,
 } from '../myStuff/api.js'
-import { ITEM_TYPE_OPTIONS, getItemCategoryContract, selectItemType, validateItemDraft } from '../myStuff/itemModel.js'
+import { ITEM_TYPE_OPTIONS, getItemCategoryContract, selectItemType, supportsVinDecoder, validateItemDraft } from '../myStuff/itemModel.js'
 import { buildRecordMyStuffReadingV2WirePayload, buildUpdateMyStuffItemV2WirePayload } from '../myStuff/payloads.js'
 import { buildExpenseDraft, EXPENSE_CATEGORIES, expenseRevision } from '../myStuff/v3Model.js'
 import { createMutationAttemptState, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
@@ -40,7 +45,7 @@ function itemToDraft(item) {
 export default function MyStuffDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile, entitlement } = useAuth()
   const [item, setItem] = useState(null)
   const [readings, setReadings] = useState([])
   const [expenses, setExpenses] = useState([])
@@ -60,6 +65,7 @@ export default function MyStuffDetail() {
   const expenseAttempt = useRef(createMutationAttemptState())
   const archiveAttempt = useRef(createMutationAttemptState())
   const transferAttempt = useRef(createMutationAttemptState())
+  const vinPersistAttempt = useRef(createMutationAttemptState())
   const inFlight = useRef(false)
 
   const load = useCallback(async () => {
@@ -114,6 +120,15 @@ export default function MyStuffDetail() {
 
   function toggleMeasurement(axis) {
     setEdit(current => ({ ...current, measurements: current.measurements.includes(axis) ? current.measurements.filter(value => value !== axis) : [...current.measurements, axis] }))
+  }
+
+  async function persistVehicleIdentity(snapshot) {
+    const next = { ...edit, ...snapshot }
+    const wire = buildUpdateMyStuffItemV2WirePayload(next)
+    const mutationId = mutationIdForPayload(vinPersistAttempt.current, wire)
+    await updateMyStuffItemV2(wire, mutationId)
+    resetMutationAttemptState(vinPersistAttempt.current)
+    setEdit(next)
   }
 
   async function saveItem(event) {
@@ -221,6 +236,7 @@ export default function MyStuffDetail() {
 
   const allowedAxes = getItemCategoryContract(edit?.category)?.measurements || []
   const money = value => value == null ? '—' : `${item.purchase_currency || 'USD'} ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const isPro = getPlan(profile, entitlement) === 'pro'
 
   return <main className="mystuff-shell" aria-labelledby="item-heading">
     <header className="mystuff-page-header"><button className="back-btn" type="button" onClick={() => navigate('/my-stuff')} aria-label="Back to My Stuff">‹</button><div><h1 id="item-heading">{item.name}</h1><p className="mystuff-help">{item.itemType.replaceAll('_', ' ')}{item.archived_at ? ' · Archived' : ''}</p></div><button type="button" className="mystuff-link" onClick={() => void load()} disabled={saving}>Refresh</button></header>
@@ -250,6 +266,13 @@ export default function MyStuffDetail() {
         <h3>Reading history</h3>{readings.length ? <ul className="mystuff-history">{readings.map(value => <li key={value.id}><strong>{Number(value.reading_value).toLocaleString()} {value.reading_type}</strong><small>{String(value.recorded_at).slice(0, 10)} · {value.source}</small></li>)}</ul> : <p className="mystuff-help">No readings recorded yet.</p>}
       </article>
     </section>
+
+    {supportsVinDecoder(item.itemType) && <>
+      <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>
+      <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => navigate('/paywall')} onApplied={load}/>
+    </>}
+    <MyStuffMaintenancePanel item={item} onChanged={load}/>
+    <PrivateReportPanel subjectType="my_stuff_item" subjectId={id} isPro={isPro} onUpgrade={() => navigate('/paywall')}/>
 
     <section className="mystuff-card" aria-labelledby="financial-heading"><div className="mystuff-section-heading"><h2 id="financial-heading">Expenses</h2><span className="mystuff-help">Total invested: {money(summary?.total_invested)}</span></div>
       <div className="mystuff-stat-grid"><div className="mystuff-stat"><small>Purchase</small><strong>{money(summary?.purchase_price)}</strong></div><div className="mystuff-stat"><small>Expenses</small><strong>{money(summary?.expense_total)}</strong></div><div className="mystuff-stat"><small>Maintenance & repair</small><strong>{money(summary?.maintenance_repair_subtotal)}</strong></div><div className="mystuff-stat"><small>Upgrades</small><strong>{money(summary?.upgrades_subtotal)}</strong></div></div>

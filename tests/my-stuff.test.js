@@ -143,7 +143,7 @@ test('PWA pages are accessible, responsive, expose core lifecycle, and keep atta
   for(const label of ['Model year','Make','Model','Serial number','Transmission','Drivetrain','Fuel / power type','Purchase price']) assert.match(create,new RegExp(label,'i'))
   for(const symbol of ['updateMyStuffItemV2','setMyStuffItemArchivedV2','deleteMyStuffItem','recordMyStuffReadingV2','createMyStuffExpenseV3','reviseMyStuffExpenseV3','voidMyStuffExpenseV3','getMyStuffFinancialSummaryV3','transferMyStuffToProjectV1']) assert.match(detail,new RegExp(symbol))
   assert.match(detail,/Attachments are not available/)
-  assert.doesNotMatch(detail,/research|reminder|ReportPanel/i)
+  for(const feature of ['ManufacturerMaintenanceResearch','MyStuffMaintenancePanel','PrivateReportPanel']) assert.match(detail,new RegExp(feature))
   assert.doesNotMatch(create,/type="file"/)
   assert.doesNotMatch(detail,/type="file"/)
   assert.match(css,/@media\s*\(min-width:\s*700px\)/)

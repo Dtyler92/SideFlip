@@ -13,6 +13,16 @@ export function createMyStuffMaintenanceClient(database) {
   const rpc = async (name, payload) => dataOrThrow(await database.rpc(name, payload))
 
   return {
+    async listDefinitions(itemId) {
+      const result = await database
+        .from('my_stuff_maintenance_definitions')
+        .select('*')
+        .eq('item_id', itemId)
+        .eq('enabled', true)
+        .order('created_at', { ascending: true })
+      return dataOrThrow(result) || []
+    },
+
     createDefinition(wirePayload, mutationId) {
       return rpc('create_my_stuff_maintenance_definition_v2', {
         ...wirePayload,
