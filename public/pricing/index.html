@@ -16,7 +16,8 @@
     .intro { max-width: 680px; margin: 0 auto; color: #5C5850; font-size: 18px; }
     .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; margin-top: 34px; }
     .plan { background: #fff; border: 1px solid #E8E4DE; border-radius: 18px; padding: 26px; box-shadow: 0 8px 28px rgba(13,13,11,0.06); display: flex; flex-direction: column; }
-    .plan.pro { border: 2px solid #C8402F; }
+    .plan.recommended { border: 2px solid #C8402F; background: #FFF9F7; box-shadow: 0 12px 34px rgba(200,64,47,0.16); }
+    .plan.pro:not(.recommended) .button { background: #fff; color: #A93224; border: 2px solid #C8402F; padding: 11px 14px; }
     .badge { display: inline-block; align-self: flex-start; background: #FBEAE7; color: #A93224; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 800; }
     h2 { margin: 14px 0 4px; font-size: 23px; }
     .price { font-size: 38px; font-weight: 850; letter-spacing: -0.04em; margin: 8px 0 0; }
@@ -52,7 +53,7 @@
           <li>Flip calculator</li>
           <li>One active Trade-Up Goal</li>
         </ul>
-        <a class="button secondary" href="/">Create Free Account</a>
+        <a class="button secondary" href="/">Use SideFlip Free</a>
       </article>
 
       <article class="plan pro">
@@ -67,10 +68,10 @@
           <li>Category performance and best-flip insights</li>
           <li>Average selling-time and recent-sales views</li>
         </ul>
-        <a class="button" href="/upgrade?plan=monthly">Sign In to Choose Monthly</a>
+        <a class="button" href="/upgrade?plan=monthly">Choose Monthly</a>
       </article>
 
-      <article class="plan pro">
+      <article class="plan pro recommended">
         <span class="badge">BEST ANNUAL VALUE</span>
         <h2>Annual</h2>
         <div class="price">$99.99</div>
@@ -82,7 +83,7 @@
           <li>Category performance and best-flip insights</li>
           <li>Average selling-time and recent-sales views</li>
         </ul>
-        <a class="button" href="/upgrade?plan=annual">Sign In to Choose Annual</a>
+        <a class="button" href="/upgrade?plan=annual">Choose Annual</a>
       </article>
     </section>
 
