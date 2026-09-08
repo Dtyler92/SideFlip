@@ -672,15 +672,10 @@ begin
   if enabled_source_domains<1 or v_secret_count<>2 then raise exception 'Research source policy or Vault configuration is incomplete'; end if;
   if exists(select 1 from private.my_stuff_research_runtime_config where singleton and (provider_name is null or provider_model is null or retention_policy is null)) then raise exception 'Research provider configuration is incomplete'; end if;
   update private.my_stuff_research_runtime_config set enabled=true,updated_at=now() where singleton;
-  update cron.job set active=true where jobname='sideflip-maintenance-research-worker';
+  perform cron.schedule('sideflip-maintenance-research-worker','*/5 * * * *','select private.invoke_my_stuff_research_worker_v1()');
 end $$;
 
--- Installed inactive; only activate_my_stuff_research_v1 can enable it after gates pass.
-do $$ declare v_job bigint; begin
-  select jobid into v_job from cron.job where jobname='sideflip-maintenance-research-worker';
-  if v_job is null then perform cron.schedule('sideflip-maintenance-research-worker','*/5 * * * *','select private.invoke_my_stuff_research_worker_v1()'); end if;
-  update cron.job set active=false where jobname='sideflip-maintenance-research-worker';
-end $$;
+-- No Cron job is installed until the owner-only activation gate passes.
 
 -- Default function ACLs are broad. Revoke first, then expose only human RPCs.
 do $$ declare f record; begin

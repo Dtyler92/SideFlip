@@ -2,7 +2,7 @@ create function public._research_assert(ok boolean,msg text) returns void langua
 create function public._research_raises(statement text,expected text) returns void language plpgsql as $$begin begin execute statement; exception when others then if sqlerrm not like '%'||expected||'%' then raise exception 'assertion failed: expected %, got %',expected,sqlerrm; end if; return; end; raise exception 'assertion failed: statement did not raise expected error: %',expected; end$$;
 
 select public._research_assert((select enabled is false and global_monthly_budget_cents=2500 and max_searches=3 and max_fetches=2 and max_attempts=2 and daily_user_job_cap=2 and monthly_user_job_cap=10 from private.my_stuff_research_runtime_config where singleton),'research installs disabled with owner-approved limits');
-select public._research_assert((select active is false from cron.job where jobname='sideflip-maintenance-research-worker'),'research cron installs inactive');
+select public._research_assert(not exists(select 1 from cron.job where jobname='sideflip-maintenance-research-worker'),'research cron is absent until owner activation');
 select public._research_assert(not has_table_privilege('authenticated','private.my_stuff_research_jobs','select,insert,update,delete'),'research jobs are private');
 select public._research_assert(not has_table_privilege('authenticated','private.my_stuff_research_approvals','select,insert,update,delete'),'research approvals are private');
 select public._research_assert(has_function_privilege('authenticated','public.enqueue_my_stuff_research_v3(uuid,text,text)','execute'),'enqueue is authenticated');
