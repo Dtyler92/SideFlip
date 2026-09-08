@@ -26,6 +26,9 @@ export const MAX_USAGE_READING=1_000_000_000
 const key=value=>String(value||'').trim().toLowerCase().replace(/[-_]+/g,' ').replace(/\s+/g,' ')
 export function getItemTypeOption(value){return TYPE_BY_VALUE[key(value).replace(/ /g,'_')]||null}
 export function deriveItemCategory(value){return getItemTypeOption(value)?.category||'other'}
+const VIN_ITEM_TYPES=new Set(['car','truck'])
+export function supportsVinDecoder(value){return VIN_ITEM_TYPES.has(getItemTypeOption(value)?.value||'')}
+export function requiresResearchIdentityReconfirmation(previousType,nextType){return previousType!==nextType&&supportsVinDecoder(previousType)&&supportsVinDecoder(nextType)}
 export function requiresUsageAndPurchase(value){return REQUIRED_TYPES.has(getItemTypeOption(value)?.value||'')}
 export function getItemCategoryContract(value){const normalized=key(value);return CONTRACTS[normalized]||CONTRACTS[ALIASES[normalized]]||null}
 export function selectItemType(draft={},value){

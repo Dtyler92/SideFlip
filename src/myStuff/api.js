@@ -1,7 +1,9 @@
 import { supabase } from '../supabase.js'
 import { createMyStuffClient, createMyStuffV3Client } from './client.js'
+import { createMaintenanceResearchClient } from './maintenanceResearchClient.js'
 const core=createMyStuffClient(supabase)
 const v3=createMyStuffV3Client(supabase)
+const research=createMaintenanceResearchClient(supabase)
 export const listMyStuffItemsV2=(...args)=>core.listItems(...args)
 export const getMyStuffItemV2=(...args)=>core.getItem(...args)
 export const createMyStuffItemV2=(...args)=>core.createItemV2(...args)
@@ -16,3 +18,10 @@ export const getMyStuffExpensesV3=(...args)=>v3.getExpenses(...args)
 export const getMyStuffFinancialSummaryV3=(...args)=>v3.getFinancialSummary(...args)
 export const transferProjectToMyStuffV3=(...args)=>v3.transferProject(...args)
 export const transferMyStuffToProjectV1=(...args)=>v3.transferItemToProject(...args)
+export const confirmMyStuffVehicleIdentityV3=(...args)=>v3.confirmVehicleIdentity(...args)
+export const enqueueMyStuffResearch=(...args)=>research.enqueue(...args)
+export const getMyStuffResearchStatus=(...args)=>research.getStatus(...args)
+export const getMyStuffResearchReview=(...args)=>research.getReview(...args)
+export const approveMyStuffResearch=(...args)=>research.approve(...args)
+export const applyMyStuffResearch=(...args)=>research.apply(...args)
+export const cancelMyStuffResearch=(...args)=>research.cancel(...args)

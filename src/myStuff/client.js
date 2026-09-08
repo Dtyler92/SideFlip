@@ -4,6 +4,7 @@ import { normalizeExpenseRows } from './v3Model.js'
 
 function dataOrThrow(result, fallbackMessage='My Stuff request failed.'){if(result?.error){const message=result.error.message||fallbackMessage;const error=new Error(message);error.code=result.error.code;throw error}return result?.data}
 const compactObject=value=>Object.fromEntries(Object.entries(value).filter(([,entry])=>entry!==''&&entry!=null))
+const vehicleIdentityPayload=(identity={})=>compactObject({model_year:identity.year??identity.model_year,manufacturer:identity.manufacturer,make:identity.make,model:identity.model,trim:identity.trim,engine_model:identity.engineModel??identity.engine_model,engine_displacement_liters:identity.engineDisplacementLiters??identity.engine_displacement_liters,engine_cylinders:identity.engineCylinders??identity.engine_cylinders,transmission:identity.transmission,drivetrain:identity.drivetrain,fuel_power_type:identity.fuelType??identity.fuel_power_type,vehicle_type:identity.vehicleType??identity.vehicle_type,body_style:identity.bodyStyle??identity.body_style,plant_name:identity.plantName??identity.plant_name,plant_country:identity.plantCountry??identity.plant_country,vehicle_market:identity.vehicleMarket??identity.vehicle_market,vin_decoder_source:identity.vinDecoderSource??identity.vin_decoder_source,vin_decoder_version:identity.vinDecoderVersion??identity.vin_decoder_version})
 const transferOptionsPayload=(options={})=>compactObject({project_disposition:options.projectDisposition??options.project_disposition,current_mileage:options.currentMileage??options.current_mileage,current_hours:options.currentHours??options.current_hours,current_cycles:options.currentCycles??options.current_cycles,usage_dimensions:options.usageDimensions??options.usage_dimensions,service_expense_ids:options.serviceExpenseIds??options.service_expense_ids??[]})
 
 export function createMyStuffClient(database){
@@ -36,6 +37,7 @@ export function createMyStuffClient(database){
 export function createMyStuffV3Client(database){
   const call=async(name,payload)=>dataOrThrow(await database.rpc(name,payload),`Could not complete ${name}.`)
   return {
+    confirmVehicleIdentity:(itemId,identity,mutationId)=>call('confirm_my_stuff_vehicle_identity_v3',{p_item_id:itemId,p_identity:vehicleIdentityPayload(identity),p_mutation_id:mutationId}),
     createExpense:(itemId,expense,mutationId)=>call('create_my_stuff_expense_v3',{p_item_id:itemId,p_expense:expense,p_mutation_id:mutationId}),
     reviseExpense:(expenseId,patch,reason,mutationId)=>call('revise_my_stuff_expense_v3',{p_expense_id:expenseId,p_patch:patch,p_reason:reason,p_mutation_id:mutationId}),
     voidExpense:(expenseId,reason,mutationId)=>call('void_my_stuff_expense_v3',{p_expense_id:expenseId,p_reason:reason,p_mutation_id:mutationId}),
