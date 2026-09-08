@@ -28,4 +28,6 @@ python3 -c "from pathlib import Path; import sys; text=Path(sys.argv[1]).read_te
 "${PSQL[@]}" < "$ROOT/tests/sql/xai-maintenance-assertions.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260908193500_raise_maintenance_research_job_caps.sql"
 "${PSQL[@]}" < "$ROOT/tests/sql/maintenance-research-cap-increase-assertions.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260908194500_raise_global_maintenance_research_budget.sql"
+"${PSQL[@]}" < "$ROOT/tests/sql/maintenance-research-global-budget-assertions.sql"
 printf 'PostgreSQL grounded maintenance research behavior passed\n'
