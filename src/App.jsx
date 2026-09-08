@@ -21,6 +21,8 @@ const DeleteAccount = lazy(() => import('./pages/DeleteAccount'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const Paywall = lazy(() => import('./pages/Paywall'))
+const MyStuffCreate = lazy(() => import('./pages/MyStuffCreate'))
+const MyStuffDetail = lazy(() => import('./pages/MyStuffDetail'))
 
 // These optional modules are deliberate replacement hooks. Adding
 // pages/MyStuff.jsx or pages/Analyze.jsx replaces the placeholder automatically.
@@ -37,6 +39,8 @@ const Analyze = optionalProductPage('./pages/Analyze.jsx', 'Analyze')
 function analyticsScreen(pathname) {
   if (/^\/project\/[^/]+\/sell$/.test(pathname)) return 'sell_project'
   if (/^\/project\/[^/]+$/.test(pathname)) return 'project_detail'
+  if (pathname === '/my-stuff/new') return 'my_stuff_create'
+  if (/^\/my-stuff\/[^/]+$/.test(pathname)) return 'my_stuff_detail'
   return ({ '/': 'home', '/new': 'new_project', '/calculator': 'calculator', '/analytics': 'analytics', '/my-stuff': 'my_stuff', '/analyze': 'analyze', '/goals': 'goals', '/settings': 'settings', '/delete-account': 'delete_account', '/upgrade': 'paywall', '/privacy': 'privacy', '/terms': 'terms' })[pathname] || 'unknown'
 }
 
@@ -163,6 +167,8 @@ function AppRoutes() {
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/my-stuff" element={<MyStuff />} />
+          <Route path="/my-stuff/new" element={<MyStuffCreate />} />
+          <Route path="/my-stuff/:id" element={<MyStuffDetail />} />
           <Route path="/analyze" element={<Analyze />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/settings" element={<Settings />} />

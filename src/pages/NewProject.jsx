@@ -5,7 +5,8 @@ import { createProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { uploadPhoto } from '../supabase'
-import { calculateGoalSummary, createMutationId } from '../goals'
+import { accessibleActiveGoalsAfterProLoss, calculateGoalSummary, createMutationId } from '../goals'
+import { getPlan } from '../capabilities'
 import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
 import { captureEvent } from '../analytics'
 import VinDecodePanel from '../components/VinDecodePanel'
@@ -13,7 +14,7 @@ import VinDecodePanel from '../components/VinDecodePanel'
 export default function NewProject() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { user } = useAuth()
+  const { user, profile, entitlement } = useAuth()
   const { refresh, goals, projects } = useData()
   const [beforePhoto, setBeforePhoto] = useState(null)
   const [afterPhoto, setAfterPhoto] = useState(null)
@@ -28,7 +29,8 @@ export default function NewProject() {
   })
 
   const fields = getExtraFields(form.category)
-  const selectedGoal = goals.find(goal => goal.id === form.goalId && goal.status === 'active')
+  const activeGoals = accessibleActiveGoalsAfterProLoss(goals, getPlan(profile, entitlement))
+  const selectedGoal = activeGoals.find(goal => goal.id === form.goalId)
   const goalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -125,13 +127,13 @@ export default function NewProject() {
             />
           </div>
 
-          {goals.filter(goal => goal.status === 'active').length > 0 && (
+          {activeGoals.length > 0 && (
             <div className="card" style={{ marginBottom: 18 }}>
               <div className="form-group">
                 <label>Trade-Up Goal (optional)</label>
                 <select value={form.goalId} onChange={e => { set('goalId', e.target.value); set('goalFundingAmount', '') }}>
                   <option value="">Not part of a goal</option>
-                  {goals.filter(goal => goal.status === 'active').map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}
+                  {activeGoals.map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}
                 </select>
               </div>
               {selectedGoal && (

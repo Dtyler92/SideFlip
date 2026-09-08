@@ -17,8 +17,8 @@ import ProjectReportPanel from '../components/ProjectReportPanel'
 import { ProjectToMyStuffAction } from '../components/ProjectIntegrationActions'
 import VinDecodePanel from '../components/VinDecodePanel'
 import { captureEvent } from '../analytics'
-import { calculateGoalSummary, createMutationId } from '../goals'
-import { can } from '../capabilities'
+import { accessibleActiveGoalsAfterProLoss, calculateGoalSummary, createMutationId } from '../goals'
+import { can, getPlan } from '../capabilities'
 import {
   buildExpenseWrite, centsToAmount, parseMoneyToCents, projectCostCents,
   projectProfitCents, resolveNotesSave,
@@ -89,7 +89,7 @@ export default function ProjectDetail() {
   const partsTotal = centsToAmount((project.expenses || []).reduce((sum, item) => sum + (parseMoneyToCents(item.amount) ?? Math.round(Number(item.amount || 0) * 100)), 0))
   const profitCents = projectProfitCents(project)
   const assignedGoal = project.goalId ? goals.find(goal => goal.id === project.goalId) : null
-  const activeGoals = goals.filter(goal => goal.status === 'active')
+  const activeGoals = accessibleActiveGoalsAfterProLoss(goals, getPlan(profile, entitlement))
   const selectedGoal = activeGoals.find(goal => goal.id === goalId)
   const selectedGoalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const isPro = can(profile, entitlement, 'ai_listings')
