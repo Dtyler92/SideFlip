@@ -60,12 +60,11 @@ export function validateEvidenceRegistry(values, approvedDomains, providerProofs
   if (!Array.isArray(values) || values.length > 30 || !Array.isArray(approvedDomains) || !approvedDomains.length) fail('INVALID_EVIDENCE', 'Evidence registry is invalid')
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) fail('INVALID_EVIDENCE', 'Evidence validation time is invalid')
   const proofs = providerProofs.map(proof => {
-    if (!plainObject(proof) || !text(proof.canonicalUrl, 2048) || !text(proof.title, 500) || !text(proof.citedText, 4000) || !text(proof.retrievedAt, 40)) fail('INVALID_CITATION', 'Provider citation proof is invalid')
+    if (!plainObject(proof) || !text(proof.canonicalUrl, 2048)) fail('INVALID_CITATION', 'Provider citation proof is invalid')
     let url
     try { url = new URL(proof.canonicalUrl) } catch { fail('INVALID_CITATION', 'Provider citation URL is invalid') }
-    const retrieved = new Date(proof.retrievedAt)
-    if (!Number.isFinite(retrieved.getTime()) || retrieved.toISOString() !== proof.retrievedAt || retrieved > now || retrieved < new Date(now.getTime() - 30 * 86400000)) fail('INVALID_CITATION', 'Provider citation retrieval time is invalid')
-    return { canonicalUrl: url.href, title: proof.title, citedText: proof.citedText, retrievedAt: proof.retrievedAt }
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.port || url.href !== proof.canonicalUrl) fail('INVALID_CITATION', 'Provider citation URL is not canonical HTTPS')
+    return { canonicalUrl: url.href }
   })
   const comparable = value => value.replace(/\s+/g, ' ').trim().toLowerCase()
   const registry = new Map()
@@ -73,7 +72,8 @@ export function validateEvidenceRegistry(values, approvedDomains, providerProofs
     if (!plainObject(evidence) || !text(evidence.id, 100) || registry.has(evidence.id) ||
         !text(evidence.title, 500) || !text(evidence.canonicalUrl, 2048) || !text(evidence.exactExcerpt, 4000) ||
         !text(evidence.applicability, 1000) || !text(evidence.accessedAt, 40) ||
-        !SOURCE_CLASSES.has(evidence.sourceClass) || evidence.locationVerified !== true ||
+        !SOURCE_CLASSES.has(evidence.sourceClass) || evidence.locationVerified !== false ||
+        evidence.verificationStatus !== 'provider_citation_unconfirmed' ||
         !(text(evidence.page, 100) || text(evidence.section, 500)) ||
         INJECTION.test(`${evidence.title}\n${evidence.exactExcerpt}`)) fail('INVALID_EVIDENCE', 'Evidence is incomplete, unsafe, or unverified')
     let url
@@ -81,10 +81,7 @@ export function validateEvidenceRegistry(values, approvedDomains, providerProofs
     if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.port || url.hostname !== url.hostname.toLowerCase() || url.href !== evidence.canonicalUrl) fail('INVALID_EVIDENCE', 'Evidence URL must be canonical HTTPS')
     const approved = matchingDomain(url.hostname, approvedDomains, now)
     if (!approved || approved.sourceClass !== evidence.sourceClass || !pathAllowed(url.pathname, approved)) fail('UNAPPROVED_SOURCE', 'Evidence source is not enabled')
-    const citation = proofs.find(proof => proof.canonicalUrl === url.href
-      && comparable(proof.title) === comparable(evidence.title)
-      && proof.retrievedAt === evidence.accessedAt
-      && (comparable(proof.citedText).includes(comparable(evidence.exactExcerpt)) || comparable(evidence.exactExcerpt).includes(comparable(proof.citedText))))
+    const citation = proofs.find(proof => proof.canonicalUrl === url.href)
     if (!citation) fail('UNCITED_EVIDENCE', 'Evidence excerpt is not backed by a provider citation')
     const accessed = new Date(evidence.accessedAt)
     if (!Number.isFinite(accessed.getTime()) || accessed.toISOString() !== evidence.accessedAt || accessed > now || accessed < new Date(now.getTime() - 30 * 86400000)) fail('INVALID_EVIDENCE', 'Evidence access time is invalid')

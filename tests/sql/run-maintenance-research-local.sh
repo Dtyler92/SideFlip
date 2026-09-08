@@ -24,4 +24,6 @@ sudo -u postgres createdb "$DB"
 python3 -c "from pathlib import Path; import sys; text=Path(sys.argv[1]).read_text(); text=text.replace('create extension if not exists pgmq;','-- pgmq supplied by local stub').replace('create extension if not exists pg_cron;','-- pg_cron supplied by local stub').replace('create extension if not exists pg_net;','-- pg_net supplied by local stub'); Path(sys.argv[2]).write_text(text)" "$ROOT/supabase/migrations/20260907120000_enable_grounded_maintenance_research.sql" "$TMP_MIGRATION"
 "${PSQL[@]}" < "$TMP_MIGRATION"
 "${PSQL[@]}" < "$ROOT/tests/sql/maintenance-research-assertions.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260908120000_convert_maintenance_research_to_xai.sql"
+"${PSQL[@]}" < "$ROOT/tests/sql/xai-maintenance-assertions.sql"
 printf 'PostgreSQL grounded maintenance research behavior passed\n'

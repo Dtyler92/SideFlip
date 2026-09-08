@@ -1,7 +1,7 @@
 // @ts-nocheck -- Supabase Edge resolves Deno globals and URL imports at deploy time.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { processLeasedJob } from './worker-core.js'
-import { createAnthropicMaintenanceProvider } from './anthropic-provider.js'
+import { createXaiMaintenanceProvider } from './xai-provider.js'
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 
@@ -37,25 +37,25 @@ Deno.serve(async request => {
       auth: { autoRefreshToken: false, persistSession: false },
       global: { headers: { 'x-sideflip-worker': 'maintenance-research-v1' } },
     })
-    const anthropicApiKey = required('ANTHROPIC_API_KEY')
+    const xaiApiKey = required('XAI_API_KEY')
     const workerId = crypto.randomUUID()
-    const { data: leasedState, error: leaseError } = await supabase.rpc('lease_my_stuff_research_worker_v1', { p_worker: workerId })
+    const { data: leasedState, error: leaseError } = await supabase.rpc('lease_my_stuff_research_worker_v2', { p_worker: workerId })
     if (leaseError) throw leaseError
     if (!leasedState) return response(200, { processed: 0 })
     const lease = leasedState.lease
     const rawConfig = leasedState.config
     const rawDomains = leasedState.domains
-    if (!lease || !rawConfig || !Array.isArray(rawDomains) || !rawDomains.length || rawConfig.policy_version !== lease.policy_version || rawConfig.provider_name !== 'anthropic' || !rawConfig.provider_model || !rawConfig.retention_policy) throw Object.assign(new Error('Invalid sealed worker state'), { code: 'RESEARCH_DISABLED' })
+    if (!lease || !rawConfig || !Array.isArray(rawDomains) || !rawDomains.length || rawConfig.policy_version !== lease.policy_version || rawConfig.provider_name !== 'xai' || rawConfig.provider_model !== 'grok-4.6' || rawConfig.retention_policy !== 'standard-30-days-store-false') throw Object.assign(new Error('Invalid sealed worker state'), { code: 'RESEARCH_DISABLED' })
     const timeoutSeconds = Math.min(rawConfig.provider_timeout_seconds, 140)
-    const provider = createAnthropicMaintenanceProvider({ apiKey: anthropicApiKey, model: rawConfig.provider_model, timeoutSeconds })
+    const provider = createXaiMaintenanceProvider({ apiKey: xaiApiKey, model: rawConfig.provider_model, timeoutSeconds })
     const domains = rawDomains.map(value => ({ domain: value.domain, sourceClass: value.source_class, includeSubdomains: value.include_subdomains, allowedPathPrefixes: value.allowed_path_prefixes, manufacturer: value.manufacturer, termsReviewedOn: value.terms_reviewed_on, robotsReviewedOn: value.robots_reviewed_on }))
     const db = {
-      settle: async ({ jobId, leaseToken, costCents, evidence, candidates, unresolved }: any) => {
-        const { error } = await supabase.rpc('settle_my_stuff_research_worker_v1', { p_job_id: jobId, p_lease_token: leaseToken, p_cost_cents: costCents, p_evidence: evidence, p_candidates: candidates, p_unresolved: unresolved })
+      settle: async ({ jobId, leaseToken, costInUsdTicks, evidence, candidates, unresolved }: any) => {
+        const { error } = await supabase.rpc('settle_my_stuff_research_worker_v2', { p_job_id: jobId, p_lease_token: leaseToken, p_cost_ticks: costInUsdTicks, p_evidence: evidence, p_candidates: candidates, p_unresolved: unresolved })
         if (error) throw error
       },
-      fail: async ({ jobId, leaseToken, code, detail }: any) => {
-        const { error } = await supabase.rpc('fail_my_stuff_research_worker_v1', { p_job_id: jobId, p_lease_token: leaseToken, p_error_code: code, p_error_detail: detail })
+      fail: async ({ jobId, leaseToken, costInUsdTicks, code, detail }: any) => {
+        const { error } = await supabase.rpc('fail_my_stuff_research_worker_v2', { p_job_id: jobId, p_lease_token: leaseToken, p_cost_ticks: costInUsdTicks, p_error_code: code, p_error_detail: detail })
         if (error) throw error
       },
     }

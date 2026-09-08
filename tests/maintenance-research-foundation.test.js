@@ -114,7 +114,7 @@ test('worker SQL has lease fencing, bounded retry/DLQ, settlement, cancellation,
   assert.match(body(source, 'apply_my_stuff_research_v1'), /on conflict/i)
 })
 
-test('shared validators enforce approved exact domains, provider citations, verified locations, and conflicts', async () => {
+test('shared validators enforce approved domains, provider citations, unconfirmed locations, and conflicts', async () => {
   const { validateEvidenceRegistry, validateNormalizedCandidates, validateUnresolvedResults, sanitizeAsset } = await import(validatorsUrl)
   const now = new Date()
   const accessedAt = now.toISOString()
@@ -123,9 +123,10 @@ test('shared validators enforce approved exact domains, provider citations, veri
   const evidence = [{
     id: 'e1', title: 'Maintenance guide', canonicalUrl: 'https://manuals.honda.com/civic.pdf',
     exactExcerpt: 'Replace engine oil every 7,500 miles.', accessedAt,
-    applicability: '2020 Honda Civic', sourceClass: 'manufacturer', page: '42', locationVerified: true,
+    applicability: '2020 Honda Civic', sourceClass: 'manufacturer', page: '42', locationVerified: false,
+    verificationStatus: 'provider_citation_unconfirmed',
   }]
-  const proofs = [{canonicalUrl:'https://manuals.honda.com/civic.pdf',title:'Maintenance guide',citedText:'Replace engine oil every 7,500 miles.',retrievedAt:accessedAt}]
+  const proofs = [{canonicalUrl:'https://manuals.honda.com/civic.pdf'}]
   const approvedDomain = { domain:'honda.com',sourceClass:'manufacturer',includeSubdomains:true,allowedPathPrefixes:['/'],termsReviewedOn:reviewedOn,robotsReviewedOn:reviewedOn }
   const registry = validateEvidenceRegistry(evidence, [approvedDomain], proofs, now)
   const candidate = { name: 'Engine oil', action: 'replace', profile: 'normal', dueSemantics: 'whichever_first', intervalMiles: 7500, evidenceIds: ['e1'], uncertainty: 'low', conflict: false }
@@ -133,11 +134,12 @@ test('shared validators enforce approved exact domains, provider citations, veri
   for (const bad of [
     [{ ...evidence[0], canonicalUrl: 'https://honda.com.evil.test/x' }],
     [{ ...evidence[0], exactExcerpt: '' }],
-    [{ ...evidence[0], locationVerified: false }],
+    [{ ...evidence[0], locationVerified: true }],
+    [{ ...evidence[0], verificationStatus: 'independently_verified' }],
   ]) assert.throws(() => validateEvidenceRegistry(bad, [approvedDomain], proofs, now))
   assert.throws(() => validateEvidenceRegistry(evidence, [{...approvedDomain,allowedPathPrefixes:['/owners/']}], proofs, now), /source/i)
   assert.throws(() => validateEvidenceRegistry(evidence, [approvedDomain], [], now), /citation/i)
-  assert.throws(() => validateEvidenceRegistry(evidence, [approvedDomain], [{...proofs[0],retrievedAt:new Date(now.getTime()-86400000).toISOString()}], now), /citation/i)
+  assert.throws(() => validateEvidenceRegistry(evidence, [approvedDomain], [{canonicalUrl:'http://manuals.honda.com/civic.pdf'}], now), /citation/i)
   for (const bad of [{ ...candidate, evidenceIds: [] }, { ...candidate, conflict: true }, { ...candidate, intervalMiles: Infinity }]) {
     assert.throws(() => validateNormalizedCandidates([bad], registry))
   }
@@ -151,8 +153,8 @@ test('worker performs capped discovery then isolated normalization without leaki
   const reviewedOn = accessedAt.slice(0,10)
   const calls = []
   const provider = {
-    discover: async input => { calls.push(['discover', input]); return { evidence: [{ id: 'e1', title: 'Guide', canonicalUrl: 'https://honda.com/guide', exactExcerpt: 'Inspect every 12 months.', accessedAt, applicability: '2020 Civic', sourceClass: 'manufacturer', section: 'Maintenance', locationVerified: true }], proofs:[{canonicalUrl:'https://honda.com/guide',title:'Guide',citedText:'Inspect every 12 months.',retrievedAt:accessedAt}], usage: { costNanoDollars: 20_000_000, searches: 3, fetches: 2 } } },
-    normalize: async input => { calls.push(['normalize', input]); return { candidates: [{ name: 'Inspection', action: 'inspect', profile: 'normal', dueSemantics: 'whichever_first', intervalMonths: 12, evidenceIds: ['e1'], uncertainty: 'low', conflict: false }], unresolved:[{name:'Brake fluid',reason:'Manufacturer sources conflict.'}], usage: { costNanoDollars: 10_000_000 } } },
+    discover: async input => { calls.push(['discover', input]); return { evidence: [{ id: 'e1', title: 'Guide', canonicalUrl: 'https://honda.com/guide', exactExcerpt: 'Inspect every 12 months.', accessedAt, applicability: '2020 Civic', sourceClass: 'manufacturer', section: 'Maintenance', locationVerified: false, verificationStatus: 'provider_citation_unconfirmed' }], proofs:[{canonicalUrl:'https://honda.com/guide'}], usage: { costInUsdTicks: 20_000_000, searches: 3, fetches: 2 } } },
+    normalize: async input => { calls.push(['normalize', input]); return { candidates: [{ name: 'Inspection', action: 'inspect', profile: 'normal', dueSemantics: 'whichever_first', intervalMonths: 12, evidenceIds: ['e1'], uncertainty: 'low', conflict: false }], unresolved:[{name:'Brake fluid',reason:'Manufacturer sources conflict.'}], usage: { costInUsdTicks: 10_000_000 } } },
   }
   let settled
   const db = { settle: async value => { settled = value }, fail: async error => { throw error } }
@@ -165,7 +167,7 @@ test('worker performs capped discovery then isolated normalization without leaki
   assert.deepEqual(Object.keys(calls[1][1]).sort(), ['evidence'])
   const serializedCalls = JSON.stringify(calls)
   for (const secret of ['VIN','SERIAL','private','home','"userId":"uid"']) assert.ok(!serializedCalls.includes(secret))
-  assert.equal(settled.costCents, 3)
+  assert.equal(settled.costInUsdTicks, 30_000_000)
   assert.deepEqual(settled.unresolved,[{name:'Brake fluid',reason:'Manufacturer sources conflict.'}])
   await assert.rejects(() => processLeasedJob({ lease, config: { maxSearches: 4, maxFetches: 2 }, domains, provider, db:{...db,fail:async()=>{}} }), /disabled/i)
 })
@@ -208,7 +210,8 @@ test('Edge worker uses service-only public RPCs and its own bearer authenticatio
   const index=readFileSync(new URL('../supabase/functions/maintenance-research-worker/index.ts',import.meta.url),'utf8')
   const config=readFileSync(new URL('../supabase/config.toml',import.meta.url),'utf8')
   assert.doesNotMatch(index,/\.schema\(['"]private['"]\)/)
-  assert.match(index,/required\(['"]ANTHROPIC_API_KEY['"]\)[\s\S]+lease_my_stuff_research_worker_v1/)
+  assert.match(index,/required\(['"]XAI_API_KEY['"]\)[\s\S]+lease_my_stuff_research_worker_v2/)
+  assert.doesNotMatch(index,/ANTHROPIC_API_KEY/)
   assert.match(index,/leasedState\.lease[\s\S]+leasedState\.config[\s\S]+leasedState\.domains/)
   assert.match(config,/\[functions\.maintenance-research-worker\][\s\S]+verify_jwt\s*=\s*false/)
 })
@@ -300,8 +303,8 @@ test('validators reject canonical-source/date tricks and candidate conflicts', a
   const { validateEvidenceRegistry, validateNormalizedCandidates, validateUnresolvedResults } = await import(validatorsUrl)
   const now = new Date('2026-09-07T15:00:00.000Z')
   const domain = {domain:'honda.com',sourceClass:'manufacturer',includeSubdomains:false,allowedPathPrefixes:['/owners'],termsReviewedOn:'2026-09-07',robotsReviewedOn:'2026-09-07'}
-  const evidence = {id:'e1',title:'Guide',canonicalUrl:'https://honda.com/owners/guide',exactExcerpt:'Inspect yearly.',accessedAt:'2026-09-07T12:00:00.000Z',applicability:'2020 Civic',sourceClass:'manufacturer',section:'Schedule',locationVerified:true}
-  const proof = {canonicalUrl:evidence.canonicalUrl,title:'Guide',citedText:'Inspect yearly.',retrievedAt:evidence.accessedAt}
+  const evidence = {id:'e1',title:'Guide',canonicalUrl:'https://honda.com/owners/guide',exactExcerpt:'Inspect yearly.',accessedAt:'2026-09-07T12:00:00.000Z',applicability:'2020 Civic',sourceClass:'manufacturer',section:'Schedule',locationVerified:false,verificationStatus:'provider_citation_unconfirmed'}
+  const proof = {canonicalUrl:evidence.canonicalUrl}
   const registry=validateEvidenceRegistry([evidence],[domain],[proof],now)
   for (const bad of [
     [{...domain,domain:'https://honda.com'}],

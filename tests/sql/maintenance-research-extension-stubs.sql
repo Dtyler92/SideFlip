@@ -38,6 +38,7 @@ create function pgmq.delete(queue_name text,msg_id bigint) returns boolean langu
 
 create table cron.job(jobid bigint generated always as identity primary key,jobname text unique not null,schedule text,command text,active boolean not null default true);
 create function cron.schedule(job_name text,schedule text,command text) returns bigint language plpgsql as $$declare result bigint; begin insert into cron.job(jobname,schedule,command) values(job_name,schedule,command) returning jobid into result; return result; end$$;
+create function cron.unschedule(target_jobid bigint) returns boolean language plpgsql as $$begin delete from cron.job where jobid=target_jobid; return found; end$$;
 
 create table vault.decrypted_secrets(name text primary key,decrypted_secret text);
 create function net.http_post(url text,headers jsonb default '{}'::jsonb,body jsonb default '{}'::jsonb,timeout_milliseconds integer default 1000) returns bigint language sql as $$select 1::bigint$$;
