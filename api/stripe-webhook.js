@@ -173,7 +173,12 @@ export default async function handler(req, res) {
         const updated = await updateProfileFromSubscription(subscription, event)
         if (!updated) break
         const email = await getCustomerEmail(subscription)
-        if (event.type === 'customer.subscription.created' && email) {
+        if (
+          event.type === 'customer.subscription.created'
+          && subscription.status === 'trialing'
+          && subscription.trial_end
+          && email
+        ) {
           await sendWelcomeEmail(email, subscriptionDetails(subscription)).catch(error => console.error('Welcome email error:', error))
         }
         const cancellationJustScheduled = subscription.cancel_at_period_end === true

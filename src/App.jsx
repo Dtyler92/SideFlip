@@ -128,7 +128,7 @@ function AppRoutes() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/upgrade" element={<Paywall trialExpired={false} />} />
+        <Route path="/upgrade" element={<Paywall />} />
       </Routes>
       <BottomNav />
     </DataProvider>

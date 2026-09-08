@@ -5,7 +5,7 @@ import { captureEvent, getStoredAttribution } from '../analytics'
 import { useAuth } from '../context/AuthContext'
 import { getStoredReferral } from '../pwa'
 
-export default function Paywall({ trialExpired }) {
+export default function Paywall() {
   const { user, signOut } = useAuth()
   const [selected, setSelected] = useState('annual')
   const [loading, setLoading] = useState(false)
@@ -74,7 +74,7 @@ export default function Paywall({ trialExpired }) {
         Get full access to SideFlip
       </div>
       <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 32, textAlign: 'center', lineHeight: 1.6 }}>
-        Start your 7-day free trial. Cancel before day 7 and you won't be charged.
+        The Free plan remains available. Upgrade only when you want SideFlip Pro.
       </div>
 
       {/* Plan selector */}
@@ -170,10 +170,10 @@ export default function Paywall({ trialExpired }) {
       <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5, marginBottom: 12 }}>
         <strong style={{ color: 'var(--text)' }}>
           {selected === 'annual'
-            ? '7-day free trial, then $99.99 charged annually ($8.33/month equivalent).'
-            : '7-day free trial, then $12.99 charged monthly.'}
+            ? '$99.99 charged immediately and annually thereafter ($8.33/month equivalent).'
+            : '$12.99 charged immediately and monthly thereafter.'}
         </strong><br />
-        Renews automatically until canceled. Cancel before the trial ends to avoid being charged.
+        Renews automatically until canceled. Manage or cancel anytime through Settings.
       </div>
 
       <label style={{
@@ -187,7 +187,7 @@ export default function Paywall({ trialExpired }) {
           style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: 'var(--accent)' }}
         />
         <span>
-          I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price after my trial and at each renewal until I cancel. I can cancel anytime through Settings.
+          I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price immediately and at each renewal until I cancel. I can cancel anytime through Settings.
         </span>
       </label>
 

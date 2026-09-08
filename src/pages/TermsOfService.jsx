@@ -6,7 +6,7 @@ export default function TermsOfService() {
         <span style={{ color: '#1A1917' }}>Side</span><span style={{ color: '#C8402F' }}>Flip</span>
       </div>
       <h1 style={{ fontSize: 28, fontWeight: 700, margin: '24px 0 8px' }}>Terms of Service</h1>
-      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: August 24, 2026</p>
+      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: September 8, 2026</p>
 
       <h2 style={sectionStyle}>1. Acceptance of Terms</h2>
       <p>SideFlip is operated by Tourbillion LLC, a Pennsylvania limited liability company. By creating an account, affirmatively accepting these Terms, and using SideFlip ("the Service"), you agree to these Terms. If you do not agree, do not use the Service.</p>
@@ -18,8 +18,8 @@ export default function TermsOfService() {
       <p>You must provide a valid email address to create an account. You are responsible for maintaining the confidentiality of your password and activity under your account. You must be at least 13 years old to use the Service.</p>
 
       <h2 style={sectionStyle}>4. Subscriptions and Billing</h2>
-      <p>Subscription prices and any trial or introductory offer are shown before purchase. Availability and pricing may vary by purchase channel and region.</p>
-      <p><strong>Web subscriptions:</strong> Website purchases are processed by Stripe. The applicable price, billing period, and any web trial are shown before checkout. Web subscriptions renew automatically until canceled and are managed through SideFlip Settings and Stripe's billing portal.</p>
+      <p>Subscription prices and billing periods are shown before purchase. Availability and pricing may vary by purchase channel and region.</p>
+      <p><strong>Web subscriptions:</strong> Website purchases are processed by Stripe. SideFlip does not offer a free trial for web subscriptions. The selected subscription is charged immediately after checkout confirmation and renews automatically at the disclosed billing interval until canceled. Web subscriptions are managed through SideFlip Settings and Stripe's billing portal.</p>
       <p><strong>iPhone subscriptions:</strong> Purchases in the SideFlip iPhone app are processed by Apple and charged to your Apple ID. Apple subscriptions renew automatically unless canceled through Apple ID subscription settings before renewal. Any introductory offer is available only if Apple shows it and your Apple ID is eligible. Apple controls App Store billing, cancellation, and refund requests.</p>
       <p>Canceling a subscription prevents future renewal according to the provider's rules but does not delete your SideFlip account. Deleting a SideFlip account does not cancel an Apple or Stripe subscription. Except where required by law or provider rules, completed charges are non-refundable.</p>
 
