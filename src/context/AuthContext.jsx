@@ -147,6 +147,15 @@ export function AuthProvider({ children }) {
     }
   }, [refreshEntitlement])
 
+  useEffect(() => {
+    if (!user) return undefined
+    const expiresAt = Date.parse(entitlement?.entitlement?.expires_at || '')
+    const untilExpiry = Number.isFinite(expiresAt) ? expiresAt - Date.now() + 100 : 300_000
+    const delay = Math.max(1_000, Math.min(300_000, untilExpiry))
+    const timer = window.setTimeout(refreshEntitlement, delay)
+    return () => window.clearTimeout(timer)
+  }, [entitlement, refreshEntitlement, user])
+
   async function signOut() {
     try {
       return await supabaseSignOut()

@@ -7,6 +7,7 @@ import { calculateGoalSummary, calculateProjectLinkFunding, canCompleteGoal, cre
 import { canCreateGoal, getPlan } from '../capabilities'
 import { CATEGORIES, fmt, categoryIcon, getTotalInvested, getProfit } from '../store'
 import { captureEvent } from '../analytics'
+import UpgradePrompt from '../components/UpgradePrompt'
 
 const newGoalForm = () => ({ name: '', goalType: 'item', targetItem: '', targetAmount: '', startingAmount: '', description: '', mutationId: createMutationId() })
 const newTradeForm = () => ({
@@ -33,6 +34,7 @@ export default function Goals() {
   const [showTargetEditor, setShowTargetEditor] = useState(false)
   const [targetAmountInput, setTargetAmountInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
 
   const selectedCandidate = goals.find(goal => goal.id === selectedId)
   const selected = selectedCandidate && !isGoalLockedAfterProLoss(selectedCandidate, goals, plan) ? selectedCandidate : null
@@ -64,7 +66,7 @@ export default function Goals() {
     const goal = goals.find(candidate => candidate.id === goalId)
     if (!goal || isGoalLockedAfterProLoss(goal, goals, plan)) {
       closeSelectedGoal()
-      alert('Your plan changed. Only your oldest active Trade-Up Goal is available without SideFlip Pro.')
+      setUpgradeMessage('Your plan changed. Only your oldest active Trade-Up Goal is available without SideFlip Pro.')
       return null
     }
     return goal
@@ -72,7 +74,7 @@ export default function Goals() {
 
   async function handleCreate(event) {
     event.preventDefault()
-    if (!canCreateGoal(profile, entitlement, goals)) return alert('Free includes one active Trade-Up Goal. SideFlip Pro unlocks additional goals.')
+    if (!canCreateGoal(profile, entitlement, goals)) return setUpgradeMessage('Free includes one active Trade-Up Goal. Upgrade to SideFlip Pro to create another.')
     try { validateGoalDraft(goalForm) } catch (error) { return alert(error.message) }
     setSaving(true)
     try {
@@ -402,6 +404,7 @@ export default function Goals() {
             <div style={{ fontSize: 11, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 6 }}>SideFlip Pro</div>
             <strong>Free includes one Trade-Up Goal.</strong>
             <div style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.5, marginTop: 5 }}>Upgrade to Pro to track additional goals at the same time.</div>
+            <button type="button" className="btn btn-secondary" onClick={() => setUpgradeMessage('Upgrade to SideFlip Pro to create and manage additional Trade-Up Goals.')}>View SideFlip Pro</button>
           </div>
         )}
         {showCreate && canCreateAnotherGoal && <form onSubmit={handleCreate} className="card" style={{ marginBottom: 16 }}>
@@ -426,9 +429,10 @@ export default function Goals() {
           </>
           const cardStyle = { width: '100%', textAlign: 'left', marginBottom: 10, ...(reachedTarget ? reachedGoalCard : {}), ...(locked ? lockedGoalCard : {}) }
           return locked
-            ? <div key={goal.id} className="card" role="group" aria-disabled="true" style={cardStyle}>{content}</div>
+            ? <button type="button" key={goal.id} className="card" aria-disabled="true" onClick={() => setUpgradeMessage('This goal is safely preserved. Upgrade to SideFlip Pro to open and continue managing it.')} style={{ ...cardStyle, cursor:'pointer' }}>{content}</button>
             : <button key={goal.id} onClick={() => setSelectedId(goal.id)} className="card" style={{ ...cardStyle, border: reachedTarget ? reachedGoalCard.border : 'none', cursor: 'pointer' }}>{content}</button>
         })}
+        <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
       </div>
     </>
   )

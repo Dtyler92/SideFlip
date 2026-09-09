@@ -21,7 +21,7 @@ export default function ProjectPhotoGallery({ userId, photos = [], project = {},
   }
 
   function showLimit() {
-    if (plan === 'free' && confirm(`Free projects include ${limit} total photos. View SideFlip Pro for up to 25?`)) onUpgrade?.()
+    if (plan === 'free') onUpgrade?.()
     else if (plan === 'pro') alert(`SideFlip Pro supports up to ${limit} photos per project.`)
   }
 

@@ -36,8 +36,20 @@ function hasActiveAppleEntitlement(entitlement, now = Date.now()) {
     && expiresAt > now
 }
 
+function hasCurrentServerEnvelope(envelope, now) {
+  const row = envelope?.entitlement
+  if (row === null) return true
+  if (!row || typeof row !== 'object') return false
+  if (!['active', 'trialing', 'billing_grace', 'grace_period'].includes(row.status)) return false
+  if (row.expires_at == null) return true
+  if (typeof row.expires_at !== 'string' || !CANONICAL_UTC_TIMESTAMP.test(row.expires_at)) return false
+  const expiresAt = new Date(row.expires_at).getTime()
+  return Number.isFinite(expiresAt) && new Date(expiresAt).toISOString() === row.expires_at && expiresAt > now
+}
+
 export function getPlan(profile, entitlement, now = Date.now()) {
-  if (entitlement?.plan === 'free' || entitlement?.plan === 'pro') return entitlement.plan
+  if (entitlement?.plan === 'free') return 'free'
+  if (entitlement?.plan === 'pro') return hasCurrentServerEnvelope(entitlement, now) ? 'pro' : 'free'
   if (hasActiveLegacyStripeSubscription(profile)) return 'pro'
   if (hasActiveAppleEntitlement(entitlement, now)) return 'pro'
   return 'free'

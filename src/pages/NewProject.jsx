@@ -9,6 +9,7 @@ import { getPlan } from '../capabilities'
 import ProjectPhotoGallery from '../components/ProjectPhotoGallery'
 import { captureEvent } from '../analytics'
 import VinDecodePanel from '../components/VinDecodePanel'
+import UpgradePrompt from '../components/UpgradePrompt'
 
 export default function NewProject() {
   const navigate = useNavigate()
@@ -17,6 +18,7 @@ export default function NewProject() {
   const { refresh, goals, projects } = useData()
   const [photos, setPhotos] = useState([])
   const [saving, setSaving] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
   const [form, setForm] = useState({
     title: '', category: '', purchasePrice: '', notes: '',
     modelNumber: '', serialNumber: '',
@@ -90,7 +92,7 @@ export default function NewProject() {
           {/* Project photos */}
           <div className="form-group">
             <label>Project Photos (optional)</label>
-            <ProjectPhotoGallery userId={user.id} photos={photos} project={{ photo: photos[0] }} plan={plan} onUpdate={async next => setPhotos(next)} onUpgrade={() => navigate('/upgrade')} />
+            <ProjectPhotoGallery userId={user.id} photos={photos} project={{ photo: photos[0] }} plan={plan} onUpdate={async next => setPhotos(next)} onUpgrade={() => setUpgradeMessage('Upgrade to SideFlip Pro to add up to 25 photos to each project.')} />
           </div>
 
           {/* Title */}
@@ -225,6 +227,7 @@ export default function NewProject() {
           <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create Project →'}</button>
         </form>
       </div>
+      <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
     </>
   )
 }

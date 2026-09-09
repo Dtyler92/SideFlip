@@ -6,12 +6,14 @@ import MyStuffMaintenancePanel from '../components/MyStuffMaintenancePanel.jsx'
 import MyStuffVinDecodePanel from '../components/MyStuffVinDecodePanel.jsx'
 import ManufacturerMaintenanceResearch from '../components/ManufacturerMaintenanceResearch.jsx'
 import PrivateReportPanel from '../components/PrivateReportPanel.jsx'
+import UpgradePrompt from '../components/UpgradePrompt.jsx'
 import {
   createMyStuffExpenseV3,
   deleteMyStuffItem,
   getMyStuffExpensesV3,
   getMyStuffFinancialSummaryV3,
   getMyStuffItemV2,
+  listMyStuffItemsV2,
   recordMyStuffReadingV2,
   reviseMyStuffExpenseV3,
   reviseMyStuffServiceExpenseV3,
@@ -23,7 +25,7 @@ import {
 import { ITEM_TYPE_OPTIONS, getItemCategoryContract, selectItemType, supportsVinDecoder, validateItemDraft } from '../myStuff/itemModel.js'
 import { buildRecordMyStuffReadingV2WirePayload, buildUpdateMyStuffItemV2WirePayload } from '../myStuff/payloads.js'
 import { buildExpenseDraft, EXPENSE_CATEGORIES, expenseRevision, reviseExpenseByLinkage } from '../myStuff/v3Model.js'
-import { createMutationAttemptState, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
+import { createMutationAttemptState, isMyStuffItemLockedAfterProLoss, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
 import './myStuff.css'
 
 const AXES = [['miles', 'Miles'], ['hours', 'Hours'], ['cycles', 'Cycles']]
@@ -62,6 +64,9 @@ export default function MyStuffDetail() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [locked, setLocked] = useState(false)
+  const [accessPlan, setAccessPlan] = useState(null)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
   const itemAttempt = useRef(createMutationAttemptState())
   const readingAttempt = useRef(createMutationAttemptState())
   const expenseAttempt = useRef(createMutationAttemptState())
@@ -69,11 +74,27 @@ export default function MyStuffDetail() {
   const transferAttempt = useRef(createMutationAttemptState())
   const vinPersistAttempt = useRef(createMutationAttemptState())
   const inFlight = useRef(false)
+  const plan = getPlan(profile, entitlement)
 
   const load = useCallback(async () => {
     if (!user?.id || !id) return
+    setLoading(true)
+    setAccessPlan(null)
     setError('')
     try {
+      const allItems = await listMyStuffItemsV2(user.id, { includeArchived:true, excludeTransferred:true })
+      const listedItem = allItems.find(candidate => candidate.id === id)
+      if (listedItem && isMyStuffItemLockedAfterProLoss(listedItem, allItems, plan)) {
+        setItem(listedItem)
+        setEdit(null)
+        setReadings([])
+        setExpenses([])
+        setSummary(null)
+        setLocked(true)
+        setAccessPlan(plan)
+        return
+      }
+      setLocked(false)
       const [core, expenseRows, financial] = await Promise.all([
         getMyStuffItemV2(user.id, id),
         getMyStuffExpensesV3(id),
@@ -85,12 +106,20 @@ export default function MyStuffDetail() {
       setSummary(financial)
       setEdit(itemToDraft(core.item))
       setReading(current => ({ ...current, type: core.item.measurements.includes(current.type) ? current.type : (core.item.measurements[0] || 'miles') }))
+      setAccessPlan(plan)
     } catch (next) {
+      setItem(null)
+      setEdit(null)
+      setReadings([])
+      setExpenses([])
+      setSummary(null)
+      setLocked(false)
+      setAccessPlan(plan)
       setError(next.message || 'Could not load this item.')
     } finally {
       setLoading(false)
     }
-  }, [id, user?.id])
+  }, [id, plan, user?.id])
 
   useEffect(() => { void load() }, [load])
 
@@ -242,12 +271,17 @@ export default function MyStuffDetail() {
     })
   }
 
-  if (loading) return <main className="mystuff-shell" aria-busy="true"><p>Loading item…</p></main>
+  if (accessPlan !== plan || loading) return <main className="mystuff-shell" aria-busy="true"><p>Checking item access…</p></main>
+  if (locked) return <main className="mystuff-shell">
+    <header className="mystuff-page-header"><button className="mystuff-link" type="button" onClick={() => navigate('/my-stuff')}>← My Stuff</button><h1>{item?.name || 'My Stuff item'}</h1></header>
+    <section className="mystuff-card mystuff-item-locked" aria-label="SideFlip Pro required"><h2>SideFlip Pro required</h2><p>This newer item is safely preserved but cannot be opened or managed on the Free plan.</p><button type="button" className="btn btn-primary" onClick={() => setUpgradeMessage('Upgrade to SideFlip Pro to open and continue managing this My Stuff item.')}>View SideFlip Pro</button></section>
+    <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
+  </main>
   if (!item) return <main className="mystuff-shell"><div className="mystuff-error" role="alert">{error || 'Item not found.'}</div><button type="button" className="btn" onClick={() => navigate('/my-stuff')}>Back to My Stuff</button></main>
 
   const allowedAxes = getItemCategoryContract(edit?.category)?.measurements || []
   const money = value => value == null ? '—' : `${item.purchase_currency || 'USD'} ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  const isPro = getPlan(profile, entitlement) === 'pro'
+  const isPro = plan === 'pro'
 
   return <main className="mystuff-shell" aria-labelledby="item-heading">
     <header className="mystuff-page-header"><button className="back-btn" type="button" onClick={() => navigate('/my-stuff')} aria-label="Back to My Stuff">‹</button><div><h1 id="item-heading">{item.name}</h1><p className="mystuff-help">{item.itemType.replaceAll('_', ' ')}{item.archived_at ? ' · Archived' : ''}</p></div><button type="button" className="mystuff-link" onClick={() => void load()} disabled={saving}>Refresh</button></header>
@@ -280,14 +314,14 @@ export default function MyStuffDetail() {
 
     {supportsVinDecoder(item.itemType) && <>
       <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>
-      <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => navigate('/upgrade')} onApplied={load}/>
+      <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => setUpgradeMessage('Upgrade to SideFlip Pro to use manufacturer maintenance research.')} onApplied={load}/>
     </>}
     <nav className="mystuff-tabs mystuff-primary-tabs" aria-label="Item record views">
       {['maintenance', 'expenses', 'history'].map(view => <button type="button" key={view} aria-current={detailView === view ? 'page' : undefined} onClick={() => setDetailView(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}
     </nav>
     {detailView === 'maintenance' && <MyStuffMaintenancePanel item={item} onChanged={load}/>}
     {detailView === 'history' && <MyStuffMaintenancePanel item={item} onChanged={load} mode="history"/>}
-    <PrivateReportPanel subjectType="my_stuff_item" subjectId={id} isPro={isPro} onUpgrade={() => navigate('/upgrade')}/>
+    <PrivateReportPanel subjectType="my_stuff_item" subjectId={id} isPro={isPro} onUpgrade={() => setUpgradeMessage('Upgrade to SideFlip Pro to create private reports.')}/>
 
     {detailView === 'expenses' && <section className="mystuff-card" aria-labelledby="financial-heading"><div className="mystuff-section-heading"><h2 id="financial-heading">Expenses</h2><span className="mystuff-help">Total invested: {money(summary?.total_invested)}</span></div>
       <div className="mystuff-stat-grid"><div className="mystuff-stat"><small>Purchase</small><strong>{money(summary?.purchase_price)}</strong></div><div className="mystuff-stat"><small>Expenses</small><strong>{money(summary?.expense_total)}</strong></div><div className="mystuff-stat"><small>Maintenance & repair</small><strong>{money(summary?.maintenance_repair_subtotal)}</strong></div><div className="mystuff-stat"><small>Upgrades</small><strong>{money(summary?.upgrades_subtotal)}</strong></div></div>
@@ -296,6 +330,7 @@ export default function MyStuffDetail() {
     </section>}
 
     <section className="mystuff-card" aria-labelledby="item-actions"><h2 id="item-actions">Item actions</h2><p className="mystuff-help">Attachments are not available in My Stuff yet.</p><div className="mystuff-actions"><button type="button" className="btn" onClick={toggleArchive} disabled={saving}>{item.archived_at ? 'Restore item' : 'Archive item'}</button>{!item.archived_at && <button type="button" className="btn" onClick={transferAndOpenProject} disabled={saving}>Move to Projects</button>}<button type="button" className="btn mystuff-danger" onClick={removeItem} disabled={saving}>Delete permanently</button></div></section>
+    <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
   </main>
 }
 

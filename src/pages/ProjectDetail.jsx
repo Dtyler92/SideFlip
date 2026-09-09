@@ -14,6 +14,7 @@ import SalesListingGenerator from '../components/SalesListingGenerator'
 import ProjectReportPanel from '../components/ProjectReportPanel'
 import { ProjectToMyStuffAction } from '../components/ProjectIntegrationActions'
 import VinDecodePanel from '../components/VinDecodePanel'
+import UpgradePrompt from '../components/UpgradePrompt'
 import { captureEvent } from '../analytics'
 import { accessibleActiveGoalsAfterProLoss, calculateGoalSummary, createMutationId } from '../goals'
 import { can, getPlan } from '../capabilities'
@@ -49,6 +50,7 @@ export default function ProjectDetail() {
   const [goalFunding, setGoalFunding] = useState('')
   const [goalMutationId, setGoalMutationId] = useState(createMutationId)
   const [savingAction, setSavingAction] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
   const [transferMutationId, setTransferMutationId] = useState(createMutationId)
   const activeProjectRef = useRef(id)
   const loadRequestRef = useRef(0)
@@ -91,7 +93,7 @@ export default function ProjectDetail() {
   const selectedGoal = activeGoals.find(goal => goal.id === goalId)
   const selectedGoalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const isPro = can(profile, entitlement, 'ai_listings')
-  const upgrade = () => navigate('/upgrade')
+  const upgrade = () => setUpgradeMessage('Upgrade to SideFlip Pro to use this project feature.')
 
   async function handleGalleryUpdate(urls) {
     const targetProjectId = id
@@ -229,7 +231,7 @@ export default function ProjectDetail() {
   return <>
     <div className="page" style={{ paddingBottom: 0 }}>
       <div className="section-title" style={{ marginTop: 0 }}>Project Photos</div>
-      <ProjectPhotoGallery userId={user.id} photos={gallery} project={project} plan={getPlan(profile, entitlement)} onUpdate={handleGalleryUpdate} onUpgrade={() => navigate('/upgrade')} />
+      <ProjectPhotoGallery userId={user.id} photos={gallery} project={project} plan={getPlan(profile, entitlement)} onUpdate={handleGalleryUpdate} onUpgrade={() => setUpgradeMessage('Upgrade to SideFlip Pro to add up to 25 photos to each project.')} />
     </div>
 
     <div className="page-header" style={{ borderTop: '1px solid var(--border)' }}>
@@ -317,5 +319,6 @@ export default function ProjectDetail() {
         <button type="button" className="btn btn-secondary" disabled={savingExpense} onClick={() => setShowExpense(false)}>Cancel</button>
       </form>
     </div></div>}
+    <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
   </>
 }
