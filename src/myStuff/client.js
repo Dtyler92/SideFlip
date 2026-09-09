@@ -1,5 +1,4 @@
 import { adaptSqlItem } from './adapters.js'
-import { excludeTransferredItems } from './transferVisibility.js'
 import { normalizeExpenseRows } from './v3Model.js'
 
 function dataOrThrow(result, fallbackMessage='My Stuff request failed.'){if(result?.error){const message=result.error.message||fallbackMessage;const error=new Error(message);error.code=result.error.code;throw error}return result?.data}
@@ -12,11 +11,8 @@ export function createMyStuffClient(database){
   return {
     async listItems(userId,{includeArchived=true,excludeTransferred=false}={}){
       if(!userId)throw new Error('Authentication is required to load My Stuff.')
-      let query=database.from('my_stuff_items').select('*').eq('user_id',userId).order('created_at',{ascending:false})
-      if(!includeArchived)query=query.is('archived_at',null)
-      const [itemsResult,transfersResult]=await Promise.all([query,excludeTransferred?database.from('my_stuff_to_project_transfers').select('item_id').eq('user_id',userId):Promise.resolve({data:[],error:null})])
-      const items=dataOrThrow(itemsResult,'Could not load your My Stuff items.')||[];const transfers=dataOrThrow(transfersResult,'Could not determine transferred-item visibility.')||[]
-      return excludeTransferredItems(items,transfers).map(adaptSqlItem)
+      const items=dataOrThrow(await database.rpc('list_my_stuff_items_v4',{p_include_archived:includeArchived,p_exclude_transferred:excludeTransferred}),'Could not load your My Stuff items.')||[]
+      return items.map(adaptSqlItem)
     },
     async getItem(userId,itemId){
       if(!userId)throw new Error('Authentication is required to load this item.')

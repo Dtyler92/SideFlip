@@ -84,7 +84,7 @@ export default function MyStuffDetail() {
     try {
       const allItems = await listMyStuffItemsV2(user.id, { includeArchived:true, excludeTransferred:true })
       const listedItem = allItems.find(candidate => candidate.id === id)
-      if (listedItem && isMyStuffItemLockedAfterProLoss(listedItem, allItems, plan)) {
+      if (listedItem?.isLocked || isMyStuffItemLockedAfterProLoss(listedItem, allItems, plan)) {
         setItem(listedItem)
         setEdit(null)
         setReadings([])

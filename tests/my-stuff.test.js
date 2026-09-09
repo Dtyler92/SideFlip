@@ -103,6 +103,18 @@ test('V2 wire payloads use exact RPC names and canonical SQL fields', async () =
   ])
 })
 
+test('My Stuff list uses the server summary contract and preserves downgrade/filter state', async () => {
+  const calls=[]
+  const database={rpc:async(name,payload)=>{
+    calls.push({name,payload})
+    return {data:[{id:'newer',name:'Truck',item_type:'truck',is_locked:true}],error:null}
+  }}
+  const items=await createMyStuffClient(database).listItems('user-1',{includeArchived:false,excludeTransferred:true})
+  assert.deepEqual(calls,[{name:'list_my_stuff_items_v4',payload:{p_include_archived:false,p_exclude_transferred:true}}])
+  assert.equal(items[0].isLocked,true)
+  assert.equal(items[0].itemType,'truck')
+})
+
 test('V3 expense and both transfer wrappers use exact RPC contracts', async () => {
   const calls=[]
   const api=createMyStuffV3Client({rpc:async(name,payload)=>{calls.push({name,payload});return {data:name==='get_my_stuff_expenses_v3'?[]:{ok:true},error:null}}})
@@ -142,7 +154,7 @@ test('expense drafts validate and normalized revisions retain IDs', () => {
   assert.throws(()=>buildExpenseDraft({description:'Bad',category:'other',amount:1,incurredOn:'2026-09-01'}),/Custom category/)
 })
 
-test('Free presentation gates only creation and transferred visibility preserves manual archives', () => {
+test('Free presentation gates creation and transferred visibility helper preserves manual archives', () => {
   assert.equal(canCreateMyStuffItem({isPro:false,itemCount:0}),true)
   assert.equal(canCreateMyStuffItem({isPro:false,itemCount:1}),false)
   const existing=[{id:'active'},{id:'archived',archived_at:'2026-01-01'},{id:'moved',archived_at:'2026-01-02'}]
