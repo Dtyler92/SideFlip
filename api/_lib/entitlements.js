@@ -36,12 +36,17 @@ function isVerifiedActiveEntitlement(entitlement, now) {
     ? ['active', 'trialing'].includes(entitlement.status)
     : entitlement?.source === 'apple'
       ? ['active', 'grace_period'].includes(entitlement.status)
-      : false
+      : entitlement?.source === 'admin'
+        ? entitlement.status === 'active'
+        : false
   if (!accessStatus) return false
 
-  const expiresAt = parseFiniteUtcTimestamp(entitlement.expires_at)
   const verifiedAt = parseFiniteUtcTimestamp(entitlement.last_verified_at)
-  return expiresAt !== null && expiresAt > now && verifiedAt !== null && verifiedAt <= now
+  if (verifiedAt === null || verifiedAt > now) return false
+
+  if (entitlement.source === 'admin' && entitlement.expires_at === null) return true
+  const expiresAt = parseFiniteUtcTimestamp(entitlement.expires_at)
+  return expiresAt !== null && expiresAt > now
 }
 
 function hasLegacyStripeCompatibility(profile) {

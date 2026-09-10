@@ -92,6 +92,25 @@ test('Apple expired and revoked rows fail closed', () => {
   }
 })
 
+test('active admin entitlements grant permanent or time-bounded Pro access', () => {
+  for (const expires_at of [null, future]) {
+    const result = resolveServerEntitlement({}, [entitlement('admin', 'active', { expires_at })], now)
+    assert.equal(result.plan, 'pro')
+    assert.deepEqual(result.entitlement, { source: 'admin', status: 'active', expires_at })
+  }
+})
+
+test('admin entitlements fail closed when terminal, expired, or verified in the future', () => {
+  for (const row of [
+    entitlement('admin', 'canceled', { expires_at: null }),
+    entitlement('admin', 'revoked', { expires_at: null }),
+    entitlement('admin', 'active', { expires_at: '2020-01-01T00:00:00Z' }),
+    entitlement('admin', 'active', { expires_at: null, last_verified_at: '2030-01-01T00:00:00Z' }),
+  ]) {
+    assert.equal(resolveServerEntitlement({}, [row], now).plan, 'free')
+  }
+})
+
 test('malformed, non-UTC, infinite, and unverified timestamps fail closed', () => {
   for (const overrides of [
     { expires_at: '2030-01-01 00:00:00' },
