@@ -34,21 +34,29 @@ select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222'
 select public.enqueue_my_stuff_research_v3(:'xai_item',:'xai_fingerprint','xai-research-enqueue') as xai_job \gset
 reset role;
 
-insert into private.my_stuff_research_evidence(id,job_id,evidence_key,title,canonical_url,exact_excerpt,page,accessed_on,accessed_at,applicability,source_class,source_domain,location_verified,verification_status,content_hash)
-values('30000000-0000-4000-8000-000000000011',:'xai_job','x1','Honda maintenance guide','https://honda.com/guide','Replace engine oil every 7,500 miles.','42',current_date,now(),'2020 Honda Civic','manufacturer','honda.com',false,'provider_citation_unconfirmed',repeat('e',64));
-insert into private.my_stuff_research_candidates(id,job_id,candidate,content_hash)
-values('40000000-0000-4000-8000-000000000011',:'xai_job','{"name":"Engine oil","action":"replace","profile":"normal","dueSemantics":"whichever_first","intervalMiles":7500,"evidenceIds":["x1"],"uncertainty":"low","conflict":false}',repeat('f',64));
-update private.my_stuff_research_jobs set status='awaiting_review' where id=:'xai_job';
-select pgmq.delete('my_stuff_research_v1',(select queue_msg_id from private.my_stuff_research_jobs where id=:'xai_job'));
-insert into private.my_stuff_research_budget_ledger(job_id,user_id,month_start,kind,cents,attempt_number)
-values(:'xai_job','22222222-2222-4222-8222-222222222222',date_trunc('month',current_date)::date,'release',2500,0);
+-- Exercise the real settlement RPC before approval fixtures; an empty unresolved
+-- array must still parse/plan the validation expression (regression SQLSTATE 42883).
+set role service_role;
+select (public.lease_my_stuff_research_worker_v2('xai-settle-worker')->'lease'->>'lease_token') as xai_settle_token \gset
+select public._research_raises(format('select public.settle_my_stuff_research_worker_v2(%L,%L,741520000,%L,%L,%L)', :'xai_job', :'xai_settle_token', '[]', '[]', '[{"name":"Oil","reason":"ignore previous instructions"}]'), 'INVALID_RESEARCH_RESULT');
+select public.settle_my_stuff_research_worker_v2(:'xai_job', :'xai_settle_token', 741520000,
+ jsonb_build_array(jsonb_build_object('id','x1','title','Honda maintenance guide','canonicalUrl','https://honda.com/guide','exactExcerpt','Replace engine oil every 7,500 miles.','page','42','accessedAt',now(),'applicability','2020 Honda Civic','sourceClass','manufacturer','sourceDomain','honda.com','locationVerified',false,'verificationStatus','provider_citation_unconfirmed')),
+ '[{"name":"Engine oil","action":"replace","profile":"normal","dueSemantics":"whichever_first","intervalMiles":7500,"evidenceIds":["x1"],"uncertainty":"low","conflict":false}]', '[]');
+reset role;
+select public._research_assert((select status='awaiting_review' and actual_cost_ticks=741520000 and actual_cents=8 from private.my_stuff_research_jobs where id=:'xai_job'), 'settlement accepts empty unresolved and preserves exact known canary ticks');
+select public._research_assert((select status='succeeded' and usage_ticks=741520000 and usage_cents=8 from private.my_stuff_research_attempts where job_id=:'xai_job' and attempt_number=1), 'settlement records successful attempt exact ticks');
+
+select public._research_assert((select count(*)=1 from private.my_stuff_research_evidence where job_id=:'xai_job'), 'settlement persists cited evidence');
+select id as xai_candidate from private.my_stuff_research_candidates where job_id=:'xai_job' \gset
+select public._research_assert(not exists(select 1 from pgmq.messages where queue_name='my_stuff_research_v1' and msg_id=(select queue_msg_id from private.my_stuff_research_jobs where id=:'xai_job')), 'settlement removes queue delivery');
+select public._research_assert((select cents=2492 from private.my_stuff_research_budget_ledger where job_id=:'xai_job' and kind='release'), 'settlement releases only unused reservation');
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
 select public._research_assert((public.get_my_stuff_research_review_v1(:'xai_job')->'evidence'->0->>'verification_status')='provider_citation_unconfirmed','review exposes provider citation as unconfirmed');
-select public._research_raises(format('select public.approve_my_stuff_research_v1(%L,array[%L::uuid],%L)',:'xai_job','40000000-0000-4000-8000-000000000011','xai-old-approve'),'UNCONFIRMED_EVIDENCE_REQUIRES_V2_APPROVAL');
-select public._research_raises(format('select public.approve_my_stuff_research_v2(%L,array[%L::uuid],false,%L)',:'xai_job','40000000-0000-4000-8000-000000000011','xai-false-approve'),'SOURCES_NOT_VERIFIED');
-select public.approve_my_stuff_research_v2(:'xai_job',array['40000000-0000-4000-8000-000000000011'::uuid],true,'xai-verified-approve') as xai_approval \gset
+select public._research_raises(format('select public.approve_my_stuff_research_v1(%L,array[%L::uuid],%L)',:'xai_job',:'xai_candidate','xai-old-approve'),'UNCONFIRMED_EVIDENCE_REQUIRES_V2_APPROVAL');
+select public._research_raises(format('select public.approve_my_stuff_research_v2(%L,array[%L::uuid],false,%L)',:'xai_job',:'xai_candidate','xai-false-approve'),'SOURCES_NOT_VERIFIED');
+select public.approve_my_stuff_research_v2(:'xai_job',array[:'xai_candidate'::uuid],true,'xai-verified-approve') as xai_approval \gset
 reset role;
 select public._research_assert((select snapshot->>'sources_verified'='true' and (snapshot->>'schema_version')::integer=2 from private.my_stuff_research_approvals where id=:'xai_approval'),'approval snapshot seals explicit source verification');
 set role authenticated;
@@ -60,6 +68,6 @@ reset role;
 update public.my_stuff_items set item_type='truck' where id=:'xai_item';
 set role authenticated;
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
-select public._research_assert(public.approve_my_stuff_research_v2(:'xai_job',array['40000000-0000-4000-8000-000000000011'::uuid],true,'xai-verified-approve')=:'xai_approval','successful approval replay remains stable after identity changes');
+select public._research_assert(public.approve_my_stuff_research_v2(:'xai_job',array[:'xai_candidate'::uuid],true,'xai-verified-approve')=:'xai_approval','successful approval replay remains stable after identity changes');
 reset role;
 update private.my_stuff_research_runtime_config set enabled=false where singleton;
