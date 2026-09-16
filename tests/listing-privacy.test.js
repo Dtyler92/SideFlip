@@ -49,3 +49,25 @@ test('VIN decode UI and policies disclose full-VIN transmission to NHTSA and bou
     assert.match(policy, /does not store or log the full VIN/i)
   }
 })
+
+test('live and static policies cover subscription identifiers, processors, and deletion timing', () => {
+  for (const policy of [privacy, publicPrivacy]) {
+    assert.match(policy, /transaction and original.transaction identifiers/i)
+    assert.match(policy, /Apple processes/i)
+    assert.match(policy, /PostHog/i)
+    assert.match(policy, /12 months/i)
+    assert.match(policy, /deletion.suppression record/i)
+    assert.match(policy, /prevent delayed Apple or Stripe events/i)
+    assert.match(policy, /billing, transaction, fraud.prevention, security, or legal records/i)
+    assert.match(policy, /analytics deletion request/i)
+    assert.match(policy, /asynchronous/i)
+  }
+})
+
+test('live and static policies accurately bound xAI listing and maintenance processing', () => {
+  for (const policy of [privacy, publicPrivacy]) {
+    assert.match(policy, /listing description/i)
+    assert.match(policy, /manufacturer maintenance research/i)
+    assert.match(policy, /xAI may retain request data[\s\S]{0,100}up to 30 days/i)
+  }
+})

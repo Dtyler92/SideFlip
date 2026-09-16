@@ -1,14 +1,14 @@
+import { normalizeAppleSubscriptionState } from './apple-subscription-state.js'
+
 export function appleNotificationStatus({ notificationType, subtype, transaction, renewalInfo, now = Date.now() }) {
-  if (notificationType === 'REFUND') return 'refunded'
-  if (notificationType === 'REVOKE') return 'revoked'
-  if (transaction?.revocationDate) return 'revoked'
-  const graceExpires = Number(renewalInfo?.gracePeriodExpiresDate || 0)
-  const graceEvidence = subtype === 'GRACE_PERIOD'
-    && renewalInfo?.isInBillingRetryPeriod === true
-    && graceExpires > now
-  if (graceEvidence) return 'grace_period'
-  if (notificationType === 'GRACE_PERIOD_EXPIRED') return 'expired'
-  return Number(transaction?.expiresDate || 0) > now ? 'active' : 'expired'
+  return normalizeAppleSubscriptionState({
+    notificationType,
+    subtype,
+    transaction,
+    renewalInfo,
+    expectedOriginalTransactionId: transaction?.originalTransactionId,
+    now,
+  }).status
 }
 
 // These flags come only from Apple's verified outer notification. They are

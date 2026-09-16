@@ -51,11 +51,17 @@ test('billing intervals are normalized and trial starts have their own event', (
 
 test('verified Apple notification evidence maps refund, revoke, and grace period', () => {
   const future = Date.now() + 60_000
+  const originalTransactionId = 'original-transaction'
+  const productId = 'com.sideflip.app.pro.monthly'
   assert.equal(appleNotificationStatus({ notificationType: 'REFUND', transaction: { expiresDate: future } }), 'refunded')
   assert.equal(appleNotificationStatus({ notificationType: 'REVOKE', transaction: { revocationDate: Date.now(), expiresDate: future } }), 'revoked')
   assert.equal(appleNotificationStatus({
     notificationType: 'DID_FAIL_TO_RENEW', subtype: 'GRACE_PERIOD',
-    transaction: { expiresDate: Date.now() - 1 }, renewalInfo: { gracePeriodExpiresDate: future, isInBillingRetryPeriod: true },
+    transaction: { originalTransactionId, expiresDate: Date.now() - 1 },
+    renewalInfo: {
+      originalTransactionId, autoRenewProductId: productId,
+      gracePeriodExpiresDate: future, signedDate: future - 1, isInBillingRetryPeriod: true,
+    },
   }), 'grace_period')
   assert.equal(appleNotificationStatus({ notificationType: 'GRACE_PERIOD_EXPIRED', transaction: { expiresDate: Date.now() - 1 } }), 'expired')
 })
