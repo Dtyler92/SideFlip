@@ -4,6 +4,41 @@ begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '60s';
 
+-- Private capability: never authorize with caller-settable custom GUCs.
+-- Only the migration/function owner can write here. RPCs install a capability
+-- AFTER validation, scoped to the owner and affected goal/projects, and remove
+-- it BEFORE returning. Exceptions roll back it and the business writes together.
+-- Backend + xid prevent another session/transaction from using a retained row.
+create schema if not exists sideflip_trade_up_private;
+revoke all on schema sideflip_trade_up_private from public, anon, authenticated, service_role;
+create table sideflip_trade_up_private.rpc_context (
+  backend_pid integer not null,
+  transaction_id bigint not null,
+  user_id uuid not null,
+  goal_id uuid,
+  project_ids uuid[] not null default '{}',
+  primary key (backend_pid, transaction_id)
+);
+alter table sideflip_trade_up_private.rpc_context enable row level security;
+revoke all on table sideflip_trade_up_private.rpc_context from public, anon, authenticated, service_role;
+
+-- SECURITY DEFINER guard current_user is the function owner, NOT the invoker.
+create function sideflip_trade_up_private.has_rpc_context(
+  p_user_id uuid, p_goal_id uuid, p_project_id uuid
+) returns boolean language sql stable security definer
+set search_path = pg_catalog
+as $$
+  select exists (
+    select 1 from sideflip_trade_up_private.rpc_context c
+    where c.backend_pid=pg_backend_pid() and c.transaction_id=txid_current()
+      and c.user_id=auth.uid() and c.user_id=p_user_id
+      and ((p_goal_id is not null and c.goal_id=p_goal_id)
+        or (p_project_id is not null and p_project_id=any(c.project_ids)))
+  )
+$$;
+revoke all on function sideflip_trade_up_private.has_rpc_context(uuid,uuid,uuid)
+  from public, anon, authenticated, service_role;
+
 create table if not exists public.trade_up_goal_mutations (
   user_id uuid not null references auth.users(id) on delete cascade,
   mutation_id text not null,
@@ -201,6 +236,9 @@ set search_path = pg_catalog, public
 as $$
 begin
   if new.status <> 'active' then return new; end if;
+  -- UPDATE ... SET status='active' is not a new activation when unchanged.
+  -- The mutable-goal guard still enforces the retained goal on ordinary edits.
+  if tg_op='UPDATE' and old.status='active' and old.user_id=new.user_id then return new; end if;
   perform pg_advisory_xact_lock(hashtextextended(new.user_id::text, 0));
   perform 1 from public.user_entitlements e
   where e.user_id = new.user_id
@@ -291,7 +329,6 @@ declare
   v_progress numeric;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   if nullif(trim(p_mutation_id), '') is null then raise exception 'Mutation ID required'; end if;
   if p_status is not null and p_status not in ('active', 'completed') then raise exception 'Invalid goal status'; end if;
   if p_target_amount is not null and (
@@ -392,6 +429,8 @@ begin
     end if;
   end if;
 
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user_id,p_goal_id,'{}'::uuid[]);
   update public.trade_up_goals
   set status = v_next_status,
       target_amount = v_next_target,
@@ -401,6 +440,8 @@ begin
         else completed_at
       end
   where id = p_goal_id and user_id = v_user_id;
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
   return p_goal_id;
 end;
 $$;
@@ -466,7 +507,6 @@ declare
   v_existing public.trade_up_goal_mutations%rowtype; v_payload jsonb;
 begin
   if v_user is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   if nullif(trim(p_mutation_id), '') is null then raise exception 'Mutation ID required'; end if;
   if nullif(trim(p_title), '') is null then raise exception 'Project title required'; end if;
   if not public.trade_up_amount_is_finite(p_purchase_price)
@@ -499,6 +539,8 @@ begin
     raise exception 'Goal available balance is non-finite';
   end if;
   if v_goal_funding > v_available then raise exception 'Insufficient amount available toward goal'; end if;
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user,p_goal_id,'{}'::uuid[]);
   insert into public.projects(
     user_id,title,category,status,purchase_price,photo,notes,model_number,serial_number,
     engine_model,engine_serial,vin,hull_number,vehicle_year,vehicle_make,vehicle_model,
@@ -514,6 +556,8 @@ begin
   end if;
   insert into public.trade_up_goal_mutations(user_id,mutation_id,operation,request_payload,goal_id,result_id)
   values(v_user,trim(p_mutation_id),'create_project',v_payload,p_goal_id,v_id);
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
   return v_id;
 end;
 $$;
@@ -528,7 +572,6 @@ declare
   v_existing public.trade_up_goal_mutations%rowtype; v_goal_funding numeric; v_payload jsonb;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   if nullif(trim(p_mutation_id), '') is null then raise exception 'Mutation ID required'; end if;
   if not public.trade_up_amount_is_finite(p_goal_funding) or p_goal_funding < 0 then raise exception 'Goal funds used must be finite and nonnegative'; end if;
   v_goal_funding:=round(p_goal_funding,2);
@@ -552,6 +595,8 @@ begin
     raise exception 'Goal available balance is non-finite';
   end if;
   if v_goal_funding > v_available then raise exception 'Goal funds used cannot exceed the amount available toward the goal'; end if;
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user_id,p_goal_id,array[p_project_id]);
   if v_goal_funding > 0 then
     insert into public.goal_ledger(goal_id,user_id,project_id,type,amount,note,client_mutation_id)
     values(p_goal_id,v_user_id,p_project_id,'goal_purchase',-v_goal_funding,'Goal funds allocated to existing project '||v_project.title,trim(p_mutation_id)||':funding');
@@ -561,6 +606,8 @@ begin
   where id=p_project_id and user_id=v_user_id;
   insert into public.trade_up_goal_mutations(user_id,mutation_id,operation,request_payload,goal_id,result_id)
   values(v_user_id,trim(p_mutation_id),'link_project',v_payload,p_goal_id,p_project_id);
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
   return p_project_id;
 end;
 $$;
@@ -575,7 +622,6 @@ declare
   v_existing_sale numeric; v_existing_keep numeric; v_sale numeric; v_keep numeric;
 begin
   if v_user is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   if not public.trade_up_amount_is_finite(p_sale_price) or not public.trade_up_amount_is_finite(p_keep_amount) then
     raise exception 'Invalid sale allocation';
   end if;
@@ -595,6 +641,8 @@ begin
     end if;
     raise exception 'Project is not active';
   end if;
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user,v_project.goal_id,array[p_project_id]);
   update public.projects set status='sold',sale_price=v_sale,sold_at=now() where id=p_project_id and user_id=v_user;
   if v_project.goal_id is not null then
     insert into public.goal_ledger(goal_id,user_id,project_id,type,amount,note)
@@ -604,6 +652,8 @@ begin
       values(v_project.goal_id,v_user,p_project_id,'cash_out',-(v_sale-v_keep),'Taken out after selling '||v_project.title);
     end if;
   end if;
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
 end;
 $$;
 
@@ -620,7 +670,6 @@ declare
   v_existing public.trade_up_goal_mutations%rowtype; v_payload jsonb;
 begin
   if v_user is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   if nullif(trim(p_mutation_id),'') is null then raise exception 'Mutation ID required'; end if;
   if nullif(trim(p_incoming_title),'') is null then raise exception 'Incoming item and trade value required'; end if;
   if not public.trade_up_amount_is_finite(p_trade_credit)
@@ -665,6 +714,8 @@ begin
   if v_basis<0 then raise exception 'Received item basis cannot be negative'; end if;
   v_out_pocket:=case when p_cash_direction='paid' then v_cash_amount-v_goal_cash else 0 end;
   if not public.trade_up_amount_is_finite(v_out_pocket) then raise exception 'Trade out-of-pocket amount is non-finite'; end if;
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user,v_out.goal_id,array[p_outgoing_id]);
   update public.projects set status='sold',sale_price=v_trade_credit,sold_at=now() where id=p_outgoing_id and user_id=v_user;
   insert into public.projects(user_id,title,category,status,purchase_price,notes,goal_id,goal_funding_amount,out_of_pocket_amount,trade_credit_amount,traded_from_project_id,trade_up_mutation_id)
   values(v_user,trim(p_incoming_title),coalesce(p_category,'other'),'active',v_basis,coalesce(nullif(trim(coalesce(p_notes,'')),''),'Received in trade for '||v_out.title),v_out.goal_id,v_goal_cash,v_out_pocket,v_trade_credit,p_outgoing_id,trim(p_mutation_id))
@@ -679,6 +730,8 @@ begin
   end if;
   insert into public.trade_up_goal_mutations(user_id,mutation_id,operation,request_payload,goal_id,result_id)
   values(v_user,trim(p_mutation_id),'direct_trade',v_payload,v_out.goal_id,v_id);
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
   return v_id;
 end;
 $$;
@@ -689,7 +742,6 @@ as $$
 declare v_user_id uuid:=auth.uid(); v_project public.projects%rowtype; v_incoming_id uuid; v_incoming_status text;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   perform pg_advisory_xact_lock(hashtextextended(v_user_id::text,0));
   select * into v_project from public.projects where id=p_project_id and user_id=v_user_id for update;
   if v_project.id is null then raise exception 'Project not found'; end if;
@@ -702,11 +754,17 @@ begin
        or exists(select 1 from public.goal_ledger where project_id=v_incoming_id and type='sale_proceeds') then
       raise exception 'Undo the received item''s later sale or trade first';
     end if;
+  end if;
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user_id,v_project.goal_id,array[p_project_id,v_incoming_id]);
+  if v_incoming_id is not null then
     delete from public.goal_ledger where project_id=v_incoming_id and user_id=v_user_id;
     delete from public.projects where id=v_incoming_id and user_id=v_user_id;
   end if;
   delete from public.goal_ledger where project_id=p_project_id and user_id=v_user_id and type in ('sale_proceeds','cash_out');
   update public.projects set status='active',sale_price=null,sold_at=null where id=p_project_id and user_id=v_user_id;
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
 end;
 $$;
 
@@ -716,10 +774,13 @@ as $$
 declare v_user_id uuid:=auth.uid();
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   perform public.assert_trade_up_goal_mutable(p_goal_id, true);
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user_id,p_goal_id,array(select id from public.projects where goal_id=p_goal_id and user_id=v_user_id));
   delete from public.trade_up_goals where id=p_goal_id and user_id=v_user_id;
   if not found then raise exception 'Goal not found'; end if;
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
 end;
 $$;
 
@@ -729,7 +790,6 @@ as $$
 declare v_user_id uuid:=auth.uid(); v_project public.projects%rowtype;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  perform set_config('sideflip.trade_up_rpc','on',true);
   perform pg_advisory_xact_lock(hashtextextended(v_user_id::text,0));
   select * into v_project from public.projects where id=p_project_id and user_id=v_user_id for update;
   if v_project.id is null then raise exception 'Project not found'; end if;
@@ -737,8 +797,12 @@ begin
   if v_project.goal_id is not null and v_project.status<>'active' then raise exception 'Undo this project''s sale or trade before deleting it'; end if;
   if v_project.traded_from_project_id is not null then raise exception 'Undo the direct trade from the previous item instead of deleting the received item'; end if;
   if exists(select 1 from public.projects where traded_from_project_id=p_project_id and user_id=v_user_id) then raise exception 'Undo this project''s direct trade before deleting it'; end if;
+  insert into sideflip_trade_up_private.rpc_context(backend_pid,transaction_id,user_id,goal_id,project_ids)
+  values(pg_backend_pid(),txid_current(),v_user_id,v_project.goal_id,array[p_project_id]);
   delete from public.goal_ledger where project_id=p_project_id and user_id=v_user_id;
   delete from public.projects where id=p_project_id and user_id=v_user_id;
+  delete from sideflip_trade_up_private.rpc_context
+  where backend_pid=pg_backend_pid() and transaction_id=txid_current();
 end;
 $$;
 
@@ -751,8 +815,10 @@ security definer
 set search_path = pg_catalog, public
 as $$
 begin
-  if current_setting('sideflip.trade_up_rpc',true)='on' then return case when tg_op='DELETE' then old else new end; end if;
-  if current_setting('role',true) in ('anon','authenticated') then
+  if sideflip_trade_up_private.has_rpc_context(case when tg_op='DELETE' then old.user_id else new.user_id end,
+    case when tg_op='DELETE' then old.goal_id else new.goal_id end,
+    case when tg_op='DELETE' then old.id else new.id end) then return case when tg_op='DELETE' then old else new end; end if;
+  if coalesce(nullif(current_setting('role',true),'none'),session_user) in ('anon','authenticated') then
     if tg_op='INSERT' and new.goal_id is not null then
       raise exception 'Create goal-linked projects through the Trade-Up workflow';
     end if;
@@ -790,8 +856,9 @@ set search_path = pg_catalog, public
 as $$
 declare v_goal_id uuid; v_project_user_id uuid; v_user_id uuid:=auth.uid();
 begin
-  if current_setting('sideflip.trade_up_rpc',true)='on' then return case when tg_op='DELETE' then old else new end; end if;
-  if current_setting('role',true) not in ('anon','authenticated') then return case when tg_op='DELETE' then old else new end; end if;
+  if sideflip_trade_up_private.has_rpc_context(case when tg_op='DELETE' then old.user_id else new.user_id end, null,
+    case when tg_op='DELETE' then old.project_id else new.project_id end) then return case when tg_op='DELETE' then old else new end; end if;
+  if coalesce(nullif(current_setting('role',true),'none'),session_user) not in ('anon','authenticated') then return case when tg_op='DELETE' then old else new end; end if;
   if v_user_id is null then raise exception 'Authentication required'; end if;
   if tg_op<>'DELETE' and not public.trade_up_amount_is_finite(new.amount) then
     raise exception 'Expense amount must be finite';
@@ -826,8 +893,8 @@ returns trigger language plpgsql security definer set search_path = pg_catalog, 
 as $$
 declare v_user uuid:=auth.uid(); v_progress numeric;
 begin
-  if current_setting('sideflip.trade_up_rpc',true)='on' then return new; end if;
-  if current_setting('role',true)<>'authenticated' then return new; end if;
+  if sideflip_trade_up_private.has_rpc_context(new.user_id, new.id, null) then return new; end if;
+  if coalesce(nullif(current_setting('role',true),'none'),session_user)<>'authenticated' then return new; end if;
   if v_user is null then raise exception 'Authentication required'; end if;
   if old.user_id<>v_user or new.user_id is distinct from old.user_id then raise exception 'Goal not found'; end if;
   perform public.assert_trade_up_goal_mutable(old.id,true);

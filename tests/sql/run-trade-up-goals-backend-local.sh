@@ -17,6 +17,7 @@ run < supabase/migrations/20260910162500_restore_admin_pro_entitlements.sql
 run < tests/sql/trade-up-goals-backend-historical-setup.sql
 run < supabase/migrations/20260916120000_authoritative_trade_up_goal_enforcement.sql
 run < tests/sql/trade-up-goals-backend-assertions.sql
+run < tests/sql/trade-up-goals-authorization-assertions.sql
 run < tests/sql/trade-up-goals-backend-concurrency-setup.sql
 
 # Both RPCs take the owner advisory lock before project/goal/ledger rows.  The

@@ -41,6 +41,24 @@ delete from public.user_entitlements where user_id='11111111-1111-4111-8111-1111
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
+-- Arbitrary custom GUCs are not capabilities, including within a transaction
+-- that has already completed a legitimate RPC.
+begin;
+select set_config('sideflip.trade_up_rpc','on',true);
+select public._goal_test_assert(public._goal_test_raises(
+  $$update public.projects set title='spoofed' where id='21000000-0000-4000-8000-000000000002'$$,
+  'Goal locked'),'spoofed GUC cannot bypass project guard');
+select public._goal_test_assert(public._goal_test_raises(
+  $$insert into public.expenses(project_id,user_id,description,amount) values('21000000-0000-4000-8000-000000000002','11111111-1111-4111-8111-111111111111','spoofed',1)$$,
+  'Goal locked'),'spoofed GUC cannot bypass expense guard');
+select public._goal_test_assert(public._goal_test_raises(
+  $$update public.trade_up_goals set status='completed' where id='10000000-0000-4000-8000-000000000001'$$,
+  'not fully funded'),'spoofed GUC cannot bypass direct completion guard');
+select public.update_trade_up_goal('10000000-0000-4000-8000-000000000001',null,100,'authorization-probe');
+select public._goal_test_assert(public._goal_test_raises(
+  $$update public.trade_up_goals set target_amount=1 where id='20000000-0000-4000-8000-000000000002'$$,
+  'Goal locked'),'successful RPC leaves no authorization behind');
+rollback;
 select public.adjust_trade_up_goal('10000000-0000-4000-8000-000000000001','personal_contribution',10,'seed','adjust-1') as retained_adjustment \gset
 select public._goal_test_assert(
   public.adjust_trade_up_goal('10000000-0000-4000-8000-000000000001','personal_contribution',10,'seed','adjust-1')=:'retained_adjustment',
