@@ -43,6 +43,12 @@ function normalizeRecord(record) {
     if (value === undefined) return null
     inputs[field] = String(record.inputs[field]).trim()
   }
+  for (const field of ['estimatedHours', 'targetHourlyRate']) {
+    const raw = record.inputs[field] ?? ''
+    const limit = field === 'estimatedHours' ? 100000 : MAX_INPUT_MONEY
+    if (finiteBounded(raw, { min: 0, max: limit }) === undefined) return null
+    inputs[field] = String(raw).trim()
+  }
   const normalized = {
     schemaVersion: ANALYSIS_SCHEMA_VERSION, id,
     projectId: record.projectId == null ? null : boundedString(record.projectId, 100),

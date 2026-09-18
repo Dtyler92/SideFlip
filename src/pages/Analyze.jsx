@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { calculateHourlyPay, calculateRequiredProfit } from '../dealLabor'
 import {
   MAX_CURRENCY_AMOUNT, MAX_PLATFORM_FEE_PERCENT, MAX_ROI_PERCENT,
   analyzeDeal, calculateListPrice, calculateMaximumBuyPrice, calculateProfit,
@@ -28,7 +29,7 @@ export const PLATFORM_PRESETS = Object.freeze([
 export const ROI_PRESETS = Object.freeze(['10', '25', '50', '100', '150'])
 
 const CURRENCY_SYMBOLS = { USD:'$', CAD:'CA$', GBP:'£', EUR:'€', AUD:'A$', MXN:'MX$', JPY:'¥', INR:'₹' }
-const EMPTY_DEAL = { itemName:'', projectId:null, purchasePrice:'', repairsMaterials:'', parts:'', fuelTravel:'', shippingCost:'', otherExpenses:'', expectedSellingPrice:'', platformFeePct:'0', sellerPaidShipping:'', salesTaxOtherFees:'', desiredMinimumProfit:'' }
+const EMPTY_DEAL = { estimatedHours:'', targetHourlyRate:'', itemName:'', projectId:null, purchasePrice:'', repairsMaterials:'', parts:'', fuelTravel:'', shippingCost:'', otherExpenses:'', expectedSellingPrice:'', platformFeePct:'0', sellerPaidShipping:'', salesTaxOtherFees:'', desiredMinimumProfit:'' }
 const EMPTY_QUICK = { askingPrice:'', estimatedRepairs:'', expectedResaleValue:'', desiredMinimumProfit:'' }
 const EMPTY_LIST = { totalInvested:'', targetMode:'profit', targetValue:'', platformFeePct:'0', sellerPaidShipping:'', additionalSellingCosts:'' }
 const EMPTY_MAX = { expectedSellingPrice:'', nonPurchaseExpenses:'', desiredMinimumProfit:'', platformFeePct:'0', sellerPaidShipping:'', otherSellingCosts:'' }
@@ -137,6 +138,8 @@ export default function Analyze({ projectId = null, onProjectPrefillConsumed }) 
   const pickerDialog = useRef(null)
 
   const dealResult = useMemo(() => analyzeDeal(deal), [deal])
+  const hourlyPay = calculateHourlyPay({ profit: dealResult.expectedProfit, hours: deal.estimatedHours })
+  const laborTarget = calculateRequiredProfit({ hours: deal.estimatedHours, hourlyRate: deal.targetHourlyRate })
   const quickResult = useMemo(() => quickDealCheck(quick), [quick])
   const listResult = useMemo(() => calculateListPrice(list), [list])
   const maxResult = useMemo(() => calculateMaximumBuyPrice(maxBuy), [maxBuy])
@@ -236,6 +239,9 @@ export default function Analyze({ projectId = null, onProjectPrefillConsumed }) 
         {deal.projectId && <p className="analyze-private">Linked Project · values are a private analysis copy</p>}
         <h3>Investment</h3>
         {[['Purchase Price','purchasePrice'],['Estimated Repairs / Materials','repairsMaterials'],['Parts','parts'],['Fuel / Travel','fuelTravel'],['Shipping Cost','shippingCost'],['Other Expenses','otherExpenses']].map(([label,key]) => <MoneyField key={key} currency={currency} label={label} value={deal[key]} onChange={setDealValue(key)}/>)}
+        <h3>Labor Estimate</h3>
+        <Field label="Estimated Labor Hours" money={false} maximum={100000} value={deal.estimatedHours} onChange={setDealValue('estimatedHours')} placeholder="Hours you expect to put in" hint="Rounded up to the next quarter hour. Estimates only; actual Project labor is unchanged."/>
+        <MoneyField currency={currency} label="Your Target Pay Per Hour (optional)" value={deal.targetHourlyRate} onChange={setDealValue('targetHourlyRate')}/>
         <h3>Sale Estimate</h3>
         <MoneyField currency={currency} label="Expected Selling Price" value={deal.expectedSellingPrice} onChange={setDealValue('expectedSellingPrice')}/>
         <PlatformPicker preset={platform} setPreset={setPlatform} fee={deal.platformFeePct} setFee={setDealValue('platformFeePct')}/>
@@ -245,6 +251,8 @@ export default function Analyze({ projectId = null, onProjectPrefillConsumed }) 
         <p className="analyze-disclosure">Estimated resale values are entered by you. This field can later accept verified comparable-sales research without changing the calculation engine.</p>
       </section>
       {Number(deal.expectedSellingPrice) > 0 && <Results><Rating result={dealResult}/><div className="analyze-metrics">
+        <Metric primary label="Estimated Pay Per Hour" value={hourlyPay === null ? '—' : `${money(hourlyPay)}/hr`} tone={hourlyPay !== null && hourlyPay < 0 ? 'negative' : 'positive'}/>
+        {hourlyPay !== null && laborTarget !== null && <Metric label="Hourly Target" value={dealResult.expectedProfit >= laborTarget ? 'Meets target' : `Below target — needs ${money(laborTarget)} profit`} tone={dealResult.expectedProfit >= laborTarget ? 'positive' : 'negative'}/>}
         <Metric primary label="Expected Profit" value={money(dealResult.expectedProfit)} tone={dealResult.expectedProfit >= 0 ? 'positive' : 'negative'}/><Metric primary label="ROI" value={pct(dealResult.roiPct)} tone={dealResult.roiPct == null || dealResult.roiPct >= 0 ? 'positive' : 'negative'}/>
         <Metric label="Maximum Buy Price" value={money(dealResult.maximumPurchasePrice)}/><Metric label="Break-Even Price" value={money(dealResult.breakEvenSellingPrice)}/><Metric label="Total Investment" value={money(dealResult.totalInvestment)}/><Metric label="Expected Revenue" value={money(dealResult.expectedRevenue)}/><Metric label="Platform Fees" value={money(dealResult.platformFees)}/><Metric label="Total Selling Costs" value={money(dealResult.totalSellingCosts)}/><Metric label="Profit Margin" value={pct(dealResult.profitMarginPct)}/>
       </div><button className="btn btn-primary" type="button" disabled={saving} onClick={saveCurrentDeal}>{saving ? 'Saving…' : 'Save Analysis'}</button></Results>}
