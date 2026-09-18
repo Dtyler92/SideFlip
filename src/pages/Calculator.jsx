@@ -1,20 +1,31 @@
 import { useState } from 'react'
 
+import { analyzeDeal } from '../dealLabor.js'
+
 const fmt = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmtHours = h => (h === null ? '—' : `${h} hr${h === 1 ? '' : 's'}`)
 
 export default function Calculator() {
   const [invested, setInvested] = useState('')
   const [targetPct, setTargetPct] = useState('50')
   const [fees, setFees] = useState('0')
+  const [hours, setHours] = useState('')
+  const [hourlyTarget, setHourlyTarget] = useState('')
 
   const inv = parseFloat(invested) || 0
   const pct = parseFloat(targetPct) || 0
   const feePct = parseFloat(fees) || 0
 
-  const targetProfit = inv * (pct / 100)
-  const listPrice = feePct > 0 ? (inv + targetProfit) / (1 - feePct / 100) : inv + targetProfit
-  const actualProfit = listPrice * (1 - feePct / 100) - inv
-  const roi = inv > 0 ? ((actualProfit / inv) * 100).toFixed(1) : null
+  const deal = analyzeDeal({
+    invested: inv,
+    targetPct: pct,
+    feePct,
+    estimatedHours: hours,
+    targetHourlyRate: hourlyTarget,
+  })
+  const listPrice = deal.listPrice ?? 0
+  const actualProfit = deal.profit ?? 0
+  const roi = deal.roi === null ? null : deal.roi.toFixed(1)
 
   const scenarios = [10, 25, 50, 100].map(p => {
     const profit = inv * (p / 100)
@@ -79,6 +90,34 @@ export default function Calculator() {
           <input type="number" inputMode="decimal" placeholder="Custom fee %" value={fees}
             onChange={e => setFees(e.target.value)} />
         </div>
+
+        <div className="form-group" style={{ marginBottom: 8 }}>
+          <label>Estimated Labor Hours</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            {[1, 2, 4, 8, 16].map(h => (
+              <button key={h} type="button"
+                onClick={() => setHours(String(h))}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, border: '1.5px solid',
+                  borderColor: hours === String(h) ? 'var(--accent)' : 'var(--border)',
+                  background: hours === String(h) ? 'var(--accent)' : 'var(--surface)',
+                  color: hours === String(h) ? '#fff' : 'var(--body)',
+                  fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)'
+                }}>{h} hr</button>
+            ))}
+          </div>
+          <input type="number" inputMode="decimal" placeholder="Hours you expect to put in" value={hours}
+            onChange={e => setHours(e.target.value)} />
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+            Estimate only — rounded up to the next quarter hour. Log real hours on the project after you do the work.
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Your Target Pay Per Hour</label>
+          <input type="number" inputMode="decimal" placeholder="Optional — e.g. 25" value={hourlyTarget}
+            onChange={e => setHourlyTarget(e.target.value)} />
+        </div>
       </div>
 
       {inv > 0 && (
@@ -101,6 +140,25 @@ export default function Calculator() {
               <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{fmt(inv)}</div>
             </div>
           </div>
+
+          {deal.hourlyPay !== null && (
+            <div style={{ borderTop: '1px solid #333', marginTop: 16, paddingTop: 16 }}>
+              <div style={{ fontSize: 10, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Your Pay Per Hour</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: deal.hourlyPay >= 0 ? '#4ade80' : '#f87171' }}>
+                {fmt(deal.hourlyPay)}<span style={{ fontSize: 14, fontWeight: 600, color: '#8C8880' }}>/hr</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#8C8880', marginTop: 4 }}>
+                {fmt(actualProfit)} for {fmtHours(deal.hours)} of work
+              </div>
+              {deal.meetsTarget !== null && (
+                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 10, color: deal.meetsTarget ? '#4ade80' : '#f87171' }}>
+                  {deal.meetsTarget
+                    ? `Clears your ${fmt(hourlyTarget)}/hr target`
+                    : `Below your ${fmt(hourlyTarget)}/hr target — you'd need ${fmt(deal.requiredProfit)} profit${deal.requiredListPrice !== null ? `, listing at ${fmt(deal.requiredListPrice)}` : ''}`}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
