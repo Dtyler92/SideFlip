@@ -34,12 +34,9 @@ reset role;
 select public._research_assert(not exists(select 1 from private.my_stuff_research_jobs where item_id=:'incomplete_item'),'incomplete identity creates no paid job');
 
 set role service_role;
-update private.my_stuff_research_jobs
-set status='running',lease_owner='focused-worker',lease_token=gen_random_uuid(),lease_expires_at=now()+interval '5 minutes',attempt_count=1,state_version=state_version+1,updated_at=now()
-where id=:'focused_job'
-returning lease_token as focused_token \gset
-insert into private.my_stuff_research_attempts(job_id,attempt_number,provider,model,retention_policy,status)
-select id,attempt_count,'xai','grok-4.6','standard-30-days-store-false','running' from private.my_stuff_research_jobs where id=:'focused_job';
+select lease->'lease'->>'id' as leased_job,lease->'lease'->>'lease_token' as focused_token
+from (select public.lease_my_stuff_research_worker_v2('focused-worker') lease) leased \gset
+select public._research_assert(:'leased_job'::uuid=:'focused_job'::uuid,'alias-backed job reaches the real paid-worker lease boundary');
 select public._research_raises(format(
   'select public.settle_my_stuff_research_worker_v2(%L,%L,1,%L::jsonb,%L::jsonb,%L::jsonb)',
   :'focused_job',:'focused_token',

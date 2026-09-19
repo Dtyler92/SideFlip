@@ -8,7 +8,8 @@ import {
   validateUnresolvedResults,
 } from '../supabase/functions/_shared/research-validators.js'
 
-const migrationUrl = new URL('../supabase/migrations/20260919190000_focus_simple_maintenance_research.sql', import.meta.url)
+const migrationUrl=new URL('../supabase/migrations/20260919190000_focus_simple_maintenance_research.sql',import.meta.url)
+const blockerFixUrl=new URL('../supabase/migrations/20260919191000_fix_simple_maintenance_review_blockers.sql',import.meta.url)
 
 const evidence = () => ({
   id:'e1',title:'Owner guide',canonicalUrl:'https://manuals.example.com/guide',
@@ -49,16 +50,22 @@ test('provider result validators reject unknown fields and fractional intervals'
 })
 
 test('additive migration narrows snapshots and uses one alias-aware source policy everywhere', () => {
-  const sql=readFileSync(migrationUrl,'utf8')
+  const baseSql=readFileSync(migrationUrl,'utf8')
+  const fixSql=readFileSync(blockerFixUrl,'utf8')
+  const sql=`${baseSql}\n${fixSql}`
   assert.match(sql,/create or replace function private\.my_stuff_research_source_matches_make_v1/i)
   assert.match(sql,/unnest\(d\.manufacturer_aliases\)/i)
   assert.match(sql,/create or replace function private\.my_stuff_research_policy_is_current_v1/i)
   assert.match(sql,/create or replace function public\.enqueue_my_stuff_research_v3/i)
   assert.match(sql,/create or replace function private\.settle_my_stuff_research_job_v4/i)
   assert.match(sql,/IDENTITY_INCOMPLETE/i)
+  assert.match(sql,/v_item\.engine_displacement_liters is null[\s\S]+IDENTITY_INCOMPLETE/i)
   assert.match(sql,/jsonb_build_object\(\s*'modelYear'[^;]+'make'[^;]+'model'[^;]+'engine'[^;]+'transmission'/is)
   assert.doesNotMatch(sql,/jsonb_build_object\(\s*'modelYear'[^;]+'trim'|'drivetrain'\s*,\s*v_item|'fuel'\s*,\s*v_item|'market'\s*,\s*v_item|'vehicleType'\s*,\s*v_item/is)
+  assert.doesNotMatch(fixSql,/coalesce\([^;]*(?:v_item\.engine\b|v_item\.engine_model)/i)
+  assert.match(fixSql,/my_stuff_research_source_matches_make_v1\(d\.domain,v_job\.request_snapshot->>'make'\)/i)
   assert.match(sql,/private\.my_stuff_research_source_matches_make_v1\(d\.domain,j\.request_snapshot->>'make'\)/i)
   assert.match(sql,/private\.my_stuff_research_source_matches_make_v1\(domain,v_job\.request_snapshot->>'make'\)/i)
+  assert.match(fixSql,/exception when unique_violation[\s\S]+select \* into v_existing[\s\S]+v_existing\.item_id<>p_item_id[\s\S]+v_existing\.confirmed_fingerprint<>p_confirmed_fingerprint/i)
   assert.match(sql,/revoke execute on function private\.my_stuff_research_source_matches_make_v1\(text,text\) from public,anon,authenticated,service_role/i)
 })
