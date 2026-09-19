@@ -1,5 +1,6 @@
 // @ts-nocheck -- Supabase Edge resolves Deno globals and URL imports at deploy time.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { emitFailureDiagnostic } from './failure-diagnostics.js'
 import { processLeasedJob } from './worker-core.js'
 import { createXaiMaintenanceProvider } from './xai-provider.js'
 
@@ -50,8 +51,8 @@ Deno.serve(async request => {
     const provider = createXaiMaintenanceProvider({ apiKey: xaiApiKey, model: rawConfig.provider_model, timeoutSeconds })
     const domains = rawDomains.map(value => ({ domain: value.domain, sourceClass: value.source_class, includeSubdomains: value.include_subdomains, allowedPathPrefixes: value.allowed_path_prefixes, manufacturer: value.manufacturer, termsReviewedOn: value.terms_reviewed_on, robotsReviewedOn: value.robots_reviewed_on }))
     const db = {
-      settle: async ({ jobId, leaseToken, costInUsdTicks, evidence, candidates, unresolved }: any) => {
-        const { error } = await supabase.rpc('settle_my_stuff_research_worker_v2', { p_job_id: jobId, p_lease_token: leaseToken, p_cost_ticks: costInUsdTicks, p_evidence: evidence, p_candidates: candidates, p_unresolved: unresolved })
+      settle: async ({ jobId, leaseToken, costInUsdTicks, evidence, candidates, unresolved, proposals = [] }: any) => {
+        const { error } = await supabase.rpc(proposals.length ? 'settle_my_stuff_research_worker_v3' : 'settle_my_stuff_research_worker_v2', { p_job_id: jobId, p_lease_token: leaseToken, p_cost_ticks: costInUsdTicks, p_evidence: evidence, p_candidates: candidates, p_unresolved: unresolved, ...(proposals.length ? { p_proposals: proposals } : {}) })
         if (error) throw error
       },
       fail: async ({ jobId, leaseToken, costInUsdTicks, code, detail }: any) => {
@@ -68,7 +69,7 @@ Deno.serve(async request => {
     })
     return response(200, { processed: 1, job_id: result.jobId, candidate_count: result.candidateCount })
   } catch (error) {
-    console.error(JSON.stringify({ event: 'maintenance_research_worker_failed', code: error?.code || 'WORKER_ERROR' }))
+    emitFailureDiagnostic(error)
     return response(500, { error: 'worker_failed' })
   }
 })

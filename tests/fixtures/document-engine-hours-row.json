@@ -1,0 +1,18 @@
+{
+  "fixtureType": "Analyst-authored single-row contract fixture; not provider output, approved semantics, or complete schedule",
+  "sourceSha256": "fe486194ca101e23b48eca6ca772a845fdac9b1d6f2d73a48f2259ab732d70de",
+  "oracleRowId": "ford-audit-095",
+  "pdfPage": 569,
+  "quote": "Replace the engine-mounted and frame-mounted fuel\nfilters.\nEvery 30,000 mi\n(48,000 km) or six months,\n600 engine hours\n",
+  "timing": {
+    "kind": "recurring",
+    "interval": {
+      "miles": 30000,
+      "months": 6,
+      "hours": 600
+    },
+    "anchor": "last_service",
+    "trigger": "whichever_first"
+  },
+  "unresolved": "Vehicle/primary-use applicability, anchor, coordination and full schedule semantics unapproved"
+}

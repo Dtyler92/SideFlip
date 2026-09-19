@@ -1,3 +1,5 @@
+import { hasBoundedTaskSupport } from './research-support.js'
+
 const ASSET_FIELDS = Object.freeze([
   'modelYear', 'make', 'model', 'trim', 'engine', 'transmission',
   'drivetrain', 'fuel', 'market', 'vehicleType',
@@ -117,6 +119,9 @@ export function validateNormalizedCandidates(values, evidenceById, unresolved = 
     }
     seen.set(key, comparable)
     output.push(candidate)
+  }
+  for (const candidate of output) {
+    if (!hasBoundedTaskSupport(candidate, evidenceById)) fail('INVALID_CANDIDATE', 'Candidate lacks bounded task/action/interval support; source review or unresolved routing required')
   }
   return output
 }

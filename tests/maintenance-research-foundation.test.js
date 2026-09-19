@@ -153,8 +153,8 @@ test('worker performs capped discovery then isolated normalization without leaki
   const reviewedOn = accessedAt.slice(0,10)
   const calls = []
   const provider = {
-    discover: async input => { calls.push(['discover', input]); return { evidence: [{ id: 'e1', title: 'Guide', canonicalUrl: 'https://honda.com/guide', exactExcerpt: 'Inspect every 12 months.', accessedAt, applicability: '2020 Civic', sourceClass: 'manufacturer', section: 'Maintenance', locationVerified: false, verificationStatus: 'provider_citation_unconfirmed' }], proofs:[{canonicalUrl:'https://honda.com/guide'}], usage: { costInUsdTicks: 20_000_000, searches: 3, fetches: 2 } } },
-    normalize: async input => { calls.push(['normalize', input]); return { candidates: [{ name: 'Inspection', action: 'inspect', profile: 'normal', dueSemantics: 'whichever_first', intervalMonths: 12, evidenceIds: ['e1'], uncertainty: 'low', conflict: false }], unresolved:[{name:'Brake fluid',reason:'Manufacturer sources conflict.'}], usage: { costInUsdTicks: 10_000_000 } } },
+    discover: async input => { calls.push(['discover', input]); return { evidence: [{ id: 'e1', title: 'Guide', canonicalUrl: 'https://honda.com/guide', exactExcerpt: 'Inspect brake hoses every 12 months.', accessedAt, applicability: '2020 Civic', sourceClass: 'manufacturer', section: 'Maintenance', locationVerified: false, verificationStatus: 'provider_citation_unconfirmed' }], proofs:[{canonicalUrl:'https://honda.com/guide'}], usage: { costInUsdTicks: 20_000_000, searches: 3, fetches: 2 } } },
+    normalize: async input => { calls.push(['normalize', input]); return { candidates: [{ name: 'Brake hoses', action: 'inspect', profile: 'normal', dueSemantics: 'whichever_first', intervalMonths: 12, evidenceIds: ['e1'], uncertainty: 'low', conflict: false }], unresolved:[{name:'Brake fluid',reason:'Manufacturer sources conflict.'}], usage: { costInUsdTicks: 10_000_000 } } },
   }
   let settled
   const db = { settle: async value => { settled = value }, fail: async error => { throw error } }
@@ -169,6 +169,17 @@ test('worker performs capped discovery then isolated normalization without leaki
   for (const secret of ['VIN','SERIAL','private','home','"userId":"uid"']) assert.ok(!serializedCalls.includes(secret))
   assert.equal(settled.costInUsdTicks, 30_000_000)
   assert.deepEqual(settled.unresolved,[{name:'Brake fluid',reason:'Manufacturer sources conflict.'}])
+  const normalize = provider.normalize
+  let failed
+  const invalidProvider = { ...provider, normalize: async input => {
+    const result = await normalize(input)
+    result.candidates[0].action = 'replace'
+    return result
+  } }
+  await assert.rejects(() => processLeasedJob({ lease, config: { maxSearches: 3, maxFetches: 2 }, domains, provider: invalidProvider,
+    db: { settle: async () => assert.fail('unsupported task must not settle'), fail: async value => { failed = value } } }), /support/i)
+  assert.equal(failed.code, 'INVALID_CANDIDATE')
+  assert.equal(failed.costInUsdTicks, 30_000_000)
   await assert.rejects(() => processLeasedJob({ lease, config: { maxSearches: 4, maxFetches: 2 }, domains, provider, db:{...db,fail:async()=>{}} }), /disabled/i)
 })
 
@@ -303,7 +314,7 @@ test('validators reject canonical-source/date tricks and candidate conflicts', a
   const { validateEvidenceRegistry, validateNormalizedCandidates, validateUnresolvedResults } = await import(validatorsUrl)
   const now = new Date('2026-09-07T15:00:00.000Z')
   const domain = {domain:'honda.com',sourceClass:'manufacturer',includeSubdomains:false,allowedPathPrefixes:['/owners'],termsReviewedOn:'2026-09-07',robotsReviewedOn:'2026-09-07'}
-  const evidence = {id:'e1',title:'Guide',canonicalUrl:'https://honda.com/owners/guide',exactExcerpt:'Inspect yearly.',accessedAt:'2026-09-07T12:00:00.000Z',applicability:'2020 Civic',sourceClass:'manufacturer',section:'Schedule',locationVerified:false,verificationStatus:'provider_citation_unconfirmed'}
+  const evidence = {id:'e1',title:'Guide',canonicalUrl:'https://honda.com/owners/guide',exactExcerpt:'Replace engine oil every 7,500 miles.',accessedAt:'2026-09-07T12:00:00.000Z',applicability:'2020 Civic',sourceClass:'manufacturer',section:'Schedule',locationVerified:false,verificationStatus:'provider_citation_unconfirmed'}
   const proof = {canonicalUrl:evidence.canonicalUrl}
   const registry=validateEvidenceRegistry([evidence],[domain],[proof],now)
   for (const bad of [

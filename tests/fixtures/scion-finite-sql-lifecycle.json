@@ -1,0 +1,589 @@
+{
+  "provenance": "Actual uploaded PDF extraction, whitespace collapsed. Human-authored expected proposals and simulated owner attestations. NOT provider output, source authentication, remote-byte equality, or real consent.",
+  "pdfSha256": "674a870e6cd42fdf08e72285649e10d9e2abffb2ecb5056e702fdd08c98dd094",
+  "evidence": [
+    {
+      "id": "p34",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "Miles or Months? Scion recommends obtaining scheduled maintenance for your vehicle every 5,000 miles or six months, whichever comes first. For example: > If you drive 5,000 miles in less than six months, you should obtain maintenance at 5,000 miles - don\u2019t wait until six months. > If at six months you have driven less than 5,000 miles, you should obtain maintenance at six months - don\u2019t wait until 5,000 miles. Be sure to keep an eye on your mileage so that you obtain maintenance when recommended. If you are a low-mileage driver, mark your calendar to remind yourself to obtain maintenance every six months. Special Operating Conditions In addition to standard maintenance items, the maintenance log indicates services that should be performed on vehicles that are driven under especially demanding conditions. These \u201cspecial operating conditions\u201d and their required maintenance items are clearly indicated in each chart. NOTE: You should perform these additional maintenance services only if the majority of your driving is done under the special operating conditions indicated. If you only occasionally drive under these circumstances, it is not necessary to perform the additional services. Engine Oil Selection Please refer to your Owner\u2019s Manual for the specific oil viscosity rating recommended for your vehicle/engine type. USING THE MAINTENANCE LOG CHARTS Maintenance Log34 MAINTENANCE",
+      "page": "34",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p37",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "15,000 miles or 18 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Rotate tires Visually inspect brake linings/drums and brake pads/discs Note: If 0W-20 oil WAS NOT used at the last oil change, replace engine oil and oil filter .1 Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Drive shaft boots __ Engine coolant 3 __ Exhaust pipes and mountings __ Radiator and condenser __ Steering gear box __ Steering linkage and boots Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Inspect engine air filter Replace engine oil and oil filter 1 Tighten nuts and bolts on chassis and body Repeated trips of less than five miles in temperatures below 32\u00b0F / 0\u00b0C: Replace engine oil and oil filter 1 Extensive idling and/or low speed driving for a long distance such as police, taxi or door-to-door delivery use: Replace engine oil and oil filter 1 DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 37",
+      "page": "37",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p39",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "30,000 miles or 36 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 3 __ Drive shaft boots __ Engine coolant 4 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Tighten nuts and bolts on chassis and body DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Inspect thickness measurement and disc runout. 4 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 39",
+      "page": "39",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p41",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "45,000 miles or 54 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Rotate tires Visually inspect brake linings/drums and brake pads/discs Note: If 0W-20 oil WAS NOT used at the last oil change, replace engine oil and oil filter .1 Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Drive shaft boots __ Engine coolant 3 __ Exhaust pipes and mountings __ Radiator and condenser __ Steering gear box __ Steering linkage and boots Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Inspect engine air filter Replace engine oil and oil filter 1 Tighten nuts and bolts on chassis and body Repeated trips of less than five miles in temperatures below 32\u00b0F / 0\u00b0C: Replace engine oil and oil filter 1 Extensive idling and/or low speed driving for a long distance such as police, taxi or door-to-door delivery use: Replace engine oil and oil filter 1 DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 41",
+      "page": "41",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p43",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "60,000 miles or 72 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 3 __ Drive belts 4 __ Drive shaft boots __ Engine coolant 5 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Tighten nuts and bolts on chassis and body DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Inspect thickness measurement and disc runout. 4 Initial inspection at 60,000 miles/72 months. Inspect every 15,000 miles/18 months thereafter . 5 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 43",
+      "page": "43",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p45",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "75,000 miles or 90 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Rotate tires Visually inspect brake linings/drums and brake pads/discs Note: If 0W-20 oil WAS NOT used at the last oil change, replace engine oil and oil filter .1 Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Drive belts __ Drive shaft boots __ Engine coolant 3 __ Exhaust pipes and mountings __ Radiator and condenser __ Steering gear box __ Steering linkage and boots Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Inspect engine air filter Replace engine oil and oil filter 1 Tighten nuts and bolts on chassis and body Repeated trips of less than five miles in temperatures below 32\u00b0F / 0\u00b0C: Replace engine oil and oil filter 1 Extensive idling and/or low speed driving for a long distance such as police, taxi or door-to-door delivery use: Replace engine oil and oil filter 1 DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 45",
+      "page": "45",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p47",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "90,000 miles or 108 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 3 __ Drive belts __ Drive shaft boots __ Engine coolant 4 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Tighten nuts and bolts on chassis and body DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Inspect thickness measurement and disc runout. 4 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 47",
+      "page": "47",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p49",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "105,000 miles or 126 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Rotate tires Visually inspect brake linings/drums and brake pads/discs Note: If 0W-20 oil WAS NOT used at the last oil change, replace engine oil and oil filter .1 Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Drive belts __ Drive shaft boots __ Engine coolant 4 __ Exhaust pipes and mountings __ Radiator and condenser __ Steering gear box __ Steering linkage and boots Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Inspect engine air filter Replace engine oil and oil filter 1 Tighten nuts and bolts on chassis and body Repeated trips of less than five miles in temperatures below 32\u00b0F / 0\u00b0C: Replace engine oil and oil filter 1 Extensive idling and/or low speed driving for a long distance such as police, taxi or door-to-door delivery use: Replace engine oil and oil filter 1 DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Initial replacement at 100,000 miles/120 months. Replace every 50,000 miles/60 months thereafter . Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. 4 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 49",
+      "page": "49",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    },
+    {
+      "id": "p51",
+      "title": "2012 Scion xD Warranty and Maintenance Guide",
+      "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+      "exactExcerpt": "120,000 miles or 144 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Replace spark plugs 3 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 4 __ Drive belts __ Drive shaft boots __ Engine coolant 5 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil Additional Maintenance Items for Special Operating Conditions 2 Driving on dirt roads or dusty roads: Tighten nuts and bolts on chassis and body DEALER SERVICE VERIFICATION: DATE: MILEAGE: 1 Reset the oil replacement reminder light (\u201cMAINT REQD\u201d) or the message \u201cOIL MAINTENANCE REQUIRED\u201d on the multi-information display after maintenance at every 5,000 miles. 2 Perform these service items only if you drive primarily under the conditions indicated. 3 Maintenance services of spark plugs are required under the terms of the Emission Control Warranty. 4 Inspect thickness measurement and disc runout. 5 Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information. MAINTENANCE LOG MAINTENANCE Maintenance Log 51",
+      "page": "51",
+      "accessedAt": "2026-09-16T00:00:00Z",
+      "applicability": "2012 Scion xD US",
+      "sourceClass": "manufacturer",
+      "sourceDomain": "assets.sia.toyota.com",
+      "locationVerified": false,
+      "verificationStatus": "provider_citation_unconfirmed"
+    }
+  ],
+  "proposals": [
+    {
+      "schemaVersion": 1,
+      "id": "Engine-air-filter",
+      "name": "Engine air filter",
+      "action": "replace",
+      "evidenceIds": [
+        "p39",
+        "p43",
+        "p47",
+        "p51",
+        "p34"
+      ],
+      "support": {
+        "origin": "provider_claim",
+        "coverage": "finite_list_only",
+        "row": [
+          {
+            "evidenceId": "p39",
+            "quote": "Replace engine air filter"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "Replace engine air filter"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "Replace engine air filter"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "Replace engine air filter"
+          }
+        ],
+        "actionContext": [
+          {
+            "evidenceId": "p39",
+            "quote": "Replace engine air filter"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "Replace engine air filter"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "Replace engine air filter"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "Replace engine air filter"
+          }
+        ],
+        "headingContext": [
+          {
+            "evidenceId": "p39",
+            "quote": "30,000 miles or 36 months"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "60,000 miles or 72 months"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "90,000 miles or 108 months"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "120,000 miles or 144 months"
+          }
+        ],
+        "notesContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "Miles or Months? Scion recommends obtaining scheduled maintenance for your vehicle every 5,000 miles or six months, whichever comes first. For example: > If you drive 5,000 miles in less than six months, you should obtain maintenance at 5,000 miles - don\u2019t wait until six months. > If at six months you have driven less than 5,000 miles, you should obtain maintenance at six months - don\u2019t wait until 5,000 miles. Be sure to keep an eye on your mileage so that you obtain maintenance when recommended. If you are a low-mileage driver, mark your calendar to remind yourself to obtain maintenance every six months. Special Operating Conditions In addition to standard maintenance items, the maintenance log indicates services that should be performed on vehicles that are driven under especially demanding conditions. These \u201cspecial operating conditions\u201d and their required maintenance items are clearly indicated in each chart. NOTE: You should perform these additional maintenance services only if the majority of your driving is done under the special operating conditions indicated. If you only occasionally drive under these circumstances, it is not necessary to perform the additional services. Engine Oil Selection Please refer to your Owner\u2019s Manual for the specific oil viscosity rating recommended for your vehicle/engine type. USING THE MAINTENANCE LOG CHARTS Maintenance Log34 MAINTENANCE"
+          }
+        ],
+        "timingContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "whichever comes first"
+          }
+        ],
+        "applicabilityContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "Scion"
+          }
+        ]
+      },
+      "schedule": {
+        "kind": "milestones",
+        "dueSemantics": "whichever_first",
+        "milestones": [
+          {
+            "miles": 30000,
+            "months": 36,
+            "evidenceIds": [
+              "p39"
+            ]
+          },
+          {
+            "miles": 60000,
+            "months": 72,
+            "evidenceIds": [
+              "p43"
+            ]
+          },
+          {
+            "miles": 90000,
+            "months": 108,
+            "evidenceIds": [
+              "p47"
+            ]
+          },
+          {
+            "miles": 120000,
+            "months": 144,
+            "evidenceIds": [
+              "p51"
+            ]
+          }
+        ],
+        "end": {
+          "miles": 120000,
+          "months": 144
+        }
+      },
+      "blockedReasons": []
+    },
+    {
+      "schemaVersion": 1,
+      "id": "Front-differential-oil",
+      "name": "Front differential oil",
+      "action": "inspect",
+      "evidenceIds": [
+        "p39",
+        "p43",
+        "p47",
+        "p51",
+        "p34"
+      ],
+      "support": {
+        "origin": "provider_claim",
+        "coverage": "finite_list_only",
+        "row": [
+          {
+            "evidenceId": "p39",
+            "quote": "Front differential oil"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "Front differential oil"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "Front differential oil"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "Front differential oil"
+          }
+        ],
+        "actionContext": [
+          {
+            "evidenceId": "p39",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "Inspect the following:"
+          }
+        ],
+        "headingContext": [
+          {
+            "evidenceId": "p39",
+            "quote": "30,000 miles or 36 months"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "60,000 miles or 72 months"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "90,000 miles or 108 months"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "120,000 miles or 144 months"
+          }
+        ],
+        "notesContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "Miles or Months? Scion recommends obtaining scheduled maintenance for your vehicle every 5,000 miles or six months, whichever comes first. For example: > If you drive 5,000 miles in less than six months, you should obtain maintenance at 5,000 miles - don\u2019t wait until six months. > If at six months you have driven less than 5,000 miles, you should obtain maintenance at six months - don\u2019t wait until 5,000 miles. Be sure to keep an eye on your mileage so that you obtain maintenance when recommended. If you are a low-mileage driver, mark your calendar to remind yourself to obtain maintenance every six months. Special Operating Conditions In addition to standard maintenance items, the maintenance log indicates services that should be performed on vehicles that are driven under especially demanding conditions. These \u201cspecial operating conditions\u201d and their required maintenance items are clearly indicated in each chart. NOTE: You should perform these additional maintenance services only if the majority of your driving is done under the special operating conditions indicated. If you only occasionally drive under these circumstances, it is not necessary to perform the additional services. Engine Oil Selection Please refer to your Owner\u2019s Manual for the specific oil viscosity rating recommended for your vehicle/engine type. USING THE MAINTENANCE LOG CHARTS Maintenance Log34 MAINTENANCE"
+          }
+        ],
+        "timingContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "whichever comes first"
+          }
+        ],
+        "applicabilityContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "Scion"
+          }
+        ]
+      },
+      "schedule": {
+        "kind": "milestones",
+        "dueSemantics": "whichever_first",
+        "milestones": [
+          {
+            "miles": 30000,
+            "months": 36,
+            "evidenceIds": [
+              "p39"
+            ]
+          },
+          {
+            "miles": 60000,
+            "months": 72,
+            "evidenceIds": [
+              "p43"
+            ]
+          },
+          {
+            "miles": 90000,
+            "months": 108,
+            "evidenceIds": [
+              "p47"
+            ]
+          },
+          {
+            "miles": 120000,
+            "months": 144,
+            "evidenceIds": [
+              "p51"
+            ]
+          }
+        ],
+        "end": {
+          "miles": 120000,
+          "months": 144
+        }
+      },
+      "blockedReasons": []
+    },
+    {
+      "schemaVersion": 1,
+      "id": "Brake-lines-and-hoses",
+      "name": "Brake lines and hoses",
+      "action": "inspect",
+      "evidenceIds": [
+        "p37",
+        "p39",
+        "p41",
+        "p43",
+        "p45",
+        "p47",
+        "p49",
+        "p51",
+        "p34"
+      ],
+      "support": {
+        "origin": "provider_claim",
+        "coverage": "finite_list_only",
+        "row": [
+          {
+            "evidenceId": "p37",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p39",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p41",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p45",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p49",
+            "quote": "Brake lines and hoses"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "Brake lines and hoses"
+          }
+        ],
+        "actionContext": [
+          {
+            "evidenceId": "p37",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p39",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p41",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p45",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p49",
+            "quote": "Inspect the following:"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "Inspect the following:"
+          }
+        ],
+        "headingContext": [
+          {
+            "evidenceId": "p37",
+            "quote": "15,000 miles or 18 months"
+          },
+          {
+            "evidenceId": "p39",
+            "quote": "30,000 miles or 36 months"
+          },
+          {
+            "evidenceId": "p41",
+            "quote": "45,000 miles or 54 months"
+          },
+          {
+            "evidenceId": "p43",
+            "quote": "60,000 miles or 72 months"
+          },
+          {
+            "evidenceId": "p45",
+            "quote": "75,000 miles or 90 months"
+          },
+          {
+            "evidenceId": "p47",
+            "quote": "90,000 miles or 108 months"
+          },
+          {
+            "evidenceId": "p49",
+            "quote": "105,000 miles or 126 months"
+          },
+          {
+            "evidenceId": "p51",
+            "quote": "120,000 miles or 144 months"
+          }
+        ],
+        "notesContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "Miles or Months? Scion recommends obtaining scheduled maintenance for your vehicle every 5,000 miles or six months, whichever comes first. For example: > If you drive 5,000 miles in less than six months, you should obtain maintenance at 5,000 miles - don\u2019t wait until six months. > If at six months you have driven less than 5,000 miles, you should obtain maintenance at six months - don\u2019t wait until 5,000 miles. Be sure to keep an eye on your mileage so that you obtain maintenance when recommended. If you are a low-mileage driver, mark your calendar to remind yourself to obtain maintenance every six months. Special Operating Conditions In addition to standard maintenance items, the maintenance log indicates services that should be performed on vehicles that are driven under especially demanding conditions. These \u201cspecial operating conditions\u201d and their required maintenance items are clearly indicated in each chart. NOTE: You should perform these additional maintenance services only if the majority of your driving is done under the special operating conditions indicated. If you only occasionally drive under these circumstances, it is not necessary to perform the additional services. Engine Oil Selection Please refer to your Owner\u2019s Manual for the specific oil viscosity rating recommended for your vehicle/engine type. USING THE MAINTENANCE LOG CHARTS Maintenance Log34 MAINTENANCE"
+          }
+        ],
+        "timingContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "whichever comes first"
+          }
+        ],
+        "applicabilityContext": [
+          {
+            "evidenceId": "p34",
+            "quote": "Scion"
+          }
+        ]
+      },
+      "schedule": {
+        "kind": "milestones",
+        "dueSemantics": "whichever_first",
+        "milestones": [
+          {
+            "miles": 15000,
+            "months": 18,
+            "evidenceIds": [
+              "p37"
+            ]
+          },
+          {
+            "miles": 30000,
+            "months": 36,
+            "evidenceIds": [
+              "p39"
+            ]
+          },
+          {
+            "miles": 45000,
+            "months": 54,
+            "evidenceIds": [
+              "p41"
+            ]
+          },
+          {
+            "miles": 60000,
+            "months": 72,
+            "evidenceIds": [
+              "p43"
+            ]
+          },
+          {
+            "miles": 75000,
+            "months": 90,
+            "evidenceIds": [
+              "p45"
+            ]
+          },
+          {
+            "miles": 90000,
+            "months": 108,
+            "evidenceIds": [
+              "p47"
+            ]
+          },
+          {
+            "miles": 105000,
+            "months": 126,
+            "evidenceIds": [
+              "p49"
+            ]
+          },
+          {
+            "miles": 120000,
+            "months": 144,
+            "evidenceIds": [
+              "p51"
+            ]
+          }
+        ],
+        "end": {
+          "miles": 120000,
+          "months": 144
+        }
+      },
+      "blockedReasons": []
+    }
+  ]
+}

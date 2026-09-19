@@ -43,7 +43,7 @@ function discoveryReply(overrides = {}) {
 }
 
 function normalizedReply(overrides = {}) {
-  return response({ text: JSON.stringify({ candidates: [{ name: 'Engine oil and filter', action: 'replace', profile: 'normal', dueSemantics: 'whichever_first', intervalMiles: 5000, intervalMonths: 6, evidenceIds: ['e1'], uncertainty: 'provider citation requires user review', conflict: false }], unresolved: [] }), ticks: 1, ...overrides })
+  return response({ text: JSON.stringify({ candidates: [{ name: 'Engine oil and oil filter', action: 'replace', profile: 'normal', dueSemantics: 'whichever_first', intervalMiles: 5000, intervalMonths: 6, evidenceIds: ['e1'], uncertainty: 'provider citation requires user review', conflict: false }], unresolved: [] }), ticks: 1, ...overrides })
 }
 
 function providerWithReplies(replies, calls = []) {
@@ -75,7 +75,7 @@ test('xAI adapter sends fixed production-safe Responses requests and isolates no
   assert.equal(calls[0].body.tool_choice, 'required')
   assert.equal('tools' in calls[1].body, false)
   const normalizationInput = JSON.parse(calls[1].body.input[1].content)
-  assert.deepEqual(Object.keys(normalizationInput).sort(), ['evidence', 'task'])
+  assert.deepEqual(Object.keys(normalizationInput).sort(), ['evidence', 'proposalContract', 'proposalRules', 'task'])
   assert.doesNotMatch(JSON.stringify(normalizationInput), /confirmedVehicle|approvedSources|modelYear/)
   assert.deepEqual(discovered.proofs, [{ canonicalUrl: sourceUrl }])
   assert.equal(discovered.evidence[0].locationVerified, false)

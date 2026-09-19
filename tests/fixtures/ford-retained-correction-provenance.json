@@ -1,0 +1,39 @@
+{
+  "kind": "local_source_grounded_correction_not_model_output",
+  "originalArtifact": "/root/sideflip-release-evidence/document-maintenance-pipeline/ford-low-reasoning-live-verification/live/review-record.json",
+  "originalArtifactSha256": "e55e404c4e2c0962d56a7b33bab92608abd487ea2b4e6bef69073a5094273ecb",
+  "sourceSha256": "fe486194ca101e23b48eca6ca772a845fdac9b1d6f2d73a48f2259ab732d70de",
+  "selectedPages": [
+    561
+  ],
+  "visuallyInspectedPages": [
+    561
+  ],
+  "originalRuleCount": 2,
+  "correctedRuleCount": 4,
+  "changes": [
+    {
+      "ruleId": "local-oil-level-refueling",
+      "evidenceIds": [
+        "e561-b2"
+      ],
+      "origin": "local authored correction; no model call"
+    },
+    {
+      "ruleId": "local-discolored-fluid-inspection",
+      "evidenceIds": [
+        "e561-b9"
+      ],
+      "origin": "local authored correction; no model call"
+    }
+  ],
+  "semanticApproval": false,
+  "publisherAuthentication": false,
+  "ownerApplicabilityConfirmed": false,
+  "limitations": [
+    "Use facts and high-performance vehicle configuration remain unknown; not a normal default.",
+    "Fluid finding answers must refer to the same fluid, not different components.",
+    "Check rule retains adjust action in instruction; no inferred replacement or recurrence.",
+    "One page only; referenced owner-check lists and reset instructions were not extracted."
+  ]
+}

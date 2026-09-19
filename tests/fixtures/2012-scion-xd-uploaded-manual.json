@@ -1,0 +1,148 @@
+{
+  "provenance": "Actual uploaded PDF excerpts (whitespace collapsed only); expected normalization is human-authored test data, NOT model output, provider proof, or owner attestation.",
+  "pdfSha256": "674a870e6cd42fdf08e72285649e10d9e2abffb2ecb5056e702fdd08c98dd094",
+  "pdfPageCount": 56,
+  "canonicalUrl": "https://assets.sia.toyota.com/publications/en/omms-s/S-MMS-12xD/pdf/2012_Scion_xD_WMG.pdf",
+  "title": "2012 Scion xD Warranty and Maintenance Guide",
+  "excerpts": [
+    {
+      "id": "log-37",
+      "pdfPage": 37,
+      "printedPage": "37",
+      "exactExcerpt": "15,000 miles or 18 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Rotate tires Visually inspect brake linings/drums and brake pads/discs Note: If 0W-20 oil WAS NOT used at the last oil change, replace engine oil and oil filter .1 Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Drive shaft boots __ Engine coolant 3 __ Exhaust pipes and mountings __ Radiator and condenser __ Steering gear box __ Steering linkage and boots"
+    },
+    {
+      "id": "log-39",
+      "pdfPage": 39,
+      "printedPage": "39",
+      "exactExcerpt": "30,000 miles or 36 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 3 __ Drive shaft boots __ Engine coolant 4 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil"
+    },
+    {
+      "id": "log-41",
+      "pdfPage": 41,
+      "printedPage": "41",
+      "exactExcerpt": "45,000 miles or 54 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Rotate tires Visually inspect brake linings/drums and brake pads/discs Note: If 0W-20 oil WAS NOT used at the last oil change, replace engine oil and oil filter .1 Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Drive shaft boots __ Engine coolant 3 __ Exhaust pipes and mountings __ Radiator and condenser __ Steering gear box __ Steering linkage and boots"
+    },
+    {
+      "id": "log-43",
+      "pdfPage": 43,
+      "printedPage": "43",
+      "exactExcerpt": "60,000 miles or 72 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 3 __ Drive belts 4 __ Drive shaft boots __ Engine coolant 5 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil"
+    },
+    {
+      "id": "log-47",
+      "pdfPage": 47,
+      "printedPage": "47",
+      "exactExcerpt": "90,000 miles or 108 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 3 __ Drive belts __ Drive shaft boots __ Engine coolant 4 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil"
+    },
+    {
+      "id": "log-51",
+      "pdfPage": 51,
+      "printedPage": "51",
+      "exactExcerpt": "120,000 miles or 144 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine air filter Replace engine oil and oil filter 1 Replace spark plugs 3 Rotate tires Inspect the following: __ Ball joints and dust covers __ Brake lines and hoses __ Brake linings/drums and brake pads/discs 4 __ Drive belts __ Drive shaft boots __ Engine coolant 5 __ Exhaust pipes and mountings __ Front differential oil __ Fuel lines and connections, fuel tank band and fuel tank vapor vent system hoses __ Fuel tank cap gasket __ Radiator and condenser __ Steering gear box __ Steering linkage and boots __ Transmission fluid or oil"
+    },
+    {
+      "id": "cadence",
+      "pdfPage": 34,
+      "printedPage": "34",
+      "exactExcerpt": "Scion recommends obtaining scheduled maintenance for your vehicle every 5,000 miles or six months, whichever comes first."
+    },
+    {
+      "id": "conditions",
+      "pdfPage": 34,
+      "printedPage": "34",
+      "exactExcerpt": "NOTE: You should perform these additional maintenance services only if the majority of your driving is done under the special operating conditions indicated. If you only occasionally drive under these circumstances, it is not necessary to perform the additional services."
+    },
+    {
+      "id": "oil",
+      "pdfPage": 54,
+      "printedPage": "54",
+      "exactExcerpt": "Engine Oil and Oil Filter Replace the oil filter and drain and refill the engine oil at specified intervals. For recommended oil grade and viscosity, refer to the Owner\u2019s Manual. NOTE: Your vehicle is certified with Genuine Toyota 0W20 motor oil. For VEHICLES CERTIFIED FOR 0W20 motor oil, the oil change interval is 10,000 miles or 12 months IF 0W20 MOTOR OIL IS BEING USED. If 0W20 is not available, 5W20 mineral oil may be used. However, it must be replaced at A 5,000 miles or 6 month INTERVAL with 0W20 motor oil. For customers who primarily drive their vehicle under any of the listed Special Operating Conditions, the motor oil and filter should be replaced at 5,000 miles or 6 months, REGARDLESS OF THE OIL USED (OR CERTIFICATION OF THE VEHICLE)."
+    },
+    {
+      "id": "coolant-first",
+      "pdfPage": 48,
+      "printedPage": "48",
+      "exactExcerpt": "100,000 miles or 120 months Check installation of driver\u2019s floor mat Inspect and adjust all fluid levels Replace engine coolant 3 Replace engine oil and oil filter 1 Rotate tires Visually inspect brake linings/drums and brake pads/discs"
+    },
+    {
+      "id": "coolant-repeat",
+      "pdfPage": 49,
+      "printedPage": "49",
+      "exactExcerpt": "3 Initial replacement at 100,000 miles/120 months. Replace every 50,000 miles/60 months thereafter . Refer to \u201cEngine Coolant\u201d in the \u201cExplanation of Maintenance Items\u201d section in the back of this guide for more information."
+    },
+    {
+      "id": "coolant-type",
+      "pdfPage": 53,
+      "printedPage": "53",
+      "exactExcerpt": "Your Scion is equipped with Genuine Toyota Super Long-Life Coolant. The replacement intervals for engine coolant recommended in this booklet are based on replacement with Genuine Toyota Super Long-Life Coolant or similar high-quality non-silicate, non-amine, non-borate ethylene-glycol coolant with long-life hybrid organic acid technology (i.e., a combination of low phosphates and organic acids). If another type of ethylene-glycol coolant is used, replacement intervals may be different."
+    }
+  ],
+  "expected": {
+    "candidates": [
+      {
+        "name": "engine air filter",
+        "action": "replace",
+        "profile": "normal",
+        "dueSemantics": "whichever_first",
+        "intervalMiles": 30000,
+        "intervalMonths": 36,
+        "evidenceIds": [
+          "log-39",
+          "log-43",
+          "log-47",
+          "log-51",
+          "cadence"
+        ],
+        "uncertainty": "Offline hand-authored expectation from uploaded guide; source review and live extraction remain unproven.",
+        "conflict": false
+      },
+      {
+        "name": "front differential oil",
+        "action": "inspect",
+        "profile": "normal",
+        "dueSemantics": "whichever_first",
+        "intervalMiles": 30000,
+        "intervalMonths": 36,
+        "evidenceIds": [
+          "log-39",
+          "log-43",
+          "log-47",
+          "log-51",
+          "cadence"
+        ],
+        "uncertainty": "Offline hand-authored expectation from uploaded guide; source review and live extraction remain unproven.",
+        "conflict": false
+      },
+      {
+        "name": "brake lines and hoses",
+        "action": "inspect",
+        "profile": "normal",
+        "dueSemantics": "whichever_first",
+        "intervalMiles": 15000,
+        "intervalMonths": 18,
+        "evidenceIds": [
+          "log-37",
+          "log-39",
+          "log-41",
+          "log-43",
+          "log-47",
+          "log-51",
+          "cadence"
+        ],
+        "uncertainty": "Offline hand-authored expectation from uploaded guide; source review and live extraction remain unproven.",
+        "conflict": false
+      }
+    ],
+    "unresolved": [
+      {
+        "name": "engine oil and oil filter",
+        "reason": "0W20 use supports 10,000 miles/12 months; substitute 5W20 must be replaced at 5,000 miles/6 months with 0W20; primarily special operating conditions require 5,000 miles/6 months regardless of oil. Current oil and operating profile are unknown."
+      },
+      {
+        "name": "engine coolant",
+        "reason": "Initial replacement 100,000 miles/120 months, then 50,000 miles/60 months; coolant type also governs applicability. Do not flatten into one repeating interval."
+      }
+    ]
+  }
+}

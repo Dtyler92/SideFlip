@@ -1,0 +1,210 @@
+{
+  "bare-ford": {
+    "value": "www.wirelessconformity.ford.com",
+    "safe": true
+  },
+  "bare-canary": {
+    "value": "ONLY-IN-ANNOTATION-984771.annotation-canary.example",
+    "safe": true
+  },
+  "bare-mixed": {
+    "value": "WWW.Example.COM",
+    "safe": true
+  },
+  "bare-hyphen": {
+    "value": "a-b.example",
+    "safe": true
+  },
+  "bare-reject-0": {
+    "value": "//example.com",
+    "safe": false
+  },
+  "bare-reject-1": {
+    "value": "user@example.com",
+    "safe": false
+  },
+  "bare-reject-2": {
+    "value": "example.com:443",
+    "safe": false
+  },
+  "bare-reject-3": {
+    "value": "example.com/path",
+    "safe": false
+  },
+  "bare-reject-4": {
+    "value": "example.com?x=1",
+    "safe": false
+  },
+  "bare-reject-5": {
+    "value": "example.com#frag",
+    "safe": false
+  },
+  "bare-reject-6": {
+    "value": "example.com\\evil",
+    "safe": false
+  },
+  "bare-reject-7": {
+    "value": "example.com\n",
+    "safe": false
+  },
+  "bare-reject-8": {
+    "value": "example.com\t",
+    "safe": false
+  },
+  "bare-reject-9": {
+    "value": " example.com",
+    "safe": false
+  },
+  "bare-reject-10": {
+    "value": "example.com ",
+    "safe": false
+  },
+  "bare-reject-11": {
+    "value": "example.com\u0000",
+    "safe": false
+  },
+  "bare-reject-12": {
+    "value": "example.com\u007f",
+    "safe": false
+  },
+  "bare-reject-13": {
+    "value": "example.com%20",
+    "safe": false
+  },
+  "bare-reject-14": {
+    "value": "%65xample.com",
+    "safe": false
+  },
+  "bare-reject-15": {
+    "value": "example.com%252f",
+    "safe": false
+  },
+  "bare-reject-16": {
+    "value": "example.com%2f",
+    "safe": false
+  },
+  "bare-reject-17": {
+    "value": "example.com%ZZ",
+    "safe": false
+  },
+  "bare-reject-18": {
+    "value": "javascript:example.com",
+    "safe": false
+  },
+  "bare-reject-19": {
+    "value": "data:example.com",
+    "safe": false
+  },
+  "bare-reject-20": {
+    "value": "file:example.com",
+    "safe": false
+  },
+  "bare-reject-21": {
+    "value": "launch:example.com",
+    "safe": false
+  },
+  "bare-reject-22": {
+    "value": "https:example.com",
+    "safe": false
+  },
+  "bare-reject-23": {
+    "value": "HTTP://example.com",
+    "safe": false
+  },
+  "bare-reject-24": {
+    "value": ".example.com",
+    "safe": false
+  },
+  "bare-reject-25": {
+    "value": "example..com",
+    "safe": false
+  },
+  "bare-reject-26": {
+    "value": "example.com.",
+    "safe": false
+  },
+  "bare-reject-27": {
+    "value": "-a.example",
+    "safe": false
+  },
+  "bare-reject-28": {
+    "value": "a-.example",
+    "safe": false
+  },
+  "bare-reject-29": {
+    "value": "a_b.example",
+    "safe": false
+  },
+  "bare-reject-30": {
+    "value": "localhost",
+    "safe": false
+  },
+  "bare-reject-31": {
+    "value": "127.0.0.1",
+    "safe": false
+  },
+  "bare-reject-32": {
+    "value": "[::1]",
+    "safe": false
+  },
+  "bare-reject-33": {
+    "value": "123.456",
+    "safe": false
+  },
+  "bare-reject-34": {
+    "value": "a.c",
+    "safe": false
+  },
+  "bare-reject-35": {
+    "value": "a.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "safe": false
+  },
+  "bare-reject-36": {
+    "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com",
+    "safe": false
+  },
+  "bare-reject-37": {
+    "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com",
+    "safe": false
+  },
+  "bare-reject-38": {
+    "value": "xn--exmple-cua.com",
+    "safe": false
+  },
+  "bare-reject-39": {
+    "value": "\uff45xample.com",
+    "safe": false
+  },
+  "bare-reject-40": {
+    "value": "example\u3002com",
+    "safe": false
+  },
+  "bare-reject-41": {
+    "value": "example.com\u202e",
+    "safe": false
+  },
+  "bare-reject-42": {
+    "value": "example.com;evil",
+    "safe": false
+  },
+  "bare-reject-43": {
+    "value": "example.com|evil",
+    "safe": false
+  },
+  "bare-reject-44": {
+    "value": "example.com<evil>",
+    "safe": false
+  },
+  "bare-reject-45": {
+    "value": "example.com(evil)",
+    "safe": false
+  },
+  "bare-reject-46": {
+    "value": "example.com/../evil",
+    "safe": false
+  },
+  "bare-reject-47": {
+    "value": "example.com@evil.com",
+    "safe": false
+  }
+}

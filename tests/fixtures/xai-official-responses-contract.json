@@ -1,0 +1,589 @@
+{
+  "provenance": {
+    "source": "https://docs.x.ai/openapi.json",
+    "kind": "Official documentation excerpts, NOT live provider output",
+    "notes": "200 example is unmodified. Tests adapt model/text/cost explicitly; mutation cases are adversarial local fixtures."
+  },
+  "requestExample": {
+    "input": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant that can answer questions and help with tasks."
+      },
+      {
+        "role": "user",
+        "content": "What is 101*3?"
+      }
+    ],
+    "model": "latest"
+  },
+  "responseExample": {
+    "created_at": 1754475266,
+    "id": "ad5663da-63e6-86c6-e0be-ff15effa8357",
+    "max_output_tokens": null,
+    "model": "latest",
+    "object": "response",
+    "output": [
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "101 multiplied by 3 is 303.",
+            "logprobs": null,
+            "annotations": []
+          }
+        ],
+        "id": "msg_ad5663da-63e6-86c6-e0be-ff15effa8357",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "previous_response_id": null,
+    "reasoning": null,
+    "temperature": null,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_p": null,
+    "usage": {
+      "input_tokens": 32,
+      "input_tokens_details": {
+        "cached_tokens": 8
+      },
+      "output_tokens": 9,
+      "output_tokens_details": {
+        "reasoning_tokens": 110
+      },
+      "total_tokens": 151,
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 0
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": true
+  },
+  "schemas": {
+    "ModelRequest": {
+      "type": "object",
+      "description": "The request body for `/v1/responses` endpoint.",
+      "required": [
+        "input"
+      ],
+      "properties": {
+        "background": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "(Unsupported) Whether to process the response asynchronously in the background.",
+          "default": false
+        },
+        "context_management": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {},
+          "description": "Optional context-management directives (e.g. compaction). Parsed but not yet executed."
+        },
+        "include": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "What additional output data to include in the response. Supported values include\n`reasoning.encrypted_content` (encrypted reasoning tokens) and tool-output options.\nOpenAI's `message.output_text.logprobs` is accepted for compatibility but silently ignored."
+        },
+        "input": {
+          "$ref": "#/components/schemas/ModelInput",
+          "description": "The input passed to the model. Can be text, image or file."
+        },
+        "instructions": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "An alternate way to specify the system prompt. Note that this cannot be used alongside `previous_response_id`, where the system prompt of the previous message will be used."
+        },
+        "logprobs": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether to return log probabilities of the output tokens or not. If true, returns the log probabilities of each output token returned in the content of message. Not supported by models `grok-4.20` and newer; the field will be silently ignored if set.",
+          "default": false
+        },
+        "max_output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32",
+          "description": "Max number of tokens that can be generated in a response. This includes both output and reasoning tokens. Defaults to 128,000 when unset; set a larger value to allow longer generations."
+        },
+        "max_turns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32",
+          "description": "Maximum number of agentic tool calling turns allowed for this request.\nIf not set, defaults to the server's global cap.\nThis parameter will be ignored for any non-agentic requests, and for\nagentic SLOP requests that have neither a server-side tool nor a file\nattachment."
+        },
+        "metadata": {
+          "description": "Not supported. Only maintained for compatibility reasons."
+        },
+        "min_p": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float",
+          "description": "Min-p sampling: tokens whose probability is below `min_p` times the probability of the most likely token are excluded from sampling. Disabled when unset.",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "model": {
+          "type": "string",
+          "description": "Model name for the model to use. Obtainable from <https://console.x.ai/team/default/models> or <https://docs.x.ai/docs/models>.",
+          "example": "latest"
+        },
+        "parallel_tool_calls": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether to allow the model to run parallel tool calls.",
+          "default": true
+        },
+        "previous_response_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The ID of the previous response from the model."
+        },
+        "prompt_cache_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Plumbed to x-grok-conv-id for Open Responses compatibility, used for routing."
+        },
+        "reasoning": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/ReasoningConfiguration",
+              "description": "Reasoning configuration. Only for reasoning models."
+            }
+          ]
+        },
+        "reasoning_effort": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "reasoning_effort alternative to reasoning configuration. This is a non-standard field meant to ease user experience. We only look at this if the reasoning field is unset."
+        },
+        "safety_identifier": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Supplied by the API client to identify the end user behind this request. A stable string that uniquely identifies each of your users; hash your internal user id or username rather than sending an email or name. Stored with the request metadata so a usage-policy violation can be attributed to that user rather than to the API key."
+        },
+        "search_parameters": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/SearchParameters",
+              "description": "Set the parameters to be used for searched data. Takes precedence over `web_search_preview` tool if specified in the tools."
+            }
+          ]
+        },
+        "service_tier": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/ServiceTier",
+              "description": "Specifies the processing tier for this request. Set to `\"priority\"` for higher scheduling\npriority at a higher token price. Valid values: `\"auto\"` (default), `\"priority\"`."
+            }
+          ]
+        },
+        "store": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether to store the input message(s) and model response for later retrieval.",
+          "default": true
+        },
+        "stream": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "If set, partial message deltas will be sent. Tokens will be sent as data-only server-sent events as they become available, with the stream terminated by a `data: [DONE]` message.",
+          "default": false,
+          "example": true
+        },
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float",
+          "description": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+          "default": 1,
+          "example": 0.2,
+          "maximum": 2,
+          "minimum": 0
+        },
+        "text": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/ModelResponseConfiguration",
+              "description": "Settings for customizing a text response from the model."
+            }
+          ]
+        },
+        "tool_choice": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/ModelToolChoice",
+              "description": "Controls which (if any) tool is called by the model. `none` means the model will not call any tool and instead generates a message. auto means the model can pick between generating a message or calling one or more tools. required means the model must call one or more tools. Specifying a particular tool via `{\"type\": \"function\", \"function\": {\"name\": \"my_function\"}}` forces the model to call that tool. `none` is the default when no tools are present. `auto` is the default if tools are present."
+            }
+          ]
+        },
+        "tools": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/components/schemas/ModelTool"
+          },
+          "description": "A list of tools the model may call in JSON-schema. Currently, only functions and web search are supported as tools. A max of 350 tools are supported.`web_search_preview` tool, if specified, will be overridden by `search_parameters`.",
+          "maxItems": 350
+        },
+        "top_k": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32",
+          "description": "Top-k sampling: only the `top_k` most probable tokens are considered at each sampling step. Disabled when unset.",
+          "minimum": 1
+        },
+        "top_logprobs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32",
+          "description": "An integer between 0 and 8 specifying the number of most likely tokens to return at each token position, each with an associated log probability. logprobs must be set to true if this parameter is used. Not supported by models `grok-4.20` and newer; the field will be silently ignored if set.",
+          "maximum": 8,
+          "minimum": 0
+        },
+        "top_p": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float",
+          "description": "An alternative to sampling with `temperature`, called nucleus sampling, where the model considers the results of the tokens with `top_p` probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. It is generally recommended to alter this or `temperature` but not both.",
+          "default": 1,
+          "maximum": 1,
+          "exclusiveMinimum": 0
+        },
+        "truncation": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Not supported. Only maintained for compatibility reasons."
+        },
+        "user": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A unique identifier representing your end-user, which can help xAI to monitor and detect abuse."
+        }
+      }
+    },
+    "ModelResponseFormat": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Specify text response format, always `\"text\"`.",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "text"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Specify json_object response format, always `json_object`. Used for backward compatibility. Prefer to use `\"json_schema\"` instead of this.",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "json_object"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Specify json_schema response format with a given schema. Type is always `\"json_schema\"`.",
+          "required": [
+            "schema",
+            "type"
+          ],
+          "properties": {
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only included for compatibility."
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only included for compatibility."
+            },
+            "schema": {
+              "description": "A json schema representing the desired response schema."
+            },
+            "strict": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "Only included for compatibility."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "json_schema"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Response format parameter for structured outputs."
+    },
+    "OutputMessage": {
+      "type": "object",
+      "description": "An output message from the model.",
+      "required": [
+        "content",
+        "role",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OutputMessageContent"
+          },
+          "description": "Content of the output message."
+        },
+        "id": {
+          "type": "string",
+          "description": "The unique ID of the output message."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the output message, which can be `assistant` or `tool`."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the item. One of `completed`, `in_progress` or `incomplete`."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of the output message, which is always `message`."
+        }
+      }
+    },
+    "OutputMessageContent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Text output.",
+          "required": [
+            "text",
+            "type"
+          ],
+          "properties": {
+            "annotations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/Annotation"
+              },
+              "description": "Citations."
+            },
+            "logprobs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TokenLogProb"
+              },
+              "description": "The log probabilities of each output token returned in the content of message."
+            },
+            "text": {
+              "type": "string",
+              "description": "The text output from the model."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "output_text"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Refusal.",
+          "required": [
+            "refusal",
+            "type"
+          ],
+          "properties": {
+            "refusal": {
+              "type": "string",
+              "description": "The reason for the refusal."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "refusal"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ModelUsage": {
+      "type": "object",
+      "required": [
+        "input_tokens",
+        "input_tokens_details",
+        "output_tokens",
+        "output_tokens_details",
+        "total_tokens",
+        "num_sources_used",
+        "num_server_side_tools_used"
+      ],
+      "properties": {
+        "context_details": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/ContextDetails",
+              "description": "Token counts for the **latest context** sent to / produced by the\nmodel. For agentic responses this reflects the most recent step\nrather than the cumulative total. Informational only \u2014 not used\nfor billing."
+            }
+          ]
+        },
+        "cost_in_nano_usd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "Cost in nano US dollars for this request."
+        },
+        "cost_in_usd_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "Accurate cost of this request in USD ticks, where \"tick\" is defined as follows:\nTICKS_IN_USD_CENT: i64 = 100_000_000\nwhich means there is 10'000'000'000 ticks in one *dollar*."
+        },
+        "input_tokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Number of input tokens used."
+        },
+        "input_tokens_details": {
+          "$ref": "#/components/schemas/InputTokensDetails",
+          "description": "Breakdown of the input tokens."
+        },
+        "num_server_side_tools_used": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Number of server side tools used."
+        },
+        "num_sources_used": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Number of sources used (for live search)."
+        },
+        "output_tokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Number of output tokens used."
+        },
+        "output_tokens_details": {
+          "$ref": "#/components/schemas/OutputTokensDetails",
+          "description": "Breakdown of the output tokens."
+        },
+        "server_side_tool_usage_details": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/components/schemas/ServerSideToolUsageDetails",
+              "description": "Details about the server side tool usage."
+            }
+          ]
+        },
+        "total_tokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total tokens used."
+        }
+      }
+    }
+  }
+}

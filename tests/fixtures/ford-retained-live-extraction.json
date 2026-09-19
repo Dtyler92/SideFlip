@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 2,
+  "sourceSha256": "fe486194ca101e23b48eca6ca772a845fdac9b1d6f2d73a48f2259ab732d70de",
+  "rules": [
+    {
+      "id": "oil-change-iolm",
+      "service": "Engine oil change",
+      "action": "replace",
+      "condition": {
+        "op": "always"
+      },
+      "timing": {
+        "kind": "monitor",
+        "mode": "vehicle_monitor",
+        "instruction": "When the oil change message appears in the information display, it is time for an oil change. Make sure you perform the oil change within two weeks or 500 mi (800 km) of the message appearing.",
+        "responseWindow": {
+          "miles": 500,
+          "days": 14
+        },
+        "maximum": {
+          "miles": 10000,
+          "months": 12
+        },
+        "fallback": {
+          "condition": {
+            "op": "any",
+            "args": [
+              {
+                "op": "eq",
+                "field": "information_display_resets_prematurely",
+                "value": true
+              },
+              {
+                "op": "eq",
+                "field": "information_display_inoperative",
+                "value": true
+              }
+            ]
+          },
+          "interval": {
+            "miles": 5000,
+            "months": 6
+          },
+          "anchor": "last_service",
+          "trigger": "whichever_first"
+        }
+      },
+      "evidenceIds": [
+        "e561-b0",
+        "e561-b1"
+      ],
+      "relatedEvidenceIds": [
+        "e561-b5",
+        "e561-b10"
+      ],
+      "overrides": []
+    },
+    {
+      "id": "reset-iolm",
+      "service": "Intelligent Oil-Life Monitor",
+      "action": "reset",
+      "condition": {
+        "op": "always"
+      },
+      "timing": {
+        "kind": "monitor",
+        "mode": "reset_reminder",
+        "instruction": "Make sure you reset the Intelligent Oil-Life Monitor after each oil change. See Oil Change Indicator Reset (page 365)."
+      },
+      "evidenceIds": [
+        "e561-b0"
+      ],
+      "relatedEvidenceIds": [],
+      "overrides": []
+    }
+  ],
+  "evidence": [
+    {
+      "id": "e561-b0",
+      "pdfPage": 561,
+      "quote": "When the oil change message appears in\nthe information display, it is time for an oil\nchange. Make sure you perform the oil\nchange within two weeks or 500 mi\n(800 km) of the message appearing. Make\nsure you reset the Intelligent Oil-Life\nMonitor after each oil change.  See Oil\nChange Indicator Reset (page 365).",
+      "role": "note"
+    },
+    {
+      "id": "e561-b1",
+      "pdfPage": 561,
+      "quote": "If your information display resets\nprematurely or becomes inoperative, you\nshould perform the oil change interval at\nsix months or 5,000 mi (8,000 km) from\nyour last oil change. Never exceed one year\nor 10,000 mi (16,000 km) between oil\nchange intervals.",
+      "role": "exception"
+    },
+    {
+      "id": "e561-b2",
+      "pdfPage": 561,
+      "quote": "You can drive high performance vehicles\nin such a way that may lead to higher oil\nconsumption this includes extended time\nat high engine speeds, high loads, engine\nbraking, hard cornering maneuvers, track\nand off-road usage. Under these\nconditions, oil consumption of\napproximately 1 quart per 500 miles (1 liter\nper 800 km) is possible. As a result, you\nneed to check the engine oil level at every\nrefueling and adjust to maintain proper\nlevels to avoid engine damage.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b3",
+      "pdfPage": 561,
+      "quote": "Your vehicle is very sophisticated and built\nwith multiple, complex, performance\nsystems. Every manufacturer develops\nthese systems using different\nspecifications and performance features.\nThat is why it is important to rely upon your\ndealership to properly diagnose and repair\nyour vehicle.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b4",
+      "pdfPage": 561,
+      "quote": "We have recommended maintenance\nintervals for various parts and component\nsystems based upon engineering testing.\nWe rely upon this testing to determine the\nmost appropriate mileage for replacement\nof oils and fluids to protect your vehicle at\nthe lowest overall cost to you and\nrecommends against maintenance\nschedules that deviate from the scheduled\nmaintenance information.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b5",
+      "pdfPage": 561,
+      "quote": "We strongly recommend the use of only\nour genuine or our authorized\nre-manufactured replacement parts\nengineered for your vehicle.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b6",
+      "pdfPage": 561,
+      "quote": "Additives and Chemicals",
+      "role": "heading"
+    },
+    {
+      "id": "e561-b7",
+      "pdfPage": 561,
+      "quote": "This owner's manual and our Workshop\nManual list the recommended additives\nand chemicals for your vehicle. We do not\nrecommend using chemicals or additives\nnot approved by us as part of your vehicle\u2019s\nnormal maintenance. Please consult your\nwarranty information.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b8",
+      "pdfPage": 561,
+      "quote": "Oils, Fluids and Flushing",
+      "role": "heading"
+    },
+    {
+      "id": "e561-b9",
+      "pdfPage": 561,
+      "quote": "In many cases, fluid discoloration is a\nnormal operating characteristic and, by\nitself, does not necessarily indicate a\nconcern or that the fluid needs to be\nchanged. However, a qualified expert, such\nas the factory-trained technicians at your\ndealership, should inspect discolored fluids\nthat also show signs of overheating or\nforeign material contamination\nimmediately.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b10",
+      "pdfPage": 561,
+      "quote": "Make sure to change your vehicle\u2019s oils and\nfluids at the specified intervals or in\nconjunction with a repair. Flushing is a\nviable way to change fluid for many vehicle\nsub-systems during scheduled\nmaintenance. It is critical that systems are\nflushed only with new fluid that is the same\nas that required to fill and operate the\nsystem or using our approved flushing\nchemical.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b11",
+      "pdfPage": 561,
+      "quote": "Owner Checks and Services",
+      "role": "heading"
+    },
+    {
+      "id": "e561-b12",
+      "pdfPage": 561,
+      "quote": "Make sure you perform the following basic\nmaintenance checks and inspections every\nmonth or at six-month intervals.",
+      "role": "note"
+    },
+    {
+      "id": "e561-b13",
+      "pdfPage": 561,
+      "quote": "558",
+      "role": "note"
+    },
+    {
+      "id": "e561-b14",
+      "pdfPage": 561,
+      "quote": "F-150 (TFC) Canada/United States of America, enUSA, Edition date: 201907, First-Printing",
+      "role": "note"
+    },
+    {
+      "id": "e561-b15",
+      "pdfPage": 561,
+      "quote": "Scheduled Maintenance",
+      "role": "heading"
+    }
+  ],
+  "ownerQuestions": [
+    {
+      "field": "information_display_resets_prematurely",
+      "type": "boolean",
+      "question": "Has the information display reset prematurely?",
+      "evidenceIds": [
+        "e561-b1"
+      ]
+    },
+    {
+      "field": "information_display_inoperative",
+      "type": "boolean",
+      "question": "Has the information display become inoperative?",
+      "evidenceIds": [
+        "e561-b1"
+      ]
+    }
+  ],
+  "unresolved": [
+    {
+      "reason": "Oil-level check at every refueling is tied to high-performance driving conditions and vehicle class; applicability must not be inferred. Consumption figure is a guideline, not a service interval.",
+      "evidenceIds": [
+        "e561-b2"
+      ]
+    },
+    {
+      "reason": "Dealership diagnosis/repair guidance is not a timed maintenance rule.",
+      "evidenceIds": [
+        "e561-b3"
+      ]
+    },
+    {
+      "reason": "General statement against deviating from scheduled maintenance; no extractable service, action, or interval.",
+      "evidenceIds": [
+        "e561-b4"
+      ]
+    },
+    {
+      "reason": "Additives/chemicals policy is a recommendation, not a maintenance interval.",
+      "evidenceIds": [
+        "e561-b6",
+        "e561-b7"
+      ]
+    },
+    {
+      "reason": "Fluid discoloration inspection is conditional on overheating or contamination with no finite/recurring interval; inspect-immediately semantics unsupported as a scheduled rule.",
+      "evidenceIds": [
+        "e561-b8",
+        "e561-b9"
+      ]
+    },
+    {
+      "reason": "Owner Checks and Services names a monthly or six-month cadence but the following checks/inspections are not listed on this page.",
+      "evidenceIds": [
+        "e561-b11",
+        "e561-b12"
+      ]
+    },
+    {
+      "reason": "Page folio and edition footer are not maintenance rules.",
+      "evidenceIds": [
+        "e561-b13",
+        "e561-b14"
+      ]
+    },
+    {
+      "reason": "Section title only.",
+      "evidenceIds": [
+        "e561-b15"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "pdfPage": 561,
+      "disposition": "reviewed_for_extraction",
+      "evidenceIds": [
+        "e561-b0",
+        "e561-b1",
+        "e561-b2",
+        "e561-b3",
+        "e561-b4",
+        "e561-b5",
+        "e561-b6",
+        "e561-b7",
+        "e561-b8",
+        "e561-b9",
+        "e561-b10",
+        "e561-b11",
+        "e561-b12",
+        "e561-b13",
+        "e561-b14",
+        "e561-b15"
+      ]
+    }
+  ]
+}
