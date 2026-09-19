@@ -14,7 +14,7 @@ const discovery = () => ({ evidence: [item], proofs: [{ canonicalUrl: url }], us
 const normalized = () => ({ candidates: [], unresolved: [], proposals: [], usage: { costInUsdTicks: 7 } })
 const reply = text => ({ status: 'completed', model: 'grok-4.6', usage: { cost_in_usd_ticks: 7, num_server_side_tools_used: 1, server_side_tool_usage_details: { web_search_calls: 1 } }, output: [{ type: 'web_search_call', status: 'completed', action: { type: 'search', sources: [{ url }] } }, { type: 'message', status: 'completed', content: [{ type: 'output_text', text, annotations: [{ type: 'url_citation', url }] }] }] })
 async function run(provider, settle = async () => {}, fail = async () => {}) {
-  return processLeasedJob({ lease: { id: 'private-job', lease_token: 'private-token', reserved_cents: 100, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD' } }, config: { maxSearches: 3, maxFetches: 2 }, domains, provider, db: { settle, fail } })
+  return processLeasedJob({ lease: { id: 'private-job', lease_token: 'private-token', reserved_cents: 100, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD', engine: '1.8L' } }, config: { maxSearches: 3, maxFetches: 2 }, domains, provider, db: { settle, fail } })
 }
 function adapter(body) { return createXaiMaintenanceProvider({ apiKey: 'offline', model: 'grok-4.6', timeoutSeconds: 10, fetchImpl: async () => new Response(body) }) }
 async function rejectsAt(provider, stage, reason, ticks, settle) {

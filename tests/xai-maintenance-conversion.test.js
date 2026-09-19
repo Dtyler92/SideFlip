@@ -160,7 +160,7 @@ test('worker adds exact xAI ticks, uses 100 million ticks per cent, and preserve
     normalize: async () => ({ ...JSON.parse(normalizedReply().output[0].content[0].text), usage: { costInUsdTicks: 9_999_999 } }),
   }
   await processLeasedJob({
-    lease: { id: 'job', lease_token: 'token', reserved_cents: 306, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD' } },
+    lease: { id: 'job', lease_token: 'token', reserved_cents: 306, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD', engine: '1.8L' } },
     config: { maxSearches: 3, maxFetches: 2 },
     domains: [{ domain: 'scion.com', sourceClass: 'manufacturer', includeSubdomains: true, allowedPathPrefixes: ['/owners/manuals'], termsReviewedOn: reviewedOn, robotsReviewedOn: reviewedOn }],
     provider, db: { settle: async value => { settled = value }, fail: async value => { throw value } },
@@ -176,7 +176,7 @@ test('worker adds exact xAI ticks, uses 100 million ticks per cent, and preserve
   }
   let failed
   await assert.rejects(() => processLeasedJob({
-    lease: { id: 'job-2', lease_token: 'token-2', reserved_cents: 1, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD' } },
+    lease: { id: 'job-2', lease_token: 'token-2', reserved_cents: 1, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD', engine: '1.8L' } },
     config: { maxSearches: 3, maxFetches: 2 }, domains: [{ domain: 'scion.com', sourceClass: 'manufacturer', includeSubdomains: true, allowedPathPrefixes: ['/owners/manuals'], termsReviewedOn: reviewedOn, robotsReviewedOn: reviewedOn }],
     provider: overBudgetProvider, db: { settle: async () => {}, fail: async value => { failed = value } },
   }), { code: 'BUDGET_EXCEEDED' })
@@ -185,7 +185,7 @@ test('worker adds exact xAI ticks, uses 100 million ticks per cent, and preserve
 
 test('worker reports known provider ticks on failure and null when accepted spend is unknowable', async () => {
   const { processLeasedJob } = await import(workerUrl)
-  const lease = { id: 'job', lease_token: 'token', reserved_cents: 2500, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD' } }
+  const lease = { id: 'job', lease_token: 'token', reserved_cents: 2500, request_snapshot: { modelYear: 2012, make: 'Scion', model: 'xD', engine: '1.8L' } }
   const config = { maxSearches: 3, maxFetches: 2 }
   const reviewedOn = new Date().toISOString().slice(0, 10)
   const domains = [{ domain: 'scion.com', sourceClass: 'manufacturer', includeSubdomains: true, allowedPathPrefixes: ['/'], termsReviewedOn: reviewedOn, robotsReviewedOn: reviewedOn }]

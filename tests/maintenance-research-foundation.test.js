@@ -119,7 +119,7 @@ test('shared validators enforce approved domains, provider citations, unconfirme
   const now = new Date()
   const accessedAt = now.toISOString()
   const reviewedOn = accessedAt.slice(0,10)
-  assert.deepEqual(sanitizeAsset({ modelYear: 2020, make: 'Honda', model: 'Civic', vin: 'secret', notes: 'secret', userId: 'secret' }), { modelYear: 2020, make: 'Honda', model: 'Civic' })
+  assert.deepEqual(sanitizeAsset({ modelYear: 2020, make: 'Honda', model: 'Civic', engine: '1.5L', vin: 'secret', notes: 'secret', userId: 'secret' }), { modelYear: 2020, make: 'Honda', model: 'Civic', engine: '1.5L' })
   const evidence = [{
     id: 'e1', title: 'Maintenance guide', canonicalUrl: 'https://manuals.honda.com/civic.pdf',
     exactExcerpt: 'Replace engine oil every 7,500 miles.', accessedAt,
@@ -158,7 +158,7 @@ test('worker performs capped discovery then isolated normalization without leaki
   }
   let settled
   const db = { settle: async value => { settled = value }, fail: async error => { throw error } }
-  const lease = { id: 'job', lease_token: 'token', reserved_cents:100, request_snapshot: { modelYear: 2020, make: 'Honda', model: 'Civic', vin: 'VIN', serialNumber: 'SERIAL', notes: 'private', costs: [9], location: 'home', userId: 'uid' } }
+  const lease = { id: 'job', lease_token: 'token', reserved_cents:100, request_snapshot: { modelYear: 2020, make: 'Honda', model: 'Civic', engine: '1.5L', vin: 'VIN', serialNumber: 'SERIAL', notes: 'private', costs: [9], location: 'home', userId: 'uid' } }
   const domains=[{domain:'honda.com',sourceClass:'manufacturer',includeSubdomains:true,allowedPathPrefixes:['/'],termsReviewedOn:reviewedOn,robotsReviewedOn:reviewedOn}]
   await processLeasedJob({ lease, config: { maxSearches: 3, maxFetches: 2 }, domains, provider, db })
   assert.equal(calls.length, 2)
@@ -212,7 +212,7 @@ test('worker persists bounded error codes rather than provider messages', async 
   const error=Object.assign(new Error('VIN SHOULD NEVER ENTER ERROR STORAGE'),{code:'PROVIDER_TRANSIENT'})
   const provider={discover:async()=>{throw error},normalize:async()=>({})}
   const db={settle:async()=>{},fail:async value=>{failure=value}}
-  await assert.rejects(()=>processLeasedJob({lease:{id:'job',lease_token:'token',reserved_cents:100,request_snapshot:{modelYear:2020,make:'Honda',model:'Civic'}},config:{maxSearches:3,maxFetches:2},domains:[{domain:'honda.com',sourceClass:'manufacturer',includeSubdomains:true}],provider,db}),value=>value===error)
+  await assert.rejects(()=>processLeasedJob({lease:{id:'job',lease_token:'token',reserved_cents:100,request_snapshot:{modelYear:2020,make:'Honda',model:'Civic',engine:'1.5L'}},config:{maxSearches:3,maxFetches:2},domains:[{domain:'honda.com',sourceClass:'manufacturer',includeSubdomains:true}],provider,db}),value=>value===error)
   assert.equal(failure.code,'PROVIDER_TRANSIENT')
   assert.equal(failure.detail,'PROVIDER_TRANSIENT')
 })

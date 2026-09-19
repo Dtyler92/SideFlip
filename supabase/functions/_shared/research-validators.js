@@ -1,9 +1,11 @@
 import { hasBoundedTaskSupport } from './research-support.js'
 
 const ASSET_FIELDS = Object.freeze([
-  'modelYear', 'make', 'model', 'trim', 'engine', 'transmission',
-  'drivetrain', 'fuel', 'market', 'vehicleType',
+  'modelYear', 'make', 'model', 'engine', 'transmission',
 ])
+const EVIDENCE_FIELDS = new Set(['id','title','canonicalUrl','exactExcerpt','accessedAt','applicability','sourceClass','page','section','locationVerified','verificationStatus'])
+const CANDIDATE_FIELDS = new Set(['name','action','profile','dueSemantics','intervalMiles','intervalHours','intervalCycles','intervalMonths','evidenceIds','uncertainty','conflict'])
+const UNRESOLVED_FIELDS = new Set(['name','reason'])
 const ACTIONS = new Set(['inspect', 'adjust', 'replace'])
 const PROFILES = new Set(['normal', 'severe'])
 const SEMANTICS = new Set(['whichever_first', 'all'])
@@ -17,15 +19,16 @@ export class ResearchValidationError extends Error {
 
 function fail(code, message) { throw new ResearchValidationError(code, message) }
 function text(value, max) { return typeof value === 'string' && value === value.trim() && value.length > 0 && value.length <= max && !CONTROL.test(value) }
-function positive(value, max) { return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= max }
+function positive(value, max) { return Number.isInteger(value) && value > 0 && value <= max }
 function plainObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
+function exactFields(value, allowed) { return Object.keys(value).every(key => allowed.has(key)) }
 
 export function sanitizeAsset(input) {
   if (!plainObject(input)) fail('IDENTITY_UNCONFIRMED', 'Confirmed asset identity is required')
   const output = Object.fromEntries(ASSET_FIELDS.flatMap(key => input[key] == null ? [] : [[key, input[key]]]))
   if (!Number.isInteger(output.modelYear) || output.modelYear < 1881 || output.modelYear > 2200 ||
-      !text(output.make, 200) || !text(output.model, 200)) {
-    fail('IDENTITY_UNCONFIRMED', 'Confirmed year, make, and model are required')
+      !text(output.make, 200) || !text(output.model, 200) || !text(output.engine, 500)) {
+    fail('IDENTITY_UNCONFIRMED', 'Confirmed year, make, model, and engine are required')
   }
   for (const [key, value] of Object.entries(output)) {
     if (key !== 'modelYear' && !text(value, key === 'engine' ? 500 : 200)) fail('IDENTITY_UNCONFIRMED', `Invalid confirmed ${key}`)
@@ -71,7 +74,7 @@ export function validateEvidenceRegistry(values, approvedDomains, providerProofs
   const comparable = value => value.replace(/\s+/g, ' ').trim().toLowerCase()
   const registry = new Map()
   for (const evidence of values) {
-    if (!plainObject(evidence) || !text(evidence.id, 100) || registry.has(evidence.id) ||
+    if (!plainObject(evidence) || !exactFields(evidence,EVIDENCE_FIELDS) || !text(evidence.id, 100) || registry.has(evidence.id) ||
         !text(evidence.title, 500) || !text(evidence.canonicalUrl, 2048) || !text(evidence.exactExcerpt, 4000) ||
         !text(evidence.applicability, 1000) || !text(evidence.accessedAt, 40) ||
         !SOURCE_CLASSES.has(evidence.sourceClass) || evidence.locationVerified !== false ||
@@ -100,7 +103,7 @@ export function validateNormalizedCandidates(values, evidenceById, unresolved = 
   const seen = new Map()
   const output = []
   for (const candidate of values) {
-    if (!plainObject(candidate) || !text(candidate.name, 200) || !ACTIONS.has(candidate.action) ||
+    if (!plainObject(candidate) || !exactFields(candidate,CANDIDATE_FIELDS) || !text(candidate.name, 200) || !ACTIONS.has(candidate.action) ||
         !PROFILES.has(candidate.profile) || !SEMANTICS.has(candidate.dueSemantics) || !text(candidate.uncertainty, 500) ||
         candidate.conflict !== false || !Array.isArray(candidate.evidenceIds) || candidate.evidenceIds.length < 1 || candidate.evidenceIds.length > 10 ||
         candidate.evidenceIds.some(id => !text(id, 100) || !evidenceById.has(id))) fail('INVALID_CANDIDATE', 'Candidate is unresolved, conflicting, or uncited')
@@ -129,7 +132,7 @@ export function validateNormalizedCandidates(values, evidenceById, unresolved = 
 export function validateUnresolvedResults(values) {
   if (!Array.isArray(values) || values.length > 50) fail('INVALID_UNRESOLVED', 'Unresolved result list is invalid')
   return values.map(value => {
-    if (!plainObject(value) || !text(value.name, 200) || !text(value.reason, 1000) || INJECTION.test(`${value.name}\n${value.reason}`)) {
+    if (!plainObject(value) || !exactFields(value,UNRESOLVED_FIELDS) || !text(value.name, 200) || !text(value.reason, 1000) || INJECTION.test(`${value.name}\n${value.reason}`)) {
       fail('INVALID_UNRESOLVED', 'Unresolved result is invalid')
     }
     return Object.freeze({ name: value.name, reason: value.reason })
