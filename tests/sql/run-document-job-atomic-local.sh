@@ -28,6 +28,8 @@ python3 -c "from pathlib import Path; import sys; text=Path(sys.argv[1]).read_te
 "${PSQL[@]}" < "$TMP_MIGRATION"
 "${PSQL[@]}" < "$ROOT/tests/sql/maintenance-research-assertions.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260908120000_convert_maintenance_research_to_xai.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260908193500_raise_maintenance_research_job_caps.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260908194500_raise_global_maintenance_research_budget.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260916190000_fix_research_settlement_json_precedence.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260916210000_add_finite_research_proposal_review.sql"
 "${PSQL[@]}" < "$ROOT/tests/sql/xai-maintenance-assertions.sql"
@@ -41,6 +43,8 @@ python3 -c "from pathlib import Path; import sys; text=Path(sys.argv[1]).read_te
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260918130000_fix_document_preflight_and_active_owner.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260918140000_document_dispatch_local.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260918150000_document_transport_quarantine.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260919164000_fix_research_activation_after_budget_raise.sql"
+"${PSQL[@]}" < "$ROOT/tests/sql/research-activation-assertions.sql"
 env -i PATH="$PATH" HOME=/root node --experimental-default-type=module "$ROOT/tests/sql/document-job-atomic-local.mjs" "$DB"
 if [[ "${DOCUMENT_DISPATCH_TEST:-0}" == 1 ]]; then
   env -i PATH="$PATH" HOME=/root node --experimental-default-type=module "$ROOT/tests/sql/document-dispatch-local.mjs" "$DB"
