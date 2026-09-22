@@ -19,6 +19,7 @@ export class ResearchValidationError extends Error {
 
 function fail(code, message) { throw new ResearchValidationError(code, message) }
 function text(value, max) { return typeof value === 'string' && value === value.trim() && value.length > 0 && value.length <= max && !CONTROL.test(value) }
+function optionalText(value, max) { return value == null || text(value, max) }
 function positive(value, max) { return Number.isInteger(value) && value > 0 && value <= max }
 function plainObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 function exactFields(value, allowed) { return Object.keys(value).every(key => allowed.has(key)) }
@@ -77,9 +78,9 @@ export function validateEvidenceRegistry(values, approvedDomains, providerProofs
     if (!plainObject(evidence) || !exactFields(evidence,EVIDENCE_FIELDS) || !text(evidence.id, 100) || registry.has(evidence.id) ||
         !text(evidence.title, 500) || !text(evidence.canonicalUrl, 2048) || !text(evidence.exactExcerpt, 4000) ||
         !text(evidence.applicability, 1000) || !text(evidence.accessedAt, 40) ||
+        !optionalText(evidence.page, 100) || !optionalText(evidence.section, 500) ||
         !SOURCE_CLASSES.has(evidence.sourceClass) || evidence.locationVerified !== false ||
         evidence.verificationStatus !== 'provider_citation_unconfirmed' ||
-        !(text(evidence.page, 100) || text(evidence.section, 500)) ||
         INJECTION.test(`${evidence.title}\n${evidence.exactExcerpt}`)) fail('INVALID_EVIDENCE', 'Evidence is incomplete, unsafe, or unverified')
     let url
     try { url = new URL(evidence.canonicalUrl) } catch { fail('INVALID_EVIDENCE', 'Evidence URL is invalid') }

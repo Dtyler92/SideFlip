@@ -10,6 +10,7 @@ import {
 
 const migrationUrl=new URL('../supabase/migrations/20260919190000_focus_simple_maintenance_research.sql',import.meta.url)
 const blockerFixUrl=new URL('../supabase/migrations/20260919191000_fix_simple_maintenance_review_blockers.sql',import.meta.url)
+const retryFixUrl=new URL('../supabase/migrations/20260922190000_fix_research_retry_budget_and_web_evidence.sql',import.meta.url)
 
 const evidence = () => ({
   id:'e1',title:'Owner guide',canonicalUrl:'https://manuals.example.com/guide',
@@ -47,6 +48,45 @@ test('provider result validators reject unknown fields and fractional intervals'
   assert.throws(()=>validateNormalizedCandidates([{...candidate,unexpected:'x'}],registry),{code:'INVALID_CANDIDATE'})
   assert.throws(()=>validateNormalizedCandidates([{...candidate,intervalMiles:7500.5}],registry),{code:'INVALID_CANDIDATE'})
   assert.throws(()=>validateUnresolvedResults([{name:'Coolant',reason:'No supported interval.',unexpected:'x'}]),{code:'INVALID_UNRESOLVED'})
+})
+
+test('citation-backed web evidence does not invent a page or section location', () => {
+  const item=evidence()
+  delete item.section
+  const registry=validateEvidenceRegistry([item],[domain(item.accessedAt)],[{canonicalUrl:item.canonicalUrl}],new Date(item.accessedAt))
+  assert.equal(registry.get('e1').canonicalUrl,item.canonicalUrl)
+  for (const invalidLocation of [
+    {page:{number:42}},
+    {page:'x'.repeat(101)},
+    {section:'x'.repeat(501)},
+    {section:'Maintenance\nintervals'},
+  ]) {
+    assert.throws(
+      ()=>validateEvidenceRegistry([{...item,...invalidLocation}],[domain(item.accessedAt)],[{canonicalUrl:item.canonicalUrl}],new Date(item.accessedAt)),
+      {code:'INVALID_EVIDENCE'},
+    )
+  }
+})
+
+test('retry fix reserves one bounded attempt so a failed low-cost job does not consume the monthly retry', () => {
+  const sql=readFileSync(retryFixUrl,'utf8')
+  assert.match(sql,/per_job_budget_cents\s*=\s*1250/i)
+  assert.match(sql,/max_attempts\s*=\s*1/i)
+  assert.match(sql,/set enabled=false/i)
+  assert.match(sql,/cron\.unschedule/i)
+  assert.ok((sql.match(/set enabled=false/gi)||[]).length>=2)
+  assert.ok((sql.match(/cron\.unschedule/gi)||[]).length>=2)
+  assert.match(sql,/select 1 from private\.my_stuff_research_runtime_config where singleton for update/i)
+  assert.match(sql,/RESEARCH_EXECUTION_RECONCILIATION_REQUIRED/i)
+  assert.match(sql,/status in \('queued','document_queued'\) and reserved_cents<>1250/i)
+  assert.match(sql,/status in \('queued','running','document_queued','document_pending'\) and reserved_cents<>1250/i)
+  assert.doesNotMatch(sql,/nullif\(v_e->>'page',''\) is null and nullif\(v_e->>'section',''\) is null/i)
+  assert.match(sql,/verification_status='provider_citation_unconfirmed'[\s\S]+nullif\(trim\(page\),'?'?\) is not null[\s\S]+nullif\(trim\(section\),'?'?\) is not null/i)
+  assert.match(sql,/jsonb_typeof\(v_e->'page'\)<>'string'/i)
+  assert.match(sql,/jsonb_typeof\(v_e->'section'\)<>'string'/i)
+  assert.match(sql,/\(v_e->>'page'\)<>trim\(v_e->>'page'\)/i)
+  assert.match(sql,/\(v_e->>'section'\)<>trim\(v_e->>'section'\)/i)
+  assert.match(sql,/create or replace function private\.settle_my_stuff_research_job_v4/i)
 })
 
 test('additive migration narrows snapshots and uses one alias-aware source policy everywhere', () => {

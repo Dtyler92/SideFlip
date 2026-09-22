@@ -1,5 +1,18 @@
 begin;
 
+select public._research_assert((
+  select status='cancelled' and last_error_code='BUDGET_POLICY_CHANGED'
+  from private.my_stuff_research_jobs
+  where client_mutation_id='legacy-budget-enqueue'
+),'legacy $25 queued authority is cancelled during policy migration');
+select public._research_assert((
+  select coalesce(sum(case when kind='reservation' then cents when kind='release' then -cents else 0 end),0)=0
+  from private.my_stuff_research_budget_ledger l
+  join private.my_stuff_research_jobs j on j.id=l.job_id
+  where j.client_mutation_id='legacy-budget-enqueue'
+),'legacy queued reservation is fully released in its original ledger cohort');
+select public._research_assert((select not enabled and per_job_budget_cents=1250 and max_attempts=1 from private.my_stuff_research_runtime_config where singleton),'policy migration remains disabled until the guarded operator activation');
+
 update private.my_stuff_research_source_domains
 set manufacturer='Honda', manufacturer_aliases=array['Honda','Honda Motor Company'], allowed_path_prefixes=array['/'], terms_reviewed_on=current_date, robots_reviewed_on=current_date
 where domain='honda.com';
@@ -23,6 +36,7 @@ reset role;
 
 select public._research_assert((select request_snapshot='{"modelYear":2020,"make":"Honda Motor Company","model":"Civic","engine":"1.5L","transmission":"CVT"}'::jsonb from private.my_stuff_research_jobs where id=:'focused_job'),'paid snapshot contains exactly the five confirmed vehicle facts');
 select public._research_assert((select request_snapshot ?& array['modelYear','make','model','engine','transmission'] and not request_snapshot ?| array['vin','trim','drivetrain','vehicleMarket','itemType','userId'] from private.my_stuff_research_jobs where id=:'focused_job'),'paid snapshot excludes VIN and extra item/user facts');
+select public._research_assert((select reserved_cents=1250 from private.my_stuff_research_jobs where id=:'focused_job'),'one user-triggered job reserves one bounded paid attempt');
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
@@ -38,20 +52,43 @@ select lease->'lease'->>'id' as leased_job,lease->'lease'->>'lease_token' as foc
 from (select public.lease_my_stuff_research_worker_v2('focused-worker') lease) leased \gset
 select public._research_assert(:'leased_job'::uuid=:'focused_job'::uuid,'alias-backed job reaches the real paid-worker lease boundary');
 select public._research_raises(format(
+  'insert into private.my_stuff_research_evidence(job_id,evidence_key,title,canonical_url,exact_excerpt,page,section,accessed_on,accessed_at,applicability,source_class,source_domain,location_verified,verification_status,content_hash) values(%L,%L,%L,%L,%L,null,null,current_date,now(),%L,%L,%L,true,%L,repeat(%L,64))',
+  :'focused_job','independent-missing','Honda guide','https://honda.com/guide','Replace engine oil every 7,500 miles.','2020 Honda Civic','manufacturer','honda.com','independently_verified','a'
+),'my_stuff_research_evidence_check');
+select public._research_raises(format(
   'select public.settle_my_stuff_research_worker_v2(%L,%L,1,%L::jsonb,%L::jsonb,%L::jsonb)',
   :'focused_job',:'focused_token',
-  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","page":"42","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed","unexpected":"x"}]',
+  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00.000Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","page":"42","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed","unexpected":"x"}]',
   '[]','[]'),'INVALID_EVIDENCE');
 select public._research_raises(format(
   'select public.settle_my_stuff_research_worker_v2(%L,%L,1,%L::jsonb,%L::jsonb,%L::jsonb)',
   :'focused_job',:'focused_token',
-  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","page":"42","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed"}]',
+  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00.000Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","page":"42","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed"}]',
   '[{"name":"Engine oil","action":"replace","profile":"normal","dueSemantics":"whichever_first","intervalMiles":7500.5,"evidenceIds":["e1"],"uncertainty":"low","conflict":false}]','[]'),'INVALID_CANDIDATE');
 select public._research_assert((select status='running' and not exists(select 1 from private.my_stuff_research_evidence e where e.job_id=:'focused_job') from private.my_stuff_research_jobs where id=:'focused_job'),'invalid settlement rolls back without partial writes');
+select public._research_raises(format(
+  'select public.settle_my_stuff_research_worker_v2(%L,%L,1,%L::jsonb,%L::jsonb,%L::jsonb)',
+  :'focused_job',:'focused_token',
+  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://evil.example/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00.000Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed"}]',
+  '[]','[]'),'INVALID_EVIDENCE');
+select public._research_raises(format(
+  'select public.settle_my_stuff_research_worker_v2(%L,%L,1,%L::jsonb,%L::jsonb,%L::jsonb)',
+  :'focused_job',:'focused_token',
+  '[{"id":"e1","title":" Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00.000Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed"}]',
+  '[]','[]'),'INVALID_EVIDENCE');
 select public.settle_my_stuff_research_worker_v2(:'focused_job',:'focused_token',1,
-  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","page":"42","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed"}]',
+  '[{"id":"e1","title":"Honda guide","canonicalUrl":"https://honda.com/guide","exactExcerpt":"Replace engine oil every 7,500 miles.","accessedAt":"2026-09-19T12:00:00.000Z","applicability":"2020 Honda Civic","sourceClass":"manufacturer","sourceDomain":"honda.com","locationVerified":false,"verificationStatus":"provider_citation_unconfirmed"}]',
   '[{"name":"Engine oil","action":"replace","profile":"normal","dueSemantics":"whichever_first","intervalMiles":7500,"evidenceIds":["e1"],"uncertainty":"low","conflict":false}]','[]');
 reset role;
 select public._research_assert((select status='awaiting_review' from private.my_stuff_research_jobs where id=:'focused_job'),'alias-backed focused research settles for review');
+
+insert into vault.decrypted_secrets(name,decrypted_secret) values
+  ('maintenance_research_worker_url','https://worker.example.invalid'),
+  ('maintenance_research_worker_secret','test-secret')
+on conflict(name) do update set decrypted_secret=excluded.decrypted_secret;
+update private.my_stuff_research_runtime_config set enabled=false where singleton;
+select private.activate_my_stuff_research_v1();
+select public._research_assert((select enabled from private.my_stuff_research_runtime_config where singleton),'activation works when the optional document schema is absent');
+select public._research_assert((select count(*)=1 from cron.job where jobname='sideflip-maintenance-research-worker'),'activation schedules exactly one worker job');
 
 rollback;

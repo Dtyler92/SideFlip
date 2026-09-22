@@ -49,4 +49,8 @@ env -i PATH="$PATH" HOME=/root node --experimental-default-type=module "$ROOT/te
 if [[ "${DOCUMENT_DISPATCH_TEST:-0}" == 1 ]]; then
   env -i PATH="$PATH" HOME=/root node --experimental-default-type=module "$ROOT/tests/sql/document-dispatch-local.mjs" "$DB"
 fi
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260919190000_focus_simple_maintenance_research.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260919191000_fix_simple_maintenance_review_blockers.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260922190000_fix_research_retry_budget_and_web_evidence.sql"
+"${PSQL[@]}" < "$ROOT/tests/sql/retry-budget-document-stack-assertions.sql"
 printf 'Atomic document PostgreSQL contracts passed in %s\n' "$DB"
