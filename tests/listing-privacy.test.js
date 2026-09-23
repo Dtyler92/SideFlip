@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 const privacy = readFileSync(new URL('../src/pages/PrivacyPolicy.jsx', import.meta.url), 'utf8')
 const publicPrivacy = readFileSync(new URL('../public/privacy/index.html', import.meta.url), 'utf8')
+const maintenanceResearchDisclosure = 'When you start manufacturer maintenance research, SideFlip sends only the confirmed vehicle year, make, model, and engine size, plus transmission when available, to xAI so Grok can search approved manufacturer or authorized-dealer sources.'
+const staleMaintenanceFieldList = 'vehicle or item type and available confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market details'
 
 test('privacy policy discloses listing-generation data sent to xAI', () => {
   assert.match(privacy, /xAI/)
@@ -14,8 +16,8 @@ test('privacy policy discloses listing-generation data sent to xAI', () => {
 })
 
 test('privacy policy discloses bounded Grok maintenance research and no stale provider', () => {
-  assert.match(privacy, /manufacturer maintenance research/i)
-  assert.match(privacy, /confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market/i)
+  assert.ok(privacy.includes(maintenanceResearchDisclosure))
+  assert.ok(!privacy.includes(staleMaintenanceFieldList))
   assert.match(privacy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
   assert.match(privacy, /review cited source links/i)
   assert.doesNotMatch(privacy, /Anthropic/i)
@@ -26,10 +28,11 @@ test('public privacy route matches the xAI listing and maintenance disclosures',
     assert.match(policy, /xAI/)
     assert.match(policy, /seller brief/i)
     assert.match(policy, /expense descriptions/i)
-    assert.match(policy, /manufacturer maintenance research/i)
-    assert.match(policy, /confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market/i)
+    assert.ok(policy.includes(maintenanceResearchDisclosure))
+    assert.ok(!policy.includes(staleMaintenanceFieldList))
     assert.match(policy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
     assert.match(policy, /review cited source links/i)
+    assert.match(policy, /Last updated: September 23, 2026/i)
     assert.doesNotMatch(policy, /Anthropic/i)
   }
 })
