@@ -44,13 +44,14 @@ function registerObjects(paths, objectBudget) {
   if (objectBudget.paths.size > objectBudget.maxObjects) throw new Error('STORAGE_OBJECT_LIMIT_EXCEEDED')
 }
 
-async function deleteAndReadBack({ storage, claim, pageSize, maxObjects, removeBatchSize, maxPasses, maxTraversalDepth, maxListRequests, listBudget, objectBudget }) {
+async function deleteAndReadBack({ storage, claim, pageSize, maxObjects, removeBatchSize, maxTraversalDepth, maxListRequests, listBudget, objectBudget, passBudget }) {
   const limits = { maxDepth: maxTraversalDepth, maxListRequests, budget: listBudget }
   const initiallyFound = await listExactPrefix(storage, claim.bucket_id, claim.storage_prefix, pageSize, maxObjects, limits)
   registerObjects(initiallyFound, objectBudget)
   const seen = new Set(initiallyFound)
   let remaining = initiallyFound
-  for (let pass = 0; pass < maxPasses && remaining.length; pass += 1) {
+  while (remaining.length && passBudget.used < passBudget.maxPasses) {
+    passBudget.used += 1
     for (let i = 0; i < remaining.length; i += removeBatchSize) {
       const batch = remaining.slice(i, i + removeBatchSize)
       if (batch.some(path => !path.startsWith(claim.storage_prefix))) throw new Error('STORAGE_PREFIX_ESCAPE')
@@ -77,8 +78,9 @@ export async function runMaintenanceDeletionBatch({ db, storage, workerId, batch
       assertClaim(claim)
       const listBudget = { requests: 0, maxRequests: maxListRequests }
       const objectBudget = { paths: new Set(), maxObjects: maxObjectsPerClaim }
+      const passBudget = { used: 0, maxPasses: maxDeletePasses }
       const cleanup = () => claim.object_type === 'item'
-        ? deleteAndReadBack({ storage, claim, pageSize, maxObjects: maxObjectsPerClaim, removeBatchSize, maxPasses: maxDeletePasses, maxTraversalDepth, maxListRequests, listBudget, objectBudget })
+        ? deleteAndReadBack({ storage, claim, pageSize, maxObjects: maxObjectsPerClaim, removeBatchSize, maxTraversalDepth, maxListRequests, listBudget, objectBudget, passBudget })
         : { expected: 0, deleted: 0, remaining: 0 }
       if (claim.phase === 'verifying_storage') {
         const counts = await cleanup()

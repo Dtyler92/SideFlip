@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { MONTHLY_PRICE, ANNUAL_PRICE, ANNUAL_MONTHLY_EQUIV, SAVINGS_PCT } from '../billing'
-import { captureEvent, getStoredAttribution } from '../analytics'
+import { captureEvent } from '../analytics'
 import { useAuth } from '../context/AuthContext'
-import { getStoredReferral } from '../pwa'
+
+function requestedPlan() {
+  return new URLSearchParams(window.location.search).get('plan') === 'monthly' ? 'monthly' : 'annual'
+}
 
 export default function Paywall() {
-  const { user, signOut } = useAuth()
-  const [selected, setSelected] = useState('annual')
+  const { signOut } = useAuth()
+  const [selected, setSelected] = useState(requestedPlan)
   const [loading, setLoading] = useState(false)
   const [billingConsent, setBillingConsent] = useState(false)
 
@@ -38,7 +41,6 @@ export default function Paywall() {
         body: JSON.stringify({
           plan: selected,
           billingConsent,
-          ref: getStoredAttribution().last?.referral_code || getStoredReferral(user?.id) || undefined,
         })
       })
       const { url, error } = await res.json()
@@ -74,7 +76,7 @@ export default function Paywall() {
         Get full access to SideFlip
       </div>
       <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 32, textAlign: 'center', lineHeight: 1.6 }}>
-        Start your 7-day free trial. Cancel before day 7 and you won't be charged.
+        The Free plan remains available. Upgrade only when you want SideFlip Pro.
       </div>
 
       {/* Plan selector */}
@@ -145,12 +147,11 @@ export default function Paywall() {
       {/* Features list */}
       <div style={{ width: '100%', marginBottom: 24 }}>
         {[
-          'Unlimited projects',
-          'Track all expenses & profit',
-          'Photo uploads',
-          'VIN, serial & engine tracking',
-          'Notes on every project',
-          'Lifetime profit dashboard',
+          'Everything included with SideFlip Free',
+          'Portfolio analytics dashboard',
+          'Realized ROI, win rate, and active-capital metrics',
+          'Category performance and best-flip insights',
+          'Average selling-time and recent-sales views',
         ].map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 14, color: 'var(--body)' }}>
             <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓</span> {f}
@@ -164,16 +165,16 @@ export default function Paywall() {
         disabled={loading}
         style={{ marginBottom: 12 }}
       >
-        {loading ? 'Redirecting...' : `Start with ${selected === 'annual' ? 'Annual' : 'Monthly'} Plan →`}
+        {loading ? 'Redirecting...' : `Continue to ${selected === 'annual' ? 'Annual' : 'Monthly'} Checkout →`}
       </button>
 
       <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5, marginBottom: 12 }}>
         <strong style={{ color: 'var(--text)' }}>
           {selected === 'annual'
-            ? '7-day free trial, then $99.99 charged annually ($8.33/month equivalent).'
-            : '7-day free trial, then $12.99 charged monthly.'}
+            ? '$99.99 charged immediately and annually thereafter ($8.33/month equivalent).'
+            : '$12.99 charged immediately and monthly thereafter.'}
         </strong><br />
-        Renews automatically until canceled. Cancel before the trial ends to avoid being charged.
+        Renews automatically until canceled. Manage or cancel anytime through Settings.
       </div>
 
       <label style={{
@@ -187,7 +188,7 @@ export default function Paywall() {
           style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: 'var(--accent)' }}
         />
         <span>
-          I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price after my trial and at each renewal until I cancel. I can cancel anytime through Settings.
+          I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Terms of Service</a> and authorize SideFlip to charge the selected price immediately and at each renewal until I cancel. I can cancel anytime through Settings.
         </span>
       </label>
 

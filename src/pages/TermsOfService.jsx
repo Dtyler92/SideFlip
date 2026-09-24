@@ -1,54 +1,56 @@
 export default function TermsOfService() {
+  const sectionStyle = { fontSize: 18, fontWeight: 700, marginTop: 32 }
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 24px', fontFamily: 'Inter, sans-serif', color: '#1A1917', lineHeight: 1.7 }}>
       <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 36, fontWeight: 800, marginBottom: 8 }}>
         <span style={{ color: '#1A1917' }}>Side</span><span style={{ color: '#C8402F' }}>Flip</span>
       </div>
       <h1 style={{ fontSize: 28, fontWeight: 700, margin: '24px 0 8px' }}>Terms of Service</h1>
-      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: July 23, 2026</p>
+      <p style={{ color: '#8C8880', marginBottom: 32 }}>Last updated: September 8, 2026</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>1. Acceptance of Terms</h2>
-      <p>By creating an account and using SideFlip ("the Service"), you agree to these Terms of Service. If you do not agree, do not use the Service.</p>
+      <h2 style={sectionStyle}>1. Acceptance of Terms</h2>
+      <p>SideFlip is operated by Tourbillion LLC, a Pennsylvania limited liability company. By creating an account, affirmatively accepting these Terms, and using SideFlip ("the Service"), you agree to these Terms. If you do not agree, do not use the Service.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>2. Description of Service</h2>
-      <p>SideFlip is a project tracking application that helps users track the cost and profit of items they buy, repair, and resell. The Service is provided "as is" and is intended for personal use.</p>
+      <h2 style={sectionStyle}>2. Description of Service</h2>
+      <p>SideFlip is project-tracking and business-management software that helps individuals and small resale businesses record the costs, expenses, receipts, sales, and profit of items they independently buy, repair, and resell. SideFlip does not buy or sell users' goods, process marketplace transactions, hold customer funds, or provide investment or financial advice.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>3. Account Registration</h2>
-      <p>You must provide a valid email address to create an account. You are responsible for maintaining the confidentiality of your password and for all activity under your account. You must be at least 13 years old to use the Service.</p>
+      <h2 style={sectionStyle}>3. Account Registration</h2>
+      <p>You must provide a valid email address to create an account. You are responsible for maintaining the confidentiality of your password and activity under your account. You must be at least 13 years old to use the Service.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>4. Subscription and Billing</h2>
-      <p>SideFlip offers a 7-day free trial followed by a paid subscription ($8.99/month or $59/year). Your card will be charged at the end of the trial period unless you cancel before the trial ends. Subscriptions automatically renew until canceled. You may cancel at any time through the billing portal accessible from within the app.</p>
-      <p>All fees are non-refundable except where required by law.</p>
+      <h2 style={sectionStyle}>4. Subscriptions and Billing</h2>
+      <p>Subscription prices and billing periods are shown before purchase. Availability and pricing may vary by purchase channel and region.</p>
+      <p><strong>Web subscriptions:</strong> Website purchases are processed by Stripe. SideFlip does not offer a free trial for web subscriptions. The selected subscription is charged immediately after checkout confirmation and renews automatically at the disclosed billing interval until canceled. Web subscriptions are managed through SideFlip Settings and Stripe's billing portal.</p>
+      <p><strong>iPhone subscriptions:</strong> Purchases in the SideFlip iPhone app are processed by Apple and charged to your Apple ID. Apple subscriptions renew automatically unless canceled through Apple ID subscription settings before renewal. Any introductory offer is available only if Apple shows it and your Apple ID is eligible. Apple controls App Store billing, cancellation, and refund requests.</p>
+      <p>Canceling a subscription prevents future renewal according to the provider's rules but does not delete your SideFlip account. Deleting a SideFlip account does not cancel an Apple or Stripe subscription. Except where required by law or provider rules, completed charges are non-refundable.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>5. Acceptable Use</h2>
-      <p>You agree not to:</p>
+      <h2 style={sectionStyle}>5. Acceptable Use</h2>
       <ul>
-        <li>Use the Service for any unlawful purpose</li>
-        <li>Upload content that infringes on third-party rights</li>
-        <li>Attempt to gain unauthorized access to the Service or its systems</li>
-        <li>Use the Service to track illegal transactions</li>
+        <li>Do not use the Service for an unlawful purpose</li>
+        <li>Do not upload content that infringes third-party rights</li>
+        <li>Do not attempt unauthorized access to the Service or its systems</li>
+        <li>Do not use the Service to track illegal transactions</li>
       </ul>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>6. Your Content</h2>
-      <p>You retain ownership of all content you upload to SideFlip (photos, project details, notes). By uploading content, you grant us a limited license to store and display it solely for the purpose of providing the Service to you.</p>
+      <h2 style={sectionStyle}>6. Your Content</h2>
+      <p>You retain ownership of content you upload. By uploading content, you grant Tourbillion LLC a limited license to store, process, and display it only as needed to provide the Service and fulfill features you request.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>7. Disclaimer of Warranties</h2>
-      <p>The Service is provided "as is" without warranties of any kind. We do not guarantee that the Service will be uninterrupted, error-free, or that your data will never be lost. We recommend keeping your own records of important financial information.</p>
+      <h2 style={sectionStyle}>7. Disclaimer of Warranties</h2>
+      <p>The Service is provided "as is" without warranties of any kind. We do not guarantee uninterrupted or error-free service or that data loss can never occur. Keep your own records of important financial information.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>8. Limitation of Liability</h2>
-      <p>To the maximum extent permitted by law, SideFlip and its operators shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Service, including any loss of data or profits.</p>
+      <h2 style={sectionStyle}>8. Limitation of Liability</h2>
+      <p>To the maximum extent permitted by law, SideFlip, Tourbillion LLC, and their operators shall not be liable for indirect, incidental, special, or consequential damages arising from use of the Service, including loss of data or profits.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>9. Termination</h2>
-      <p>We reserve the right to suspend or terminate your account if you violate these Terms. You may cancel your account at any time. Upon termination, your data will be retained for 30 days then deleted.</p>
+      <h2 style={sectionStyle}>9. Account Termination and Deletion</h2>
+      <p>We may suspend or terminate accounts that violate these Terms. Canceling a subscription and deleting an account are separate actions. You may delete your account through <strong>Settings → Delete Account</strong> in the iPhone app or by contacting support. Account deletion is permanent and is handled as described in the Privacy Policy.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>10. Changes to Terms</h2>
-      <p>We may update these Terms at any time. Continued use of the Service after changes are posted constitutes your acceptance of the revised Terms. We will notify you of material changes via email.</p>
+      <h2 style={sectionStyle}>10. Changes to Terms</h2>
+      <p>We may update these Terms from time to time. We will post revised Terms and notify users of material changes when appropriate. Continued use after revised Terms take effect constitutes acceptance.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>11. Governing Law</h2>
-      <p>These Terms are governed by the laws of the State of Pennsylvania, without regard to conflict of law principles.</p>
+      <h2 style={sectionStyle}>11. Governing Law</h2>
+      <p>These Terms are governed by the laws of the Commonwealth of Pennsylvania, without regard to conflict-of-law principles.</p>
 
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 32 }}>12. Contact</h2>
-      <p>Questions about these Terms? Email us at <a href="mailto:tyler@tourbillionenergy.com" style={{ color: '#C8402F' }}>tyler@tourbillionenergy.com</a>.</p>
+      <h2 style={sectionStyle}>12. Contact</h2>
+      <p>Questions? Email <a href="mailto:tyler@tourbillionenergy.com" style={{ color: '#C8402F' }}>tyler@tourbillionenergy.com</a>.</p>
 
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #E8E4DE' }}>
         <a href="/" style={{ color: '#C8402F', fontWeight: 600, textDecoration: 'none' }}>← Back to SideFlip</a>

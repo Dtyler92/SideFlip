@@ -43,19 +43,7 @@ export default async function handler(req, res) {
       .maybeSingle()
     if (profileError) throw profileError
 
-    let discounts
     const referralCode = typeof ref === 'string' ? ref.trim().slice(0, 64) : ''
-    if (referralCode) {
-      try {
-        const coupons = await stripe.coupons.list({ limit: 100 })
-        const match = coupons.data.find(
-          coupon => coupon.name?.toUpperCase() === referralCode.toUpperCase() && coupon.valid
-        )
-        if (match) discounts = [{ coupon: match.id }]
-      } catch (error) {
-        console.error('Referral lookup error:', error.message)
-      }
-    }
 
     const planDescription = plan === 'annual'
       ? '$99.99 charged annually (equivalent to $8.33 per month)'
@@ -65,7 +53,7 @@ export default async function handler(req, res) {
       userId: user.id,
       plan,
       recurringBillingConsent: 'true',
-      consentVersion: '2026-07-28',
+      consentVersion: '2026-09-08-no-trial',
       consentTimestamp,
       ...(referralCode && { referralCode }),
     }
@@ -78,16 +66,13 @@ export default async function handler(req, res) {
       client_reference_id: user.id,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
         metadata,
       },
-      allow_promotion_codes: !discounts,
-      ...(discounts && { discounts }),
       payment_method_collection: 'always',
       consent_collection: { terms_of_service: 'required' },
       custom_text: {
         submit: {
-          message: `By subscribing, you authorize SideFlip to charge ${planDescription} until canceled. Cancel before the trial ends to avoid the first charge. Manage or cancel anytime in SideFlip Settings.`,
+          message: `By subscribing, you authorize SideFlip to charge ${planDescription} immediately and at each renewal until canceled. Manage or cancel anytime in SideFlip Settings.`,
         },
       },
       managed_payments: { enabled: false },

@@ -173,6 +173,31 @@ test('worker enforces one cumulative object budget across both storage drains', 
   assert.equal(acknowledgements.at(-1).error, 'STORAGE_OBJECT_LIMIT_EXCEEDED')
 })
 
+test('worker shares one deletion-pass budget across both storage drains', async () => {
+  const currentClaim = claim()
+  let listCall = 0
+  const removed = []
+  const storage = {
+    async list() {
+      listCall += 1
+      if (listCall === 1) return [{ id:'a', name:'a.jpg', metadata:{} }]
+      if (listCall === 2) return []
+      if (listCall === 3) return [{ id:'b', name:'b.jpg', metadata:{} }]
+      return []
+    },
+    async remove(_bucket, paths) { removed.push(...paths) },
+  }
+  const db = {
+    claim:async()=>[currentClaim],
+    ack:async args=>({ status:args.error?'failed':'deleting_database' }),
+    finalize:async()=>({ status:'verifying_storage' }),
+  }
+  const result = await runMaintenanceDeletionBatch({ db, storage, workerId:currentClaim.worker_id, maxDeletePasses:1 })
+  assert.equal(result.results[0].status, 'failed')
+  assert.equal(result.results[0].remaining, 1)
+  assert.deepEqual(removed, [`${currentClaim.storage_prefix}a.jpg`])
+})
+
 test('exact-prefix listing bounds recursive traversal depth', async () => {
   const storage = memoryStorage([`${prefix}a/b/c/d/e.jpg`])
   await assert.rejects(

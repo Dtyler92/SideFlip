@@ -22,22 +22,49 @@ function hasActiveLegacyStripeSubscription(profile) {
   )
 }
 
-const CANONICAL_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+const UTC_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|\+00:00)$/
+
+function parseFiniteUtcTimestamp(value) {
+  if (typeof value !== 'string') return null
+  const match = UTC_TIMESTAMP.exec(value)
+  if (!match) return null
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
+  const instant = Date.parse(value)
+  if (!Number.isFinite(instant)) return null
+
+  const parsed = new Date(instant)
+  if (
+    parsed.getUTCFullYear() !== Number(yearText)
+    || parsed.getUTCMonth() + 1 !== Number(monthText)
+    || parsed.getUTCDate() !== Number(dayText)
+    || parsed.getUTCHours() !== Number(hourText)
+    || parsed.getUTCMinutes() !== Number(minuteText)
+    || parsed.getUTCSeconds() !== Number(secondText)
+  ) return null
+
+  return instant
+}
 
 function hasActiveAppleEntitlement(entitlement, now = Date.now()) {
   if (entitlement?.source !== 'apple' || entitlement.status !== 'active') return false
-  if (typeof entitlement.expires_at !== 'string' || !CANONICAL_UTC_TIMESTAMP.test(entitlement.expires_at)) {
-    return false
-  }
+  const expiresAt = parseFiniteUtcTimestamp(entitlement.expires_at)
+  return expiresAt !== null && expiresAt > now
+}
 
-  const expiresAt = new Date(entitlement.expires_at).getTime()
-  return Number.isFinite(expiresAt)
-    && new Date(expiresAt).toISOString() === entitlement.expires_at
-    && expiresAt > now
+function hasCurrentServerEnvelope(envelope, now) {
+  const row = envelope?.entitlement
+  if (row === null) return true
+  if (!row || typeof row !== 'object') return false
+  if (!['active', 'trialing', 'billing_grace', 'grace_period'].includes(row.status)) return false
+  if (row.expires_at == null) return true
+  const expiresAt = parseFiniteUtcTimestamp(row.expires_at)
+  return expiresAt !== null && expiresAt > now
 }
 
 export function getPlan(profile, entitlement, now = Date.now()) {
-  if (entitlement?.plan === 'free' || entitlement?.plan === 'pro') return entitlement.plan
+  if (entitlement?.plan === 'free') return 'free'
+  if (entitlement?.plan === 'pro') return hasCurrentServerEnvelope(entitlement, now) ? 'pro' : 'free'
   if (hasActiveLegacyStripeSubscription(profile)) return 'pro'
   if (hasActiveAppleEntitlement(entitlement, now)) return 'pro'
   return 'free'

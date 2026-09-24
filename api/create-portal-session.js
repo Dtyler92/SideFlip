@@ -12,13 +12,13 @@ function getBearerToken(req) {
   return authorization.startsWith('Bearer ') ? authorization.slice(7) : null
 }
 
-async function resolveCustomerId(user, profile) {
+export async function resolveCustomerId(user, profile, stripeClient = stripe) {
   if (profile?.stripe_customer_id) return profile.stripe_customer_id
 
   // Recover accounts where the subscription webhook saved incompletely.
   if (profile?.subscription_id) {
     try {
-      const subscription = await stripe.subscriptions.retrieve(profile.subscription_id)
+      const subscription = await stripeClient.subscriptions.retrieve(profile.subscription_id)
       if (subscription?.customer) {
         return typeof subscription.customer === 'string'
           ? subscription.customer
@@ -32,9 +32,9 @@ async function resolveCustomerId(user, profile) {
   // Older checkout records may have the email but no Stripe ID in Supabase.
   // Prefer a subscription carrying this exact Supabase user ID.
   if (user.email) {
-    const customers = await stripe.customers.list({ email: user.email, limit: 10 })
+    const customers = await stripeClient.customers.list({ email: user.email, limit: 10 })
     for (const customer of customers.data) {
-      const subscriptions = await stripe.subscriptions.list({
+      const subscriptions = await stripeClient.subscriptions.list({
         customer: customer.id,
         status: 'all',
         limit: 10,

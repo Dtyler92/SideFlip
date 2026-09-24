@@ -39,6 +39,23 @@ test('server-authoritative plan envelope overrides stale legacy profile mirrors'
   }), 'pro')
 })
 
+test('a cached Pro envelope expires locally before its refresh request completes', () => {
+  const cached = { plan:'pro', entitlement:{ source:'stripe', status:'active', expires_at:'2026-09-08T12:00:00.000Z' } }
+  assert.equal(getPlan({}, cached, Date.parse('2026-09-08T11:59:59.000Z')), 'pro')
+  assert.equal(getPlan({}, cached, Date.parse('2026-09-08T12:00:00.000Z')), 'free')
+})
+
+test('active Pro envelopes accept the UTC timestamp shapes returned by Supabase', () => {
+  for (const expires_at of [
+    '2027-07-29T23:50:55+00:00',
+    '2027-07-29T23:50:55.99+00:00',
+    '2027-07-29T23:50:55.123456Z',
+  ]) {
+    const envelope = { plan: 'pro', entitlement: { source: 'stripe', status: 'active', expires_at } }
+    assert.equal(getPlan({}, envelope, TEST_NOW), 'pro', expires_at)
+  }
+})
+
 test('a verified active Apple entitlement grants Pro access', () => {
   assert.equal(getPlan({}, ACTIVE_APPLE_PRO, TEST_NOW), 'pro')
   assert.equal(can({}, ACTIVE_APPLE_PRO, 'ai_listings', TEST_NOW), true)

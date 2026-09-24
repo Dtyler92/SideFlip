@@ -4,51 +4,56 @@ import { CATEGORIES, getExtraFields, fmt } from '../store'
 import { createProject } from '../db'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { uploadPhoto } from '../supabase'
-import { calculateGoalSummary, createMutationId } from '../goals'
-import ProjectPhotoSlot from '../components/ProjectPhotoSlot'
+import { accessibleActiveGoalsAfterProLoss, calculateGoalSummary, createMutationId } from '../goals'
+import { getPlan } from '../capabilities'
+import ProjectPhotoGallery from '../components/ProjectPhotoGallery'
 import { captureEvent } from '../analytics'
+import VinDecodePanel from '../components/VinDecodePanel'
+import UpgradePrompt from '../components/UpgradePrompt'
 
 export default function NewProject() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { user } = useAuth()
+  const { user, profile, entitlement } = useAuth()
   const { refresh, goals, projects } = useData()
-  const [beforePhoto, setBeforePhoto] = useState(null)
-  const [afterPhoto, setAfterPhoto] = useState(null)
-  const [uploadingSlot, setUploadingSlot] = useState(null)
+  const [photos, setPhotos] = useState([])
   const [saving, setSaving] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
   const [form, setForm] = useState({
-    title: '', category: 'mower', purchasePrice: '', notes: '',
+    title: '', category: '', purchasePrice: '', notes: '',
     modelNumber: '', serialNumber: '',
     engineModel: '', engineSerial: '',
-    vin: '', hullNumber: '',
+    vin: '', hullNumber: '', vehicleYear: '', vehicleMake: '', vehicleModel: '', transmission: '',
     goalId: searchParams.get('goal') || '', goalFundingAmount: '', mutationId: createMutationId(),
   })
 
   const fields = getExtraFields(form.category)
-  const selectedGoal = goals.find(goal => goal.id === form.goalId && goal.status === 'active')
+  const plan = getPlan(profile, entitlement)
+  const activeGoals = accessibleActiveGoalsAfterProLoss(goals, plan)
+  const selectedGoal = activeGoals.find(goal => goal.id === form.goalId)
   const goalSummary = selectedGoal ? calculateGoalSummary(selectedGoal, projects, selectedGoal.ledger) : null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  async function handlePhotoFile(slot, e) {
-    const file = e.target.files[0]
-    if (!file) return
-    setUploadingSlot(slot)
-    try {
-      const url = await uploadPhoto(user.id, file)
-      if (slot === 'before') setBeforePhoto(url)
-      else setAfterPhoto(url)
-    } catch (err) {
-      alert('Photo upload failed: ' + err.message)
-    } finally {
-      setUploadingSlot(null)
+  const selectCategory = category => setForm(current => {
+    const nextFields = getExtraFields(category)
+    return {
+      ...current,
+      category,
+      vin: nextFields.hasVin ? current.vin : '',
+      hullNumber: nextFields.hasHull ? current.hullNumber : '',
+      vehicleYear: nextFields.hasVehicleDetails ? current.vehicleYear : '',
+      vehicleMake: nextFields.hasVehicleDetails ? current.vehicleMake : '',
+      vehicleModel: nextFields.hasVehicleDetails ? current.vehicleModel : '',
+      transmission: nextFields.hasVehicleDetails ? current.transmission : '',
+      engineModel: nextFields.hasEngine ? current.engineModel : '',
+      engineSerial: nextFields.hasEngine ? current.engineSerial : '',
     }
-  }
+  })
+
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.title.trim()) return alert('Give your project a name')
+    if (!form.category) return alert('Select a category')
     if (form.goalId && !selectedGoal) return alert('That Trade-Up Goal is no longer active. Choose another goal or create this project without one.')
     const purchase = Number(form.purchasePrice) || 0
     const goalFunding = Number(form.goalFundingAmount) || 0
@@ -58,9 +63,8 @@ export default function NewProject() {
     try {
       await createProject(user.id, {
         ...form,
-        photo: beforePhoto || afterPhoto,
-        beforePhoto,
-        afterPhoto,
+        photo: photos[0] || null,
+        photos,
         goalId: form.goalId || null,
         goalFundingAmount: goalFunding,
         outOfPocketAmount: Math.max(0, purchase - goalFunding),
@@ -88,11 +92,7 @@ export default function NewProject() {
           {/* Project photos */}
           <div className="form-group">
             <label>Project Photos (optional)</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <ProjectPhotoSlot label="Before" photo={beforePhoto} uploading={uploadingSlot === 'before'} onFile={e => handlePhotoFile('before', e)} />
-              <ProjectPhotoSlot label="After" photo={afterPhoto} uploading={uploadingSlot === 'after'} onFile={e => handlePhotoFile('after', e)} />
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>Show the starting condition and the finished result for this flip.</div>
+            <ProjectPhotoGallery userId={user.id} photos={photos} project={{ photo: photos[0] }} plan={plan} onUpdate={async next => setPhotos(next)} onUpgrade={() => setUpgradeMessage('Upgrade to SideFlip Pro to add up to 25 photos to each project.')} />
           </div>
 
           {/* Title */}
@@ -108,8 +108,9 @@ export default function NewProject() {
 
           {/* Category */}
           <div className="form-group">
-            <label>Category</label>
-            <select value={form.category} onChange={e => set('category', e.target.value)}>
+            <label>Category *</label>
+            <select value={form.category} onChange={e => selectCategory(e.target.value)} required>
+              <option value="" disabled>Select a category</option>
               {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
@@ -124,13 +125,13 @@ export default function NewProject() {
             />
           </div>
 
-          {goals.filter(goal => goal.status === 'active').length > 0 && (
+          {activeGoals.length > 0 && (
             <div className="card" style={{ marginBottom: 18 }}>
               <div className="form-group">
                 <label>Trade-Up Goal (optional)</label>
                 <select value={form.goalId} onChange={e => { set('goalId', e.target.value); set('goalFundingAmount', '') }}>
                   <option value="">Not part of a goal</option>
-                  {goals.filter(goal => goal.status === 'active').map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}
+                  {activeGoals.map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}
                 </select>
               </div>
               {selectedGoal && (
@@ -154,6 +155,21 @@ export default function NewProject() {
                 onChange={e => set(fields.hasVin ? 'vin' : 'hullNumber', e.target.value)}
               />
             </div>
+          )}
+
+          {fields.hasVehicleDetails && (
+            <>
+              <section aria-label="Unconfirmed editable review"><VinDecodePanel values={form} onChange={setForm} /></section>
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Vehicle details (manual entry)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group"><label>Year</label><input inputMode="numeric" value={form.vehicleYear} onChange={e => set('vehicleYear', e.target.value)} /></div>
+                  <div className="form-group"><label>Make</label><input value={form.vehicleMake} onChange={e => set('vehicleMake', e.target.value)} /></div>
+                  <div className="form-group"><label>Model</label><input value={form.vehicleModel} onChange={e => set('vehicleModel', e.target.value)} /></div>
+                  <div className="form-group"><label>Transmission type</label><input value={form.transmission} onChange={e => set('transmission', e.target.value)} /></div>
+                </div>
+              </div>
+            </>
           )}
 
           {fields.hasModel && (
@@ -211,6 +227,7 @@ export default function NewProject() {
           <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create Project →'}</button>
         </form>
       </div>
+      <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
     </>
   )
 }

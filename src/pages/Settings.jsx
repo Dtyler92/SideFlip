@@ -2,24 +2,25 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../supabase'
 import { isAnalyticsEnabled, setAnalyticsEnabled } from '../analytics'
+import { CURRENCIES } from '../currencyModel'
 
-const CURRENCIES = [
-  { code: 'USD', symbol: '$', label: 'US Dollar' },
-  { code: 'CAD', symbol: 'CA$', label: 'Canadian Dollar' },
-  { code: 'GBP', symbol: '£', label: 'British Pound' },
-  { code: 'EUR', symbol: '€', label: 'Euro' },
-  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar' },
-  { code: 'MXN', symbol: 'MX$', label: 'Mexican Peso' },
-  { code: 'JPY', symbol: '¥', label: 'Japanese Yen' },
-  { code: 'INR', symbol: '₹', label: 'Indian Rupee' },
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'pt', label: 'Português' },
+  { code: 'ja', label: '日本語' },
 ]
 
 export default function Settings() {
   const { user, profile, signOut, refreshProfile } = useAuth()
   const [currency, setCurrency] = useState(profile?.currency || 'USD')
+  const [language, setLanguage] = useState(profile?.language || 'en')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [portalMessage, setPortalMessage] = useState('')
   const [analyticsEnabled, setAnalyticsPreference] = useState(isAnalyticsEnabled(user?.id))
   const [analyticsSaving, setAnalyticsSaving] = useState(false)
   const [analyticsError, setAnalyticsError] = useState('')
@@ -37,15 +38,28 @@ export default function Settings() {
 
   async function handleSave() {
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({ currency }).eq('id', user.id)
-    setSaving(false)
-    if (error) return alert('Error saving: ' + error.message)
-    await refreshProfile()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Please sign in again.')
+      const response = await fetch('/api/update-profile-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ currency, language, onboarded: Boolean(profile?.onboarded) }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.error || 'Could not save preferences.')
+      await refreshProfile()
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      alert('Error saving: ' + error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleManageSub() {
+    setPortalMessage('')
     setPortalLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -59,6 +73,10 @@ export default function Settings() {
         },
       })
       const { url, error } = await res.json()
+      if (res.status === 404) {
+        setPortalMessage(error || 'No web subscription was found for this login.')
+        return
+      }
       if (!res.ok || error) throw new Error(error || 'Could not open the billing portal.')
       window.location.href = url
     } catch (err) {
@@ -95,9 +113,41 @@ export default function Settings() {
         ))}
       </div>
 
+      <div style={sectionLabel}>Language</div>
+      <select value={language} onChange={event => setLanguage(event.target.value)} style={{ width: '100%', marginBottom: 24 }}>
+        {LANGUAGES.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}
+      </select>
+
       <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ marginBottom: 12 }}>
         {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
       </button>
+
+      <div style={sectionLabel}>Web Subscription</div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        {profile?.stripe_customer_id || profile?.subscription_id ? (
+          <>
+            <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+              Manage or cancel the SideFlip web subscription linked to this account.
+            </p>
+            <button className="btn btn-secondary" onClick={handleManageSub} disabled={portalLoading}>
+              {portalLoading ? 'Loading…' : 'Manage Web Subscription'}
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+              No active web subscription is linked to this account. SideFlip Free remains available.
+            </p>
+            <a className="btn btn-secondary" href="/pricing" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+              View Pro Plans
+            </a>
+            <button className="btn btn-secondary" onClick={handleManageSub} disabled={portalLoading} style={{ marginTop: 10 }}>
+              {portalLoading ? 'Checking…' : 'Already subscribed on web? Find Web Subscription'}
+            </button>
+            {portalMessage && <p role="status" style={{ margin: '10px 0 0', color: 'var(--muted)', fontSize: 12 }}>{portalMessage}</p>}
+          </>
+        )}
+      </div>
 
       <div style={sectionLabel}>Privacy</div>
       <label className="card" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20, cursor: 'pointer' }}>
@@ -111,12 +161,22 @@ export default function Settings() {
         <span>
           <strong style={{ display: 'block', fontSize: 14 }}>Share usage analytics</strong>
           <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
-            Help improve SideFlip by sharing feature and screen usage plus subscription plan, status, amount, and currency. We never collect project text, photos, or project financials; card, billing, or payment-provider identifiers; or session recordings.
+            Help improve SideFlip by sharing a stable pseudonymous account ID, feature and screen usage, campaign/referral attribution, and subscription plan, status, amount, and currency. We never collect project text, photos, or project financials; card, billing, or payment-provider identifiers; or session recordings.
           </span>
           {analyticsSaving && <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>Saving analytics preference…</span>}
           {analyticsError && <span role="alert" style={{ display: 'block', color: '#B42318', fontSize: 12, marginTop: 6 }}>{analyticsError}</span>}
         </span>
       </label>
+
+      <div style={sectionLabel}>Account Data</div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>
+          Permanently delete your account and SideFlip data. Subscription cancellation is handled separately by the original billing provider.
+        </p>
+        <a className="btn btn-secondary" href="/delete-account" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', color: '#B3261E' }}>
+          Delete Account
+        </a>
+      </div>
 
       <button className="btn btn-secondary" onClick={() => { if (confirm('Sign out?')) signOut() }} style={{ marginBottom: 24 }}>
         🚪 Sign Out
@@ -127,9 +187,7 @@ export default function Settings() {
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
         <a href="/support" style={{ color: 'var(--muted)', fontSize: 12 }}>Support</a>
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
-        <button onClick={handleManageSub} disabled={portalLoading} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
-          {portalLoading ? 'Loading…' : 'Manage Subscription'}
-        </button>
+        <a href="/pricing" style={{ color: 'var(--muted)', fontSize: 12 }}>Plans</a>
         <span style={{ color: 'var(--muted)', margin: '0 8px', fontSize: 12 }}>·</span>
         <a href="/privacy" style={{ color: 'var(--muted)', fontSize: 12 }}>Privacy Policy</a>
       </div>

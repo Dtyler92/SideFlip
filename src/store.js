@@ -32,8 +32,12 @@ export function fmt(num) {
 export const CATEGORIES = [
   { value: 'mower', label: '🚜 Lawn Mower' },
   { value: 'car', label: '🚗 Car' },
+  { value: 'truck', label: '🛻 Truck' },
   { value: 'motorcycle', label: '🏍️ Motorcycle' },
   { value: 'atv', label: '🏎️ ATV / Powersports' },
+  { value: 'side_by_side', label: '🏁 Side-by-side' },
+  { value: 'trailer', label: '🚛 Trailer' },
+  { value: 'rv', label: '🚐 RV' },
   { value: 'boat', label: '⛵ Boat' },
   { value: 'airplane', label: '✈️ Airplane' },
   { value: 'bicycle', label: '🚲 Bicycle / E-Bike' },
@@ -44,9 +48,37 @@ export const CATEGORIES = [
   { value: 'exercise', label: '💪 Exercise Equipment' },
   { value: 'instrument', label: '🎸 Musical Instrument' },
   { value: 'furniture', label: '🪑 Furniture' },
-  { value: 'house', label: '🏠 House Project' },
+  { value: 'house', label: '🏠 Home Improvement' },
   { value: 'other', label: '📦 Other' },
 ]
+
+const CATEGORY_VALUES = new Set(CATEGORIES.map(category => category.value))
+const PROJECT_CATEGORY_ALIASES = Object.freeze({
+  'lawn mower': 'mower',
+  lawnmower: 'mower',
+  automobile: 'car',
+  automotive: 'car',
+  'atv powersports': 'atv',
+  powersports: 'atv',
+  'side by side': 'side_by_side',
+  sxs: 'side_by_side',
+  'recreational vehicle': 'rv',
+  'bicycle e bike': 'bicycle',
+  'e bike': 'bicycle',
+  ebike: 'bicycle',
+  'gaming console': 'gaming',
+  'tool equipment': 'tool',
+  'exercise equipment': 'exercise',
+  'musical instrument': 'instrument',
+  'house project': 'house',
+  'home improvement': 'house',
+})
+
+function normalizeProjectCategory(value) {
+  const key = String(value || '').trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()
+  const canonical = key.replace(/ /g, '_')
+  return CATEGORY_VALUES.has(canonical) ? canonical : PROJECT_CATEGORY_ALIASES[key] || canonical
+}
 
 export const EXPENSE_CATEGORIES = [
   { value: 'parts', label: '🔩 Parts', icon: '🔩' },
@@ -58,7 +90,8 @@ export const EXPENSE_CATEGORIES = [
 ]
 
 export function categoryIcon(value) {
-  return CATEGORIES.find(c => c.value === value)?.label?.split(' ')[0] || '📦'
+  const category = normalizeProjectCategory(value)
+  return CATEGORIES.find(c => c.value === category)?.label?.split(' ')[0] || '📦'
 }
 
 // before_photo / after_photo are additive fields. photo remains the legacy main image.
@@ -87,10 +120,13 @@ export function expenseIcon(value) {
 
 // Which extra fields to show per category
 export function getExtraFields(category) {
-  const hasVin    = ['car', 'motorcycle', 'atv'].includes(category)
-  const hasHull   = ['boat'].includes(category)
-  const hasEngine = ['car', 'mower', 'boat', 'airplane', 'motorcycle', 'atv'].includes(category)
-  const hasModel  = ['car', 'mower', 'boat', 'airplane', 'motorcycle', 'atv', 'bicycle',
-                     'electronics', 'gaming', 'tool', 'exercise', 'instrument'].includes(category)
-  return { hasEngine, hasVin, hasHull, hasModel }
+  const normalized = normalizeProjectCategory(category)
+  const hasVehicleDetails = ['car', 'truck', 'motorcycle', 'atv', 'side_by_side', 'trailer', 'rv'].includes(normalized)
+  const hasVin = hasVehicleDetails
+  const hasHull = normalized === 'boat'
+  const hasEngine = hasVehicleDetails || ['mower', 'boat', 'airplane'].includes(normalized)
+  // Android exposes model and serial identification for every selected category.
+  // Keep it available for unknown legacy values so existing identifiers remain visible.
+  const hasModel = Boolean(normalized)
+  return { hasEngine, hasVin, hasHull, hasModel, hasVehicleDetails }
 }

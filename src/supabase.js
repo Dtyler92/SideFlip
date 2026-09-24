@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireJpegBlob } from './media/jpeg.js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -30,12 +31,12 @@ export function onAuthChange(callback) {
 export async function uploadPhoto(userId, file) {
   // Compress/resize before upload if large
   const compressed = await compressImage(file)
-  const ext = file.name.split('.').pop().toLowerCase().replace('heic', 'jpg') || 'jpg'
-  const path = `${userId}/${Date.now()}.${ext}`
+  const objectId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const path = `${userId}/${objectId}.jpg`
 
   const { error } = await supabase.storage
     .from('project-photos')
-    .upload(path, compressed, { upsert: true, contentType: compressed.type })
+    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' })
 
   if (error) throw error
 
@@ -43,29 +44,54 @@ export async function uploadPhoto(userId, file) {
   return data.publicUrl
 }
 
-export async function deletePhoto(url) {
-  if (!url || url.startsWith('data:')) return // skip base64
-  const path = url.split('/project-photos/')[1]
-  if (!path) return
-  await supabase.storage.from('project-photos').remove([path])
+export async function deletePhoto(userId, url) {
+  if (!userId || !url || url.startsWith('data:') || url.startsWith('blob:')) return
+  let path
+  try {
+    const marker = '/project-photos/'
+    const pathname = new URL(url).pathname
+    const markerIndex = pathname.indexOf(marker)
+    if (markerIndex < 0) return
+    path = decodeURIComponent(pathname.slice(markerIndex + marker.length))
+  } catch { return }
+  if (!path.startsWith(`${userId}/`) || path.includes('../') || path.includes('\\')) return
+  const { error } = await supabase.storage.from('project-photos').remove([path])
+  if (error) throw error
 }
 
 async function compressImage(file) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const MAX = 1200
     const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read this image. Please choose another file.'))
     reader.onload = ev => {
       const img = new Image()
+      img.onerror = () => reject(new Error('This image format cannot be processed in this browser. Please choose a JPEG, PNG, or WebP image.'))
       img.onload = () => {
         let { width, height } = img
+        if (!width || !height) {
+          reject(new Error('Could not read this image. Please choose another file.'))
+          return
+        }
         if (width > MAX || height > MAX) {
           if (width > height) { height = Math.round(height * MAX / width); width = MAX }
           else { width = Math.round(width * MAX / height); height = MAX }
         }
         const canvas = document.createElement('canvas')
         canvas.width = width; canvas.height = height
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', 0.82)
+        const context = canvas.getContext('2d')
+        if (!context) {
+          reject(new Error('Could not process this image. Please try another browser.'))
+          return
+        }
+        context.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(blob => {
+          try {
+            resolve(requireJpegBlob(blob))
+          } catch (error) {
+            reject(error)
+          }
+        }, 'image/jpeg', 0.82)
       }
       img.src = ev.target.result
     }
@@ -81,11 +107,13 @@ export async function resetPassword(email) {
 
 
 export async function getProfile(userId) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .single()
+  if (error) throw error
+  if (!data) throw new Error('Could not load your profile.')
   return data
 }
 
