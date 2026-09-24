@@ -1,0 +1,31 @@
+-- SideFlip Maintenance Integrity V4 future owner-only reconciliation/cutover template.
+--
+-- THIS FILE IS INTENTIONALLY UNAPPLICABLE. Phase 1 has no activation path and no
+-- readiness self-attestation. After the exact PWA, iOS, Android, and deletion-worker
+-- releases are deployed, a database owner must generate a new migration containing:
+--
+--   * immutable release identifiers (web deployment id, iOS build, Android build,
+--     worker deployment digest) copied from independently verified release records;
+--   * the exact evidence timestamps/URLs/digests used to verify those releases;
+--   * state reconciliation that preserves archives/transfers and resolves legacy
+--     duplicate definitions without renaming history;
+--   * the reviewed legacy privilege revocations and archive/disable guards.
+--
+-- Do not replace those values with caller parameters, readiness booleans, mutable
+-- rows, browser claims, service_role calls, or other self-attestation. The generated
+-- migration must verify current_user is the database owner/postgres and hard-code all
+-- evidence before it can alter data, enable V4, or retire a legacy path.
+begin;
+
+do $$
+begin
+  if current_user not in ('postgres', (select pg_get_userbyid(datdba) from pg_database where datname=current_database())) then
+    raise exception 'DATABASE_OWNER_REQUIRED';
+  end if;
+  raise exception 'CUTOVER_TEMPLATE_BLOCKED_EXACT_RELEASE_EVIDENCE_REQUIRED';
+end;
+$$;
+
+-- Unreachable by design. There are no functions, grants, triggers, data changes,
+-- revocations, or activation statements in this template.
+rollback;

@@ -38,7 +38,9 @@ test('analytics compatibility rewrites are explicit, ordered before the SPA fall
     { source: '/api/analytics-preference', destination: '/api/analytics/preference' },
     { source: '/api/analytics-readiness', destination: '/api/analytics/readiness' },
   ])
-  assert.equal(config.rewrites[5].destination, '/index.html')
+  assert.deepEqual(config.rewrites[5], { source: '/api/maintenance-deletion-worker', destination: '/api/analytics/maintenance-deletion' })
+  assert.equal(config.rewrites.at(-1).destination, '/index.html')
+  assert.deepEqual(config.crons, [{ path: '/api/maintenance-deletion-worker', schedule: '0 3 * * *' }])
 })
 
 test('the dynamic analytics entry keeps VIN and report within the twelve-function Vercel budget', () => {
@@ -70,6 +72,7 @@ test('router maps every public alias and internal canonical path while ignoring 
     dispatch: async req => calls.push(['dispatch', req]),
     preference: async req => calls.push(['preference', req]),
     readiness: async req => calls.push(['readiness', req]),
+    maintenanceDeletion: async req => calls.push(['maintenanceDeletion', req]),
   })
   const routes = [
     ['/api/analytics', 'preference'],
@@ -80,6 +83,8 @@ test('router maps every public alias and internal canonical path while ignoring 
     ['/api/analytics/dispatch', 'dispatch'],
     ['/api/analytics/preference', 'preference'],
     ['/api/analytics/readiness', 'readiness'],
+    ['/api/maintenance-deletion-worker', 'maintenanceDeletion'],
+    ['/api/analytics/maintenance-deletion', 'maintenanceDeletion'],
   ]
 
   for (const [path, operation] of routes) {

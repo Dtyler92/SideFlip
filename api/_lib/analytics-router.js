@@ -8,6 +8,9 @@ const OPERATIONS_BY_PATH = Object.freeze({
   '/api/analytics/dispatch': 'dispatch',
   '/api/analytics/preference': 'preference',
   '/api/analytics/readiness': 'readiness',
+  // Co-located to stay within the twelve-function Vercel project limit.
+  '/api/maintenance-deletion-worker': 'maintenanceDeletion',
+  '/api/analytics/maintenance-deletion': 'maintenanceDeletion',
 })
 
 export function createAnalyticsRouter(handlers) {

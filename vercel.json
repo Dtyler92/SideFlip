@@ -11,12 +11,19 @@
       ]
     }
   ],
+  "functions": {
+    "api/analytics/[operation].js": { "maxDuration": 60 }
+  },
   "rewrites": [
     { "source": "/api/analytics", "destination": "/api/analytics/preference" },
     { "source": "/api/analytics-worker", "destination": "/api/analytics/dispatch" },
     { "source": "/api/analytics-dispatch", "destination": "/api/analytics/dispatch" },
     { "source": "/api/analytics-preference", "destination": "/api/analytics/preference" },
     { "source": "/api/analytics-readiness", "destination": "/api/analytics/readiness" },
+    { "source": "/api/maintenance-deletion-worker", "destination": "/api/analytics/maintenance-deletion" },
     { "source": "/((?!api|privacy|terms|support|assets|_next).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/maintenance-deletion-worker", "schedule": "0 3 * * *" }
   ]
 }

@@ -13,23 +13,21 @@ test('privacy policy discloses listing-generation data sent to xAI', () => {
   assert.match(privacy, /listing description/i)
 })
 
-test('privacy policy discloses bounded Grok maintenance research and no stale provider', () => {
-  assert.match(privacy, /manufacturer maintenance research/i)
-  assert.match(privacy, /confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market/i)
-  assert.match(privacy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
-  assert.match(privacy, /review cited source links/i)
+test('privacy policy states maintenance research is retired with transitional retention', () => {
+  assert.match(privacy, /automated maintenance research is disabled/i)
+  assert.match(privacy, /no longer sends new vehicle or item details/i)
+  assert.match(privacy, /applicable retention window/i)
   assert.doesNotMatch(privacy, /Anthropic/i)
 })
 
-test('public privacy route matches the xAI listing and maintenance disclosures', () => {
+test('public privacy route matches the xAI listing and retired-maintenance disclosures', () => {
   for (const policy of [privacy, publicPrivacy]) {
     assert.match(policy, /xAI/)
     assert.match(policy, /seller brief/i)
     assert.match(policy, /expense descriptions/i)
-    assert.match(policy, /manufacturer maintenance research/i)
-    assert.match(policy, /confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market/i)
-    assert.match(policy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
-    assert.match(policy, /review cited source links/i)
+    assert.match(policy, /automated maintenance research is disabled/i)
+    assert.match(policy, /no longer sends new vehicle or item details/i)
+    assert.match(policy, /applicable retention window/i)
     assert.doesNotMatch(policy, /Anthropic/i)
   }
 })

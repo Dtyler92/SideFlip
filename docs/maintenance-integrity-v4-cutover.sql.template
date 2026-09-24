@@ -1,0 +1,16 @@
+-- BLOCKED TEMPLATE — NOT A SUPABASE MIGRATION AND NOT EXECUTABLE.
+-- The release owner must generate a new timestamped migration only after all
+-- three exact release facts below are known and independently verified:
+--   PWA_DEPLOYMENT_ID = __REQUIRED_EXACT_PWA_DEPLOYMENT_ID__
+--   IOS_MINIMUM_VERSION = __REQUIRED_EXACT_IOS_MINIMUM_VERSION__
+--   ANDROID_MINIMUM_VERSION = __REQUIRED_EXACT_ANDROID_MINIMUM_VERSION__
+--
+-- The generated migration must hardcode those exact facts (no booleans or
+-- caller-supplied strings), verify current_user is the database owner or
+-- postgres, reconcile archived items and duplicate definitions under owner
+-- review, and only then enable V4 and install/revoke legacy enforcement.
+-- It must grant no activation/cutover function to browser or service_role.
+--
+-- Intentionally invalid sentinel: generation must remove it after evidence is
+-- substituted and tests prove the final ordered migration stack.
+CUTOVER_BLOCKED_UNTIL_EXACT_RELEASE_EVIDENCE_IS_HARDCODED

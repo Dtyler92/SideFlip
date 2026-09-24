@@ -16,6 +16,7 @@ const Calculator = lazy(() => import('./pages/Calculator'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Goals = lazy(() => import('./pages/Goals'))
+const MyStuff = lazy(() => import('./pages/MyStuff'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const Paywall = lazy(() => import('./pages/Paywall'))
@@ -23,7 +24,7 @@ const Paywall = lazy(() => import('./pages/Paywall'))
 function analyticsScreen(pathname) {
   if (/^\/project\/[^/]+\/sell$/.test(pathname)) return 'sell_project'
   if (/^\/project\/[^/]+$/.test(pathname)) return 'project_detail'
-  return ({ '/': 'home', '/new': 'new_project', '/calculator': 'calculator', '/analytics': 'analytics', '/goals': 'goals', '/settings': 'settings', '/upgrade': 'paywall', '/privacy': 'privacy', '/terms': 'terms' })[pathname] || 'unknown'
+  return ({ '/': 'home', '/new': 'new_project', '/my-stuff': 'my_stuff', '/calculator': 'calculator', '/analytics': 'analytics', '/goals': 'goals', '/settings': 'settings', '/upgrade': 'paywall', '/privacy': 'privacy', '/terms': 'terms' })[pathname] || 'unknown'
 }
 
 function LoadingScreen({ message }) {
@@ -143,6 +144,7 @@ function AppRoutes() {
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/goals" element={<Goals />} />
+          <Route path="/my-stuff" element={<MyStuff />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/upgrade" element={<Paywall />} />
         </Routes>
