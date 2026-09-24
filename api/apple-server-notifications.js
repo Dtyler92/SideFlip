@@ -9,6 +9,7 @@ export function createAppleServerNotificationsHandler({
   client,
   verifySignedData = verifyAppleSignedData,
   reconcileExpiration = reconcileVerifiedAppleExpiration,
+  now = Date.now,
 } = {}) {
   return async function handler(req, res) {
   const runtimeClient = client || createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -40,6 +41,7 @@ export function createAppleServerNotificationsHandler({
       transaction,
       renewalInfo,
       expectedOriginalTransactionId: transaction.originalTransactionId,
+      now: now(),
     })
     const semantics = appleNotificationSemantics({
       notificationType: notification.notificationType,

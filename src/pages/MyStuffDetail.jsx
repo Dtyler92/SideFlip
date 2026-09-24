@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { getPlan } from '../capabilities.js'
 import MyStuffMaintenancePanel from '../components/MyStuffMaintenancePanel.jsx'
 import MyStuffVinDecodePanel from '../components/MyStuffVinDecodePanel.jsx'
-import ManufacturerMaintenanceResearch from '../components/ManufacturerMaintenanceResearch.jsx'
 import PrivateReportPanel from '../components/PrivateReportPanel.jsx'
 import UpgradePrompt from '../components/UpgradePrompt.jsx'
 import {
@@ -312,10 +311,7 @@ export default function MyStuffDetail() {
       </article>
     </section>
 
-    {supportsVinDecoder(item.itemType) && <>
-      <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>
-      <ManufacturerMaintenanceResearch item={item} confirmedFingerprint={item.vin_confirmation_fingerprint} isPro={isPro} onUpgrade={() => setUpgradeMessage('Upgrade to SideFlip Pro to use manufacturer maintenance research.')} onApplied={load}/>
-    </>}
+    {supportsVinDecoder(item.itemType) && <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>}
     <nav className="mystuff-tabs mystuff-primary-tabs" aria-label="Item record views">
       {['maintenance', 'expenses', 'history'].map(view => <button type="button" key={view} aria-current={detailView === view ? 'page' : undefined} onClick={() => setDetailView(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}
     </nav>

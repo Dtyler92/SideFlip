@@ -30,7 +30,7 @@ export const VIN_ITEM_TYPES=Object.freeze(['car','truck','motorcycle','atv','sid
 const VIN_ITEM_TYPE_SET=new Set(VIN_ITEM_TYPES)
 const VIN_IDENTITY_FIELDS=Object.freeze(['vin','trim','series','manufacturer','vehicleType','bodyStyle','plantName','plantCountry','vehicleMarket','engineModel','engineDisplacementLiters','engineCylinders','transmission','drivetrain'])
 export function supportsVinDecoder(value){return VIN_ITEM_TYPE_SET.has(getItemTypeOption(value)?.value||'')}
-export function requiresResearchIdentityReconfirmation(previousType,nextType){return previousType!==nextType&&supportsVinDecoder(previousType)&&supportsVinDecoder(nextType)}
+export function requiresVehicleIdentityReconfirmation(previousType,nextType){return previousType!==nextType&&supportsVinDecoder(previousType)&&supportsVinDecoder(nextType)}
 export function requiresUsageAndPurchase(value){return REQUIRED_TYPES.has(getItemTypeOption(value)?.value||'')}
 export function getItemCategoryContract(value){const normalized=key(value);return CONTRACTS[normalized]||CONTRACTS[ALIASES[normalized]]||null}
 export function selectItemType(draft={},value){

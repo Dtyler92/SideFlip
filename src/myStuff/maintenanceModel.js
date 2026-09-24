@@ -14,6 +14,10 @@ const DUE_STATE_DIMENSIONS = Object.freeze([
 
 const DISPLAYABLE_DUE_STATUSES = new Set(['overdue', 'due_now', 'due_soon', 'upcoming'])
 
+export function normalizeDueSemantics(value) {
+  return value === 'all' ? 'all' : 'whichever_first'
+}
+
 const hasFiniteValue = value => value !== null
   && value !== undefined
   && value !== ''

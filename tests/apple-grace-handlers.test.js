@@ -63,6 +63,7 @@ test('notification handler orders grace by verified renewal signedDate and recon
   })
   const handler = createAppleServerNotificationsHandler({
     client, verifySignedData,
+    now: () => Date.parse('2026-09-16T14:00:00.000Z'),
     reconcileExpiration: async input => { reconciliations.push(input); return true },
   })
   const res = responseRecorder()

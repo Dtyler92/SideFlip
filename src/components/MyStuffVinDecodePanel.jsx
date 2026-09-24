@@ -14,7 +14,7 @@ import {
   persistThenConfirmVehicleIdentity,
   validateVin,
 } from '../myStuff/vinModel.js'
-import './myStuffResearch.css'
+import './myStuffTools.css'
 
 const FIELD_LABELS={year:'Model year',make:'Make',model:'Model',trim:'Trim / version',series:'Series',bodyStyle:'Body style',vehicleType:'Vehicle type',manufacturer:'Manufacturer',plantName:'Plant',plantCountry:'Plant country',vehicleMarket:'Market',fuelType:'Fuel / power type',engineCylinders:'Engine cylinders',engineDisplacementLiters:'Engine displacement (L)',engineModel:'Engine model',engine:'Engine / power system',transmission:'Transmission type',drivetrain:'Drivetrain'}
 const ALWAYS_EDITABLE=['transmission']
@@ -104,7 +104,7 @@ export default function MyStuffVinDecodePanel({itemId,values,onChange,persistIde
       const isCurrent=()=>generation===confirmationGeneration.current&&!hasVehicleIdentityChanged(snapshot,valuesRef.current)
       const result=await persistThenConfirmVehicleIdentity({snapshot,persist:persistIdentity,confirm:identity=>confirmMyStuffVehicleIdentityV3(itemId,identity,mutationId),isCurrent})
       if(!result.confirmed)return
-      resetMutationAttemptState(confirmationAttempt.current);setConfirmed(true);setMessage('Vehicle identity confirmed. Manufacturer maintenance research can now be started separately.');await onIdentityConfirmed?.()
+      resetMutationAttemptState(confirmationAttempt.current);setConfirmed(true);setMessage('Vehicle identity confirmed. You can now add or edit common maintenance schedules separately.');await onIdentityConfirmed?.()
     }catch(error){if(generation===confirmationGeneration.current)setMessage(`${error?.message||'Vehicle confirmation is unavailable.'} Your editable review is still here and manual entry remains available.`)}
     finally{if(operationLock)operationLock.current=false;if(generation===confirmationGeneration.current)setConfirming(false)}
   }

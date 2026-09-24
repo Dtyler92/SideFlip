@@ -7,19 +7,29 @@ import {
   setMyStuffOccurrenceStatusV3,
 } from '../myStuff/api.js'
 import { createMyStuffMaintenanceClient } from '../myStuff/maintenanceClient.js'
-import { getMaintenanceDefinitionAxes } from '../myStuff/maintenanceModel.js'
+import {
+  COMMON_MAINTENANCE_DISCLAIMER,
+  COMMON_MAINTENANCE_PRESETS,
+  activeDefinitionMatchesPreset,
+  buildCommonMaintenanceDraft,
+} from '../myStuff/commonMaintenancePresets.js'
+import { archiveMaintenanceDefinition, addCommonMaintenancePresets } from '../myStuff/commonMaintenancePresetWorkflow.js'
+import { supportsVinDecoder } from '../myStuff/itemModel.js'
+import { getMaintenanceDefinitionAxes, normalizeDueSemantics } from '../myStuff/maintenanceModel.js'
 import { buildCreateMaintenanceDefinitionV2WirePayload, buildUpdateMaintenanceDefinitionV2WirePayload } from '../myStuff/payloads.js'
 import {
   buildServiceExpenseRequest,
   buildServicePayload,
   classifyDueOccurrences,
+  groupMaintenanceOccurrences,
   normalizePlannedOccurrences,
   serviceCompletionDefaults,
 } from '../myStuff/v3Model.js'
 import { createMutationAttemptState, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
 import MaintenanceReminderPanel from './MaintenanceReminderPanel.jsx'
+import './commonMaintenancePresets.css'
 
-const emptyDraft = () => ({ name: '', description: '', miles: '', hours: '', cycles: '', months: '' })
+const emptyDraft = () => ({ name: '', description: '', dueSemantics:'whichever_first', miles: '', hours: '', cycles: '', months: '' })
 const today = () => new Date().toISOString().slice(0, 10)
 const statusText = status => ({
   overdue: 'Overdue', due_now: 'Due now', due_soon: 'Due soon', upcoming: 'Upcoming',
@@ -48,6 +58,8 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
   const updateAttempt = useRef(createMutationAttemptState())
   const serviceAttempts = useRef(new Map())
   const statusAttempts = useRef(new Map())
+  const presetAttempts = useRef(new Map())
+  const archiveAttempts = useRef(new Map())
   const [definitions, setDefinitions] = useState([])
   const [v2DueRows, setV2DueRows] = useState([])
   const [plannedRows, setPlannedRows] = useState([])
@@ -60,6 +72,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
   const [serviceTarget, setServiceTarget] = useState(null)
   const [serviceDraft, setServiceDraft] = useState(null)
   const [statusDrafts, setStatusDrafts] = useState({})
+  const [selectedPresets, setSelectedPresets] = useState(new Set())
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -91,6 +104,11 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
   }, [item?.id])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    setSelectedPresets(new Set())
+    presetAttempts.current.clear()
+    archiveAttempts.current.clear()
+  }, [item?.id])
 
   const v2Schedules = useMemo(() => definitions.map(definition => ({
     ...definition,
@@ -101,6 +119,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
     [plannedRows, dueViews, definitions],
   )
   const dueGroups = useMemo(() => classifyDueOccurrences(occurrences), [occurrences])
+  const scheduleGroups = useMemo(() => groupMaintenanceOccurrences(occurrences, definitions), [occurrences, definitions])
   const occurrencesByDefinition = useMemo(() => {
     const result = new Map()
     for (const row of occurrences) {
@@ -141,6 +160,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
     setDraft({
       name: definition.name || '',
       description: definition.description || '',
+      dueSemantics: normalizeDueSemantics(definition.due_semantics),
       miles: definition.normal_interval_miles ?? '',
       hours: definition.normal_interval_hours ?? '',
       cycles: definition.normal_interval_cycles ?? '',
@@ -160,6 +180,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
       definitionId: editingId,
       name: draft.name,
       description: draft.description,
+      dueSemantics: normalizeDueSemantics(draft.dueSemantics),
       intervals: { miles: draft.miles, hours: draft.hours, cycles: draft.cycles },
       calendarMonths: draft.months,
       enabled: true,
@@ -175,6 +196,70 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
         resetMutationAttemptState(attempt)
         setDraft(emptyDraft())
         setEditingId(null)
+        await load()
+        await onChanged?.()
+      },
+    )
+  }
+
+  async function addPresets(presets) {
+    if (!presets.length) {
+      setError('Select at least one common maintenance schedule to add.')
+      return
+    }
+    await mutate(async () => {
+      await addCommonMaintenancePresets({
+        presets,
+        readDefinitions:() => client.current.listDefinitions(item.id),
+        mutationIdForPreset:preset => {
+          const draft = buildCommonMaintenanceDraft(preset, item)
+          const wire = buildCreateMaintenanceDefinitionV2WirePayload({ itemId:item.id, ...draft })
+          return mutationIdForPayload(attemptFor(presetAttempts, preset.id), wire)
+        },
+        createDefinition:(preset, mutationId) => {
+          const draft = buildCommonMaintenanceDraft(preset, item)
+          const wire = buildCreateMaintenanceDefinitionV2WirePayload({ itemId:item.id, ...draft })
+          return client.current.createDefinition(wire, mutationId)
+        },
+        onConfirmed:preset => {
+          const attempt = presetAttempts.current.get(preset.id)
+          if (attempt) resetMutationAttemptState(attempt)
+          presetAttempts.current.delete(preset.id)
+        },
+      })
+      setSelectedPresets(current => {
+        const next = new Set(current)
+        for (const preset of presets) next.delete(preset.id)
+        return next
+      })
+    }, async () => {
+      await load()
+      await onChanged?.()
+    })
+  }
+
+  async function archiveDefinition(definition) {
+    const confirmed = window.confirm('Archive this maintenance task?\n\nIt will stop affecting due status. Its service history stays visible.')
+    if (!confirmed) return
+    const wire = buildUpdateMaintenanceDefinitionV2WirePayload({ definitionId:definition.id, enabled:false })
+    const attempt = attemptFor(archiveAttempts, definition.id)
+    const mutationId = mutationIdForPayload(attempt, wire)
+    await mutate(
+      () => archiveMaintenanceDefinition({
+        definitionId:definition.id,
+        mutationId,
+        updateDefinition:(payload, stableMutationId) => client.current.updateDefinition(payload, stableMutationId),
+        readDefinitions:() => client.current.listDefinitions(item.id),
+        onConfirmed:() => {
+          resetMutationAttemptState(attempt)
+          archiveAttempts.current.delete(definition.id)
+        },
+      }),
+      async () => {
+        if (editingId === definition.id) {
+          setEditingId(null)
+          setDraft(emptyDraft())
+        }
         await load()
         await onChanged?.()
       },
@@ -273,7 +358,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
       </div>
       {error && <p className="field-error" role="alert">{error}</p>}
       {loading ? <p className="mystuff-help" role="status">Loading maintenance…</p> : activeTab === 'schedule'
-        ? <ScheduleView definitions={definitions} occurrencesByDefinition={occurrencesByDefinition} busy={busy} editDefinition={editDefinition} beginService={beginService}/>
+        ? <><CommonMaintenancePresets item={item} definitions={definitions} selected={selectedPresets} setSelected={setSelectedPresets} busy={busy} addPresets={addPresets}/><ScheduleView definitions={definitions} occurrencesByDefinition={occurrencesByDefinition} scheduleGroups={scheduleGroups} busy={busy} editDefinition={editDefinition} archiveDefinition={archiveDefinition} beginService={beginService}/></>
         : <DueView groups={dueGroups} busy={busy} beginService={beginService} statusDrafts={statusDrafts} setStatusDrafts={setStatusDrafts} saveStatus={saveStatus}/>
       }
       {serviceTarget && serviceDraft && <ServiceForm item={item} target={serviceTarget} draft={serviceDraft} setDraft={setServiceDraft} onSubmit={saveService} onCancel={() => { setServiceTarget(null); setServiceDraft(null) }} busy={busy}/>}
@@ -281,6 +366,10 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
         <h3>{editingId ? 'Edit maintenance task' : 'Add maintenance task'}</h3>
         <label htmlFor="maintenance-name">Task name *</label><input id="maintenance-name" value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))}/>
         <label htmlFor="maintenance-description">Description</label><input id="maintenance-description" value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))}/>
+        <fieldset><legend>Combined due behavior</legend><div className="mystuff-actions">
+          <label><input type="radio" name="maintenance-due-semantics" value="whichever_first" checked={draft.dueSemantics === 'whichever_first'} onChange={() => setDraft(current => ({ ...current, dueSemantics:'whichever_first' }))}/> Whichever first</label>
+          <label><input type="radio" name="maintenance-due-semantics" value="all" checked={draft.dueSemantics === 'all'} onChange={() => setDraft(current => ({ ...current, dueSemantics:'all' }))}/> All intervals</label>
+        </div></fieldset>
         <div className="mystuff-columns"><MaintenanceNumber label="Every miles" name="miles" value={draft.miles} setDraft={setDraft}/><MaintenanceNumber label="Every hours" name="hours" value={draft.hours} setDraft={setDraft}/></div>
         <div className="mystuff-columns"><MaintenanceNumber label="Every cycles" name="cycles" value={draft.cycles} setDraft={setDraft}/><MaintenanceNumber label="Every months" name="months" value={draft.months} setDraft={setDraft}/></div>
         <div className="mystuff-actions"><button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : editingId ? 'Save schedule' : 'Add schedule'}</button>{editingId && <button type="button" className="btn" onClick={() => { setEditingId(null); setDraft(emptyDraft()) }} disabled={busy}>Cancel</button>}</div>
@@ -290,14 +379,42 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
   </>
 }
 
-function ScheduleView({ definitions, occurrencesByDefinition, busy, editDefinition, beginService }) {
+function CommonMaintenancePresets({ item, definitions, selected, setSelected, busy, addPresets }) {
+  if (!supportsVinDecoder(item.itemType)) return null
+  const available = COMMON_MAINTENANCE_PRESETS.filter(preset => !definitions.some(definition => activeDefinitionMatchesPreset(definition, preset)))
+  const selectedValues = COMMON_MAINTENANCE_PRESETS.filter(preset => selected.has(preset.id) && available.some(value => value.id === preset.id))
+  const toggle = id => setSelected(current => {
+    const next = new Set(current)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+  const interval = preset => [item.measurements.includes('miles') && preset.miles && `${preset.miles.toLocaleString()} mi`, preset.months && `${preset.months} months`].filter(Boolean).join(' or ')
+
+  return <section className="mystuff-presets" aria-labelledby="common-maintenance-heading">
+    <h3 id="common-maintenance-heading">Common maintenance schedules</h3>
+    <p className="mystuff-help">{COMMON_MAINTENANCE_DISCLAIMER}</p>
+    <p className="mystuff-help">These generic presets are not vehicle-specific recommendations. Select several or add one, then edit the saved intervals below.</p>
+    <ul className="mystuff-preset-list">{COMMON_MAINTENANCE_PRESETS.map(preset => {
+      const exists = !available.some(value => value.id === preset.id)
+      return <li key={preset.id}>
+        <label><input type="checkbox" checked={selected.has(preset.id)} disabled={busy || exists} onChange={() => toggle(preset.id)} aria-label={`Select ${preset.name}`}/><span><strong>{preset.name}</strong><small>{interval(preset)} · editable after adding{exists ? ' · already added' : ''}</small></span></label>
+        {!exists && <button type="button" className="btn" aria-label={`Add this schedule: ${preset.name}`} disabled={busy} onClick={() => void addPresets([preset])}>Add</button>}
+      </li>
+    })}</ul>
+    <button type="button" className="btn btn-primary" disabled={busy || !selectedValues.length} onClick={() => void addPresets(selectedValues)}>Add selected</button>
+  </section>
+}
+
+function ScheduleView({ definitions, occurrencesByDefinition, scheduleGroups, busy, editDefinition, archiveDefinition, beginService }) {
   if (!definitions.length) return <p className="mystuff-help">No maintenance schedule yet.</p>
-  return <div role="tabpanel"><ul className="mystuff-history">{definitions.map(definition => {
+  return <div role="tabpanel">
+    {Object.entries(scheduleGroups).filter(([, rows]) => rows.length).map(([group, rows]) => <section className="mystuff-due-group" key={group}><h3>{group}{group === 'Manufacturer' ? ' intervals' : ''}</h3><ul className="mystuff-subhistory">{rows.map(row => <li key={row.planned_occurrence_id}><strong>{row.name || 'Maintenance task'}</strong><small>{dueDetails(row)}</small></li>)}</ul></section>)}
+    <h3>Maintenance schedules</h3><ul className="mystuff-history">{definitions.map(definition => {
     const rows = occurrencesByDefinition.get(definition.id) || []
     return <li key={definition.id}>
       <div className="mystuff-history-row"><span><strong>{definition.name}</strong><small>{definition.description || getMaintenanceDefinitionAxes(definition).join(', ') || 'Custom schedule'}</small></span><strong>{definition.enabled === false ? 'Disabled' : `${rows.length} planned`}</strong></div>
       {rows.length > 0 && <ul className="mystuff-subhistory">{rows.map(row => <li key={row.planned_occurrence_id}><span>{statusText(row.due_status || row.status)}</span><small>{dueDetails(row)}</small></li>)}</ul>}
-      <div className="mystuff-actions"><button type="button" className="mystuff-link" onClick={() => editDefinition(definition)} disabled={busy}>Edit schedule</button>{definition.enabled !== false && <button type="button" className="btn" onClick={() => beginService({ ...definition, definition_id: definition.id })} disabled={busy}>Record service</button>}</div>
+      <div className="mystuff-actions"><button type="button" className="mystuff-link" onClick={() => editDefinition(definition)} disabled={busy || definition.enabled === false}>Edit schedule</button>{definition.enabled !== false && <><button type="button" className="mystuff-link" onClick={() => void archiveDefinition(definition)} disabled={busy} aria-label={`Archive ${definition.name} schedule`}>Archive</button><button type="button" className="btn" onClick={() => beginService({ ...definition, definition_id: definition.id })} disabled={busy}>Record service</button></>}</div>
     </li>
   })}</ul></div>
 }

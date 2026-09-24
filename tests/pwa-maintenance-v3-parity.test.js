@@ -7,6 +7,7 @@ import {
   buildServiceExpenseRequest,
   buildServicePayload,
   classifyDueOccurrences,
+  groupMaintenanceOccurrences,
   linkedOccurrenceId,
   normalizePlannedOccurrences,
   reviseExpenseByLinkage,
@@ -79,6 +80,23 @@ test('planned schedule and due RPC rows normalize into Android-equivalent due gr
   assert.deepEqual(groups.completedRecently.map(row => row.planned_occurrence_id), ['p2'])
 })
 
+test('manufacturer and historical AI research schedules stay in the Manufacturer group', () => {
+  const groups = groupMaintenanceOccurrences([
+    { planned_occurrence_id:'manufacturer-plan', definition_id:'manufacturer-def' },
+    { planned_occurrence_id:'historical-ai-plan', definition_id:'historical-ai-def' },
+    { planned_occurrence_id:'manual-plan', definition_id:'manual-def' },
+    { planned_occurrence_id:'time-plan', definition_id:'time-def' },
+  ], [
+    { id:'manufacturer-def', provenance_type:'manufacturer', normal_interval_miles:7500 },
+    { id:'historical-ai-def', provenance_type:'ai_research', normal_interval_miles:6000 },
+    { id:'manual-def', provenance_type:'manual', normal_interval_miles:5000 },
+    { id:'time-def', provenance_type:'manual', normal_interval_days:180 },
+  ])
+  assert.deepEqual(groups.Manufacturer.map(row => row.planned_occurrence_id), ['manufacturer-plan','historical-ai-plan'])
+  assert.deepEqual(groups.Mileage.map(row => row.planned_occurrence_id), ['manual-plan'])
+  assert.deepEqual(groups.Time.map(row => row.planned_occurrence_id), ['time-plan'])
+})
+
 test('service completion preserves actual details and optional linked expense', () => {
   const service = buildServicePayload({
     occurrence: { name: 'Oil change', service_category: 'maintenance', service_action: 'replace' },
@@ -139,6 +157,8 @@ test('My Stuff detail exposes Schedule, Due Items, occurrence status, service de
   for (const text of ['Schedule', 'Due Items', 'Not applicable', 'History unknown', 'Actual service date', 'Save service and linked expense', 'Service history']) {
     assert.match(panel, new RegExp(text, 'i'))
   }
+  assert.match(panel, /groupMaintenanceOccurrences/)
+  assert.match(panel, /group === 'Manufacturer'/)
   assert.match(detail, /reviseExpenseByLinkage/)
   assert.match(detail, /reviseMyStuffServiceExpenseV3/)
 })

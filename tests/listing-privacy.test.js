@@ -4,36 +4,28 @@ import { readFileSync } from 'node:fs'
 
 const privacy = readFileSync(new URL('../src/pages/PrivacyPolicy.jsx', import.meta.url), 'utf8')
 const publicPrivacy = readFileSync(new URL('../public/privacy/index.html', import.meta.url), 'utf8')
-const maintenanceResearchDisclosure = 'When you start manufacturer maintenance research, SideFlip sends only the confirmed vehicle year, make, model, and engine size, plus transmission when available, to xAI so Grok can search approved manufacturer or authorized-dealer sources.'
-const staleMaintenanceFieldList = 'vehicle or item type and available confirmed year, make, model, trim, engine, transmission, drivetrain, fuel, and market details'
 
 test('privacy policy discloses listing-generation data sent to xAI', () => {
-  assert.match(privacy, /xAI/)
-  assert.match(privacy, /seller brief/i)
-  assert.match(privacy, /project notes/i)
-  assert.match(privacy, /expense descriptions/i)
-  assert.match(privacy, /listing description/i)
-})
-
-test('privacy policy discloses bounded Grok maintenance research and no stale provider', () => {
-  assert.ok(privacy.includes(maintenanceResearchDisclosure))
-  assert.ok(!privacy.includes(staleMaintenanceFieldList))
-  assert.match(privacy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
-  assert.match(privacy, /review cited source links/i)
-  assert.doesNotMatch(privacy, /Anthropic/i)
-})
-
-test('public privacy route matches the xAI listing and maintenance disclosures', () => {
   for (const policy of [privacy, publicPrivacy]) {
     assert.match(policy, /xAI/)
     assert.match(policy, /seller brief/i)
+    assert.match(policy, /project notes/i)
     assert.match(policy, /expense descriptions/i)
-    assert.ok(policy.includes(maintenanceResearchDisclosure))
-    assert.ok(!policy.includes(staleMaintenanceFieldList))
-    assert.match(policy, /does not send the VIN, serial number, notes, location, costs, or expenses/i)
-    assert.match(policy, /review cited source links/i)
-    assert.match(policy, /Last updated: September 23, 2026/i)
+    assert.match(policy, /listing description/i)
+    assert.match(policy, /xAI may retain request data[\s\S]{0,100}up to 30 days/i)
+    assert.match(policy, /automated manufacturer maintenance research is disabled/i)
+    assert.match(policy, /no new vehicle details are sent/i)
+    assert.match(policy, /previously submitted requests may remain with xAI[\s\S]{0,100}up to 30 days[\s\S]{0,100}safety and abuse monitoring/i)
+    assert.doesNotMatch(policy, /Research manufacturer schedule/i)
     assert.doesNotMatch(policy, /Anthropic/i)
+  }
+})
+
+test('public privacy route matches listing and transitional xAI processing disclosures', () => {
+  for (const policy of [privacy, publicPrivacy]) {
+    assert.match(policy, /listing-description generation/i)
+    assert.match(policy, /automated manufacturer maintenance research is disabled/i)
+    assert.match(policy, /Last updated: September 23, 2026/i)
   }
 })
 
@@ -64,13 +56,5 @@ test('live and static policies cover subscription identifiers, processors, and d
     assert.match(policy, /billing, transaction, fraud.prevention, security, or legal records/i)
     assert.match(policy, /analytics deletion request/i)
     assert.match(policy, /asynchronous/i)
-  }
-})
-
-test('live and static policies accurately bound xAI listing and maintenance processing', () => {
-  for (const policy of [privacy, publicPrivacy]) {
-    assert.match(policy, /listing description/i)
-    assert.match(policy, /manufacturer maintenance research/i)
-    assert.match(policy, /xAI may retain request data[\s\S]{0,100}up to 30 days/i)
   }
 })

@@ -52,7 +52,7 @@ export default function UpgradePrompt({ open, onDismiss, message = 'Upgrade to S
       <ul>
         <li>More projects, My Stuff items, goals, and photos</li>
         <li>Portfolio analytics and AI listing tools</li>
-        <li>Private reports and manufacturer maintenance research</li>
+        <li>Private reports and advanced project tools</li>
       </ul>
       <button ref={upgradeButton} type="button" className="btn btn-primary" onClick={() => navigate('/upgrade')}>Upgrade to SideFlip Pro</button>
       <button type="button" className="btn btn-secondary" onClick={() => dismiss.current?.()}>Dismiss</button>
