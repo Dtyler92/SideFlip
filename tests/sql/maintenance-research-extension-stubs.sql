@@ -10,7 +10,14 @@ create table pgmq.messages(
   visible_at timestamptz not null default now(),
   read_count integer not null default 0
 );
-create function pgmq.create(queue_name text) returns void language plpgsql as $$begin return; end$$;
+create function pgmq.create(queue_name text) returns void language plpgsql as $$
+begin
+  execute format(
+    'create or replace view pgmq.%I as select msg_id,read_count,visible_at as vt,visible_at as enqueued_at,message from pgmq.messages where queue_name=%L',
+    'q_'||queue_name,
+    queue_name
+  );
+end$$;
 create function pgmq.send(queue_name text,message jsonb) returns bigint language plpgsql as $$
 declare result bigint; begin
   insert into pgmq.messages(queue_name,message) values(queue_name,message) returning msg_id into result;
