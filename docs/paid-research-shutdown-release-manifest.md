@@ -158,10 +158,11 @@ Only after every DB verification above passes:
 3. Delete only Vault secrets named **`maintenance_research_worker_url`** and **`maintenance_research_worker_secret`**:
 
    ```sql
-   select vault.delete_secret(id)
-   from vault.secrets
+   delete from vault.secrets
    where name in ('maintenance_research_worker_url','maintenance_research_worker_secret');
    ```
+
+   The production Vault extension does not expose a `vault.delete_secret(uuid)` function; delete only these exact named rows as `postgres`, then require metadata count zero.
 
 4. Read back metadata only: the two Vault names count `0`; the Edge Function is absent; `XAI_API_KEY` is absent; runtime and document lane remain false; cron/queue/executable-job/dangerous-grant counts remain zero.
 
