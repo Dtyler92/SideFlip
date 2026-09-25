@@ -28,6 +28,26 @@ test('maintenance deletion cron is GET-only and requires the exact cron bearer s
   assert.equal(calls, 0)
 })
 
+test('maintenance deletion cron accepts the dedicated production secret without replacing shared cron auth', async () => {
+  const oldDedicated = process.env.MAINTENANCE_DELETION_CRON_SECRET
+  const oldShared = process.env.CRON_SECRET
+  process.env.MAINTENANCE_DELETION_CRON_SECRET = 'dedicated-secret'
+  process.env.CRON_SECRET = 'shared-secret'
+  try {
+    const handler = createMaintenanceDeletionHandler({}, { runWorker: async () => ({ claimed:0, results:[] }) })
+    for (const secret of ['dedicated-secret', 'shared-secret']) {
+      const res = response()
+      await handler({ method:'GET', headers:{ authorization:`Bearer ${secret}` } }, res)
+      assert.equal(res.statusCode, 200)
+    }
+  } finally {
+    if (oldDedicated === undefined) delete process.env.MAINTENANCE_DELETION_CRON_SECRET
+    else process.env.MAINTENANCE_DELETION_CRON_SECRET = oldDedicated
+    if (oldShared === undefined) delete process.env.CRON_SECRET
+    else process.env.CRON_SECRET = oldShared
+  }
+})
+
 test('maintenance deletion cron invokes a bounded worker and exposes counts only', async () => {
   let received
   const handler = createMaintenanceDeletionHandler({ marker: true }, {

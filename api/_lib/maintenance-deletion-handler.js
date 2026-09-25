@@ -9,7 +9,9 @@ function safeEqual(left, right) {
 
 export function createMaintenanceDeletionHandler(supabase, options = {}) {
   const runWorker = options.runWorker || runMyStuffDeletionWorker
-  const cronSecret = options.cronSecret ?? process.env.CRON_SECRET
+  const cronSecrets = options.cronSecret != null
+    ? [options.cronSecret]
+    : [process.env.MAINTENANCE_DELETION_CRON_SECRET, process.env.CRON_SECRET].filter(Boolean)
   const deploymentIdentity = options.deploymentIdentity
     ?? process.env.VERCEL_DEPLOYMENT_ID
     ?? process.env.VERCEL_URL
@@ -17,7 +19,7 @@ export function createMaintenanceDeletionHandler(supabase, options = {}) {
 
   return async function maintenanceDeletionHandler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
-    if (!cronSecret || !safeEqual(req.headers?.authorization, `Bearer ${cronSecret}`)) {
+    if (!cronSecrets.length || !cronSecrets.some(secret => safeEqual(req.headers?.authorization, `Bearer ${secret}`))) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
