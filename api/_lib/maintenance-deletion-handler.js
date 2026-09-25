@@ -19,7 +19,12 @@ export function createMaintenanceDeletionHandler(supabase, options = {}) {
 
   return async function maintenanceDeletionHandler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
-    if (!cronSecrets.length || !cronSecrets.some(secret => safeEqual(req.headers?.authorization, `Bearer ${secret}`))) {
+    // Vercel Cron uses Authorization. The dedicated readiness probe uses a
+    // namespaced bearer header because deployment protection may consume the
+    // standard Authorization header before a direct external request reaches
+    // the function.
+    const bearer = req.headers?.['x-maintenance-authorization'] ?? req.headers?.authorization
+    if (!cronSecrets.length || !cronSecrets.some(secret => safeEqual(bearer, `Bearer ${secret}`))) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 

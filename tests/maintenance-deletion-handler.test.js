@@ -40,6 +40,9 @@ test('maintenance deletion cron accepts the dedicated production secret without 
       await handler({ method:'GET', headers:{ authorization:`Bearer ${secret}` } }, res)
       assert.equal(res.statusCode, 200)
     }
+    const readiness = response()
+    await handler({ method:'GET', headers:{ 'x-maintenance-authorization':'Bearer dedicated-secret' } }, readiness)
+    assert.equal(readiness.statusCode, 200)
   } finally {
     if (oldDedicated === undefined) delete process.env.MAINTENANCE_DELETION_CRON_SECRET
     else process.env.MAINTENANCE_DELETION_CRON_SECRET = oldDedicated
