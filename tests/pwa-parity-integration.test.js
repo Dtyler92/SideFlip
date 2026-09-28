@@ -14,12 +14,12 @@ test('My Stuff core pages are all reachable from authenticated routing', () => {
   assert.match(app, /\/my-stuff\/[^/]+.*my_stuff_detail/)
 })
 
-test('My Stuff detail reaches maintenance, VIN, retired-research, reminder, and report workflows', () => {
+test('My Stuff detail reaches maintenance, VIN, reminder, and report workflows without retired research', () => {
   const detail = source('src/pages/MyStuffDetail.jsx')
   for (const hook of ['MyStuffVinDecodePanel', 'MyStuffMaintenancePanel', 'PrivateReportPanel']) {
     assert.match(detail, new RegExp(hook), `${hook} must be rendered from My Stuff detail`)
   }
-  assert.match(detail, /Manufacturer maintenance research has been retired/)
+  assert.doesNotMatch(detail, /Manufacturer maintenance research has been retired/)
   assert.doesNotMatch(detail, /<ManufacturerMaintenanceResearch/)
   const maintenance = source('src/components/MyStuffMaintenancePanel.jsx')
   assert.match(maintenance, /createDefinition/)

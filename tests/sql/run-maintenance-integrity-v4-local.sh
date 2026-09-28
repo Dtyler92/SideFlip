@@ -57,15 +57,19 @@ done
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260923120000_retire_paid_maintenance_research.sql"
 # Seed archive/duplicate state after the final historical stack and before V4.
 "${PSQL[@]}" < "$ROOT/tests/sql/maintenance-integrity-v4-seed.sql"
-# RED: the V4 RPC does not exist before the candidate migration.
+# RED: the V4 RPCs do not exist before the candidate migrations.
 if "${PSQL[@]}" -c "select public.get_my_stuff_maintenance_report_v4('00000000-0000-0000-0000-000000000000')" >/dev/null 2>&1; then
   echo 'expected V4 RED probe to fail before migration' >&2; exit 1
 fi
+if "${PSQL[@]}" -c "select public.update_my_stuff_maintenance_definition_v4('00000000-0000-0000-0000-000000000000','{}',now(),'red')" >/dev/null 2>&1; then
+  echo 'expected V4 definition-edit RED probe to fail before migration' >&2; exit 1
+fi
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260924120000_maintenance_integrity_v4.sql"
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260924130000_add_maintenance_definition_edit_v4.sql"
 "${PSQL[@]}" < "$ROOT/tests/sql/maintenance-integrity-v4-assertions.sql"
 # Two independent authenticated sessions race the same canonical completion and correction.
 "${PSQL[@]}" -c "insert into private.my_stuff_maintenance_test_clock_v4(singleton,server_now) values(true,'2026-09-25 12:00:00Z');"
-CONCURRENT_SQL="set session authorization authenticated; select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false); select public.complete_my_stuff_maintenance_v4((select id from public.my_stuff_maintenance_definitions where name='Oil and filter change'),'{\"service_performed_on\":\"2026-09-25\",\"service_mileage\":12000,\"current_mileage\":13000}'::jsonb,'2026-09-25 12:00:00Z','v4-concurrent-complete');"
+CONCURRENT_SQL="set session authorization authenticated; select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false); select public.complete_my_stuff_maintenance_v4((select id from public.my_stuff_maintenance_definitions where client_mutation_id='v4-definition:v4-oil-setup'),'{\"service_performed_on\":\"2026-09-25\",\"service_mileage\":12000,\"current_mileage\":13000}'::jsonb,'2026-09-25 12:00:00Z','v4-concurrent-complete');"
 "${PSQL[@]}" -c "$CONCURRENT_SQL" >/dev/null & p1=$!
 "${PSQL[@]}" -c "$CONCURRENT_SQL" >/dev/null & p2=$!
 wait "$p1"; wait "$p2"
@@ -89,4 +93,5 @@ if "${PSQL[@]}" < "$ROOT/docs/maintenance-integrity-v4-enforcement.sql.template"
 fi
 "${PSQL[@]}" < "$ROOT/tests/sql/maintenance-integrity-v4-enforcement-assertions.sql"
 "${PSQL[@]}" < "$ROOT/supabase/migrations/20260924120000_maintenance_integrity_v4.sql" >/dev/null 2>&1 && { echo 'migration unexpectedly replayed despite intentionally one-shot additive DDL' >&2; exit 1; } || true
+"${PSQL[@]}" < "$ROOT/supabase/migrations/20260924130000_add_maintenance_definition_edit_v4.sql" >/dev/null 2>&1 && { echo 'definition-edit migration unexpectedly replayed despite one-shot function DDL' >&2; exit 1; } || true
 printf 'Maintenance integrity V4 RED/GREEN full-stack SQL rehearsal passed\n'

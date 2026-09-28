@@ -3,6 +3,15 @@ function dataOrThrow(result) {
   return result?.data
 }
 
+export function createMaintenanceLoadGate() {
+  let generation = 0
+  return {
+    begin(identity) { return { generation:++generation, identity:String(identity) } },
+    isCurrent(request) { return Boolean(request) && request.generation === generation },
+    invalidate() { generation += 1 },
+  }
+}
+
 /**
  * Supabase wrappers for the V2 maintenance RPC contract.
  *
@@ -18,6 +27,7 @@ export function createMyStuffMaintenanceClient(database) {
         .from('my_stuff_maintenance_definitions')
         .select('*')
         .eq('item_id', itemId)
+        .eq('enabled', true)
         .order('created_at', { ascending: false })
       return dataOrThrow(result) || []
     },

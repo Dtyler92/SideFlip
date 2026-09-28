@@ -6,9 +6,16 @@ function scheduleLabel(schedule) {
 }
 
 function dueDescription(schedule) {
-  if (schedule.tracking_type === 'calendar') return `Due ${String(schedule.next_due_at).slice(0, 10)}`
-  const suffix = schedule.tracking_type === 'mileage' ? 'mi' : 'hr'
-  return `Due at ${Number(schedule.next_due_value).toLocaleString()} ${suffix}`
+  const values = []
+  const dueDate = schedule.next_due_date || schedule.next_due_at
+  if (dueDate) values.push(`Due ${String(dueDate).slice(0, 10)}`)
+  const mileage = schedule.next_due_mileage ?? (schedule.tracking_type === 'mileage' ? schedule.next_due_value : null)
+  const hours = schedule.next_due_hours ?? (schedule.tracking_type === 'hours' ? schedule.next_due_value : null)
+  const cycles = schedule.next_due_cycles ?? (schedule.tracking_type === 'cycles' ? schedule.next_due_value : null)
+  if (mileage != null) values.push(`${Number(mileage).toLocaleString()} mi`)
+  if (hours != null) values.push(`${Number(hours).toLocaleString()} hr`)
+  if (cycles != null) values.push(`${Number(cycles).toLocaleString()} cycles`)
+  return values.join(' · ') || 'Due threshold unavailable'
 }
 
 export default function MaintenanceReminderPanel({ schedules = [], item = {}, now, runtime: suppliedRuntime }) {
@@ -16,22 +23,30 @@ export default function MaintenanceReminderPanel({ schedules = [], item = {}, no
   if (!fallbackRuntime.current) fallbackRuntime.current = createBrowserMaintenanceReminderRuntime()
   const runtime = suppliedRuntime || fallbackRuntime.current
   const [permissionState, setPermissionState] = useState('idle')
+  const lifecycleController = useRef(null)
   const due = useMemo(() => visibleMaintenanceReminders(schedules, item, now || new Date()), [schedules, item, now])
 
   useEffect(() => {
+    const controller = new AbortController()
+    lifecycleController.current = controller
     let active = true
-    Promise.all(due.map(schedule => runtime.notifyIfDue({ schedule, item, now: now || new Date() })))
+    Promise.all(due.map(schedule => runtime.notifyIfDue({ schedule, item, now: now || new Date(), signal:controller.signal })))
       .then(results => { if (active && results.some(result => result.status === 'notified')) setPermissionState('notified') })
       .catch(() => {})
-    return () => { active = false }
+    return () => { active = false; controller.abort(); if (lifecycleController.current === controller) lifecycleController.current = null }
   }, [due, item, now, runtime])
 
   async function enableAlerts() {
+    const controller = lifecycleController.current
     setPermissionState('requesting')
     const result = await runtime.requestPermission()
+    if (!controller || controller.signal.aborted) {
+      if (lifecycleController.current) setPermissionState('idle')
+      return
+    }
     setPermissionState(result.status)
     if (result.status === 'granted') {
-      await Promise.all(due.map(schedule => runtime.notifyIfDue({ schedule, item, now: now || new Date() })))
+      await Promise.all(due.map(schedule => runtime.notifyIfDue({ schedule, item, now: now || new Date(), signal:controller.signal })))
     }
   }
 

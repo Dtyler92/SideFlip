@@ -1,18 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createMaintenanceResearchClient } from '../src/myStuff/maintenanceResearchClient.js'
-import {
-  createResearchRequestGate,
-  evidenceForCandidate,
-  formatResearchInterval,
-  normalizeResearchReview,
-  normalizeResearchStatus,
-  researchCanPoll,
-  researchEvidenceVerificationLabel,
-  researchSourceAccessibilityLabel,
-  researchSourceClassLabel,
-} from '../src/myStuff/maintenanceResearchModel.js'
 import {
   applyVinSuggestions,
   buildVehicleConfirmationSnapshot,
@@ -23,7 +11,7 @@ import {
   normalizeVin,
   validateVin,
 } from '../src/myStuff/vinModel.js'
-import { requiresResearchIdentityReconfirmation, supportsVinDecoder } from '../src/myStuff/itemModel.js'
+import { supportsVinDecoder } from '../src/myStuff/itemModel.js'
 
 const source = relative => readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8')
 const VIN = '1HGCM82633A004352'
@@ -59,51 +47,6 @@ test('VIN request gate aborts stale work and item type helpers fail closed', () 
   for (const itemType of ['boat', 'airplane', 'mower', 'equipment', 'other']) {
     assert.equal(supportsVinDecoder(itemType), false, `${itemType} should not support automotive VIN decoding`)
   }
-  assert.equal(requiresResearchIdentityReconfirmation('car', 'truck'), true)
-  assert.equal(requiresResearchIdentityReconfirmation('truck', 'truck'), false)
-})
-
-test('research client uses exact lifecycle RPC contracts and source attestation', async () => {
-  const calls = []
-  const client = createMaintenanceResearchClient({ rpc: async (name, payload) => { calls.push({ name, payload }); return { data: { name }, error: null } } })
-  await client.enqueue('item-1', 'fingerprint', 'enqueue-1')
-  await client.getStatus('item-1')
-  await client.getReview('job-1')
-  await client.approve('job-1', ['candidate-1'], true, 'approve-1')
-  await client.apply('approval-1', 'apply-1')
-  await client.cancel('job-1', 'cancel-1')
-  assert.deepEqual(calls.map(value => value.name), ['enqueue_my_stuff_research_v3', 'get_my_stuff_research_status_v1', 'get_my_stuff_research_review_v1', 'approve_my_stuff_research_v2', 'apply_my_stuff_research_v1', 'cancel_my_stuff_research_v1'])
-  assert.deepEqual(calls[3].payload, { p_job_id: 'job-1', p_candidate_ids: ['candidate-1'], p_sources_verified: true, p_mutation_id: 'approve-1' })
-  await assert.rejects(() => client.approve('job-1', ['candidate-1'], false, 'approve-2'), /SOURCES_NOT_VERIFIED/)
-  await assert.rejects(() => client.approve('job-1', [], true, 'approve-2'), /CANDIDATES_REQUIRED/)
-})
-
-test('research normalization joins evidence and labels unknown sources as unverified', () => {
-  const status = normalizeResearchStatus({ id: 'job-1', status: 'awaiting_review', approval_id: null })
-  assert.equal(status.jobId, 'job-1')
-  const review = normalizeResearchReview({
-    job: status,
-    candidates: [{ id: 'candidate-1', name: 'Engine oil', interval_miles: 7500, evidence_ids: ['e1'] }],
-    evidence: [{ evidence_key: 'e1', title: 'Owner guide', canonical_url: 'https://example.test/guide', exact_excerpt: 'Replace every 7,500 miles.', accessed_at: '2026-09-08T00:00:00Z', source_class: 'manufacturer', location_verified: false, page: '42' }],
-    unresolved: [{ name: 'Coolant', reason: 'Conflicting intervals' }],
-  })
-  assert.equal(formatResearchInterval(review.candidates[0]), 'Every 7,500 mi')
-  assert.equal(evidenceForCandidate(review.candidates[0], review.evidence)[0].key, 'e1')
-  assert.match(researchEvidenceVerificationLabel(review.evidence[0]), /not verified/i)
-  assert.equal(researchSourceClassLabel('unexpected'), 'Unverified source')
-  assert.equal(researchSourceAccessibilityLabel(review.evidence[0]), 'Manufacturer source: Owner guide')
-  assert.equal(researchCanPoll('running'), true)
-  assert.equal(researchCanPoll('awaiting_review'), false)
-})
-
-test('research gate rejects stale item and inactive component requests', () => {
-  const gate = createResearchRequestGate()
-  gate.activate('item-a')
-  const request = gate.snapshot('item-a')
-  assert.equal(gate.isCurrent(request, 'item-a', true), true)
-  assert.equal(gate.isCurrent(request, 'item-b', true), false)
-  gate.invalidate()
-  assert.equal(gate.isCurrent(request, 'item-a', true), false)
 })
 
 test('reusable VIN panel confirms explicitly and retired research is unreachable', () => {
@@ -116,7 +59,7 @@ test('reusable VIN panel confirms explicitly and retired research is unreachable
   assert.match(vin, /Confirm Vehicle/)
   assert.match(vin, /persistIdentity/)
   assert.match(source('src/myStuff/client.js'), /confirm_my_stuff_vehicle_identity_v3/)
-  assert.match(detail, /Manufacturer maintenance research has been retired/)
+  assert.doesNotMatch(detail, /Manufacturer maintenance research has been retired/)
   assert.doesNotMatch(detail, /ManufacturerMaintenanceResearch/)
   assert.doesNotMatch(api, /enqueueMyStuffResearch|approveMyStuffResearch|applyMyStuffResearch/)
 })

@@ -6,7 +6,7 @@ import {
   recordMyStuffServiceWithExpenseV3,
   setMyStuffOccurrenceStatusV3,
 } from '../myStuff/api.js'
-import { createMyStuffMaintenanceClient } from '../myStuff/maintenanceClient.js'
+import { createMaintenanceLoadGate, createMyStuffMaintenanceClient } from '../myStuff/maintenanceClient.js'
 import { createMyStuffIntegrityV4Client } from '../myStuff/integrityV4Client.js'
 import { getMaintenanceDefinitionAxes } from '../myStuff/maintenanceModel.js'
 import { buildCreateMaintenanceDefinitionV2WirePayload, buildUpdateMaintenanceDefinitionV2WirePayload } from '../myStuff/payloads.js'
@@ -20,12 +20,31 @@ import {
 import { createMutationAttemptState, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
 import MaintenanceReminderPanel from './MaintenanceReminderPanel.jsx'
 import { MAINTENANCE_PRESET_DISCLAIMER, MAINTENANCE_PRESETS } from '../maintenance/presets.js'
+import { createBrowserMaintenanceReminderRuntime } from '../myStuff/reminders.js'
 
 const emptyDraft = () => ({
   name:'', description:'', serviceAction:'service', miles:'', hours:'', cycles:'', months:'',
   lastServiceKnown:false, lastServiceDate:'', lastServiceMiles:'', lastServiceHours:'', lastServiceCycles:'',
 })
+const emptyPresetSetup = () => ({ anchorMode:'unknown', lastServiceDate:'', lastServiceMiles:'', lastServiceHours:'', lastServiceCycles:'', currentMileage:'', currentHours:'', currentCycles:'' })
 const today = () => new Date().toISOString().slice(0, 10)
+const normalizedDefinitionName = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+const activeDefinitionMatches = (definition, name, action) => definition?.enabled !== false
+  && (definition.lifecycle_state == null || definition.lifecycle_state === 'active')
+  && normalizedDefinitionName(definition.name) === normalizedDefinitionName(name)
+  && definition.service_action === action
+const definitionPatchMatches = (definition, patch) => Object.entries(patch).every(([key, value]) => {
+  const actual = definition?.[key]
+  if (value == null || value === '') return actual == null
+  if (typeof value === 'number') return Number(actual) === value
+  return actual === value
+})
+const recurringDefinition = definition => [
+  'normal_interval_miles','normal_interval_hours','normal_interval_cycles','normal_calendar_months',
+  'severe_interval_miles','severe_interval_hours','severe_interval_cycles','severe_calendar_months',
+  'first_interval_miles','first_interval_hours','first_interval_cycles','first_calendar_months',
+].some(field => definition?.[field] != null)
+const definitionSourceGroup = definition => ['manufacturer','ai_research'].includes(definition?.provenance_type) ? 'Manufacturer' : 'Owner-created'
 const statusText = status => ({
   overdue: 'Overdue', due_now: 'Due now', due_soon: 'Due soon', upcoming: 'Upcoming',
   completed: 'Completed', completed_recently: 'Completed recently', not_completed: 'Due',
@@ -50,11 +69,13 @@ function dueDetails(row) {
 export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maintenance', integrityRollout = { featureEnabled:false, legacyRetired:false } }) {
   const client = useRef(createMyStuffMaintenanceClient(supabase))
   const integrityClient = useRef(createMyStuffIntegrityV4Client(supabase))
+  const reminderRuntime = useRef(createBrowserMaintenanceReminderRuntime())
   const createAttempt = useRef(createMutationAttemptState())
   const updateAttempt = useRef(createMutationAttemptState())
   const serviceAttempts = useRef(new Map())
   const statusAttempts = useRef(new Map())
   const correctionAttempts = useRef(new Map())
+  const presetAttempts = useRef(new Map())
   const [definitions, setDefinitions] = useState([])
   const [v2DueRows, setV2DueRows] = useState([])
   const [plannedRows, setPlannedRows] = useState([])
@@ -67,19 +88,26 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
   const [serviceTarget, setServiceTarget] = useState(null)
   const [serviceDraft, setServiceDraft] = useState(null)
   const [statusDrafts, setStatusDrafts] = useState({})
+  const [selectedPresets, setSelectedPresets] = useState([])
+  const [presetSetup, setPresetSetup] = useState(emptyPresetSetup)
   const [correctionTarget, setCorrectionTarget] = useState(null)
   const [correctionDraft, setCorrectionDraft] = useState(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const inFlight = useRef(false)
+  const loadGate = useRef(createMaintenanceLoadGate())
 
   const load = useCallback(async () => {
     if (!item?.id) return
+    const request = loadGate.current.begin(`${item.id}:${integrityRollout.featureEnabled}:${integrityRollout.legacyRetired}`)
+    setLoading(true)
     setError('')
     try {
-      const nextDefinitions = await client.current.listDefinitions(item.id)
-      const activeDefinitions = nextDefinitions.filter(definition => definition.enabled !== false)
+      const loadedDefinitions = await client.current.listDefinitions(item.id)
+      if (!loadGate.current.isCurrent(request)) return
+      const nextDefinitions = loadedDefinitions.filter(definition => definition.enabled !== false && (definition.lifecycle_state == null || definition.lifecycle_state === 'active'))
+      const activeDefinitions = nextDefinitions
       const [nextV2Due, nextPlanned, nextDueViews, nextHistorySource, nextEvents] = await Promise.all([
         integrityRollout.featureEnabled ? integrityClient.current.getMaintenanceStates(activeDefinitions) : client.current.getDueState(item.id),
         integrityRollout.legacyRetired ? Promise.resolve([]) : listMyStuffScheduleGroupsV3(item.id),
@@ -94,6 +122,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
         hours:entry.effective?.service_hours, cycles:entry.effective?.service_cycles,
         notes:entry.effective?.notes, revisions:entry.correction_chain || [], ...entry,
       })) : nextHistorySource
+      if (!loadGate.current.isCurrent(request)) return
       setDefinitions(nextDefinitions)
       setV2DueRows((Array.isArray(nextV2Due) ? nextV2Due : []).map(row => integrityRollout.featureEnabled ? { ...row, next_due_at:row.next_due_date } : row))
       setPlannedRows(Array.isArray(nextPlanned) ? nextPlanned : [])
@@ -101,13 +130,19 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
       setServiceHistory(nextHistory)
       setStatusEvents(nextEvents)
     } catch (next) {
-      setError(next?.message || 'Maintenance information could not be loaded.')
+      if (loadGate.current.isCurrent(request)) setError(next?.message || 'Maintenance information could not be loaded.')
     } finally {
-      setLoading(false)
+      if (loadGate.current.isCurrent(request)) setLoading(false)
     }
   }, [integrityRollout.featureEnabled, integrityRollout.legacyRetired, item?.id])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => loadGate.current.invalidate()
+  }, [load])
+  useEffect(() => {
+    setPresetSetup({ ...emptyPresetSetup(), currentMileage:item?.currentUsage?.miles ?? '', currentHours:item?.currentUsage?.hours ?? '', currentCycles:item?.currentUsage?.cycles ?? '' })
+  }, [item?.id])
 
   const v2Schedules = useMemo(() => definitions.map(definition => ({
     ...definition,
@@ -118,11 +153,12 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
     [plannedRows, dueViews, definitions],
   )
   const v4DueOccurrences = useMemo(() => v2Schedules.map(row => ({
-    id:`v4-definition:${row.id}`, definition_id:row.id, planned_occurrence_id:null,
+    id:`v4-definition:${row.id}`, definition_id:row.id, planned_occurrence_id:row.planned_occurrence_id || null,
     name:row.name, service_name:row.name, service_action:row.service_action,
     status:'not_completed', due_status:row.due_status,
     due_at:row.next_due_date, due_mileage:row.next_due_mileage,
     due_hours:row.next_due_hours, due_cycles:row.next_due_cycles,
+    recurrence_expected:recurringDefinition(row),
   })), [v2Schedules])
   const dueRows = integrityRollout.legacyRetired ? v4DueOccurrences : occurrences
   const dueGroups = useMemo(() => classifyDueOccurrences(dueRows), [dueRows])
@@ -175,9 +211,76 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
     })
   }
 
+  function isPresetDuplicate(preset, rows = definitions) {
+    return rows.some(definition => activeDefinitionMatches(definition, preset.name, preset.persistedAction))
+  }
+
+  function presetSetupPayload() {
+    const setup = { anchor_mode:presetSetup.anchorMode }
+    if (presetSetup.anchorMode === 'known') {
+      if (presetSetup.lastServiceDate) setup.last_service_performed_on = presetSetup.lastServiceDate
+      if (presetSetup.lastServiceMiles !== '') setup.last_service_mileage = Number(presetSetup.lastServiceMiles)
+      if (presetSetup.lastServiceHours !== '') setup.last_service_hours = Number(presetSetup.lastServiceHours)
+      if (presetSetup.lastServiceCycles !== '') setup.last_service_cycles = Number(presetSetup.lastServiceCycles)
+    }
+    if (item.measurements.includes('miles') && presetSetup.currentMileage !== '') setup.current_mileage = Number(presetSetup.currentMileage)
+    if (item.measurements.includes('hours') && presetSetup.currentHours !== '') setup.current_hours = Number(presetSetup.currentHours)
+    if (item.measurements.includes('cycles') && presetSetup.currentCycles !== '') setup.current_cycles = Number(presetSetup.currentCycles)
+    return setup
+  }
+
+  async function addPresets(presetIds) {
+    const requested = MAINTENANCE_PRESETS.filter(preset => presetIds.includes(preset.id))
+    if (!requested.length) return
+    const setup = presetSetupPayload()
+    if (Object.values(setup).some(value => typeof value === 'number' && (!Number.isFinite(value) || value < 0))) {
+      setError('Enter valid non-negative maintenance starting readings, or leave them unknown.')
+      return
+    }
+    if (setup.last_service_mileage != null && setup.current_mileage != null && setup.last_service_mileage > setup.current_mileage) {
+      setError('Current mileage cannot be below the last service mileage.')
+      return
+    }
+    await mutate(async () => {
+      for (const preset of requested) {
+        const before = await client.current.listDefinitions(item.id)
+        if (isPresetDuplicate(preset, before)) continue
+        const values = {
+          itemId:item.id, name:preset.name, serviceAction:preset.persistedAction,
+          dueSemantics:'whichever_first', activeProfile:item.usage_profile || 'normal', cadenceAnchor:'last_completion',
+          intervals:{ miles:item.measurements.includes('miles') && preset.miles != null ? preset.miles : null },
+          calendarMonths:preset.months, enabled:true,
+        }
+        const wire = buildCreateMaintenanceDefinitionV2WirePayload(values)
+        const attempt = attemptFor(presetAttempts, preset.id)
+        const businessPayload = integrityRollout.featureEnabled ? { itemId:item.id, definition:wire.p_definition, setup } : wire
+        const mutationId = mutationIdForPayload(attempt, businessPayload)
+        try {
+          if (integrityRollout.featureEnabled) await integrityClient.current.setupDefinition(item.id, wire.p_definition, setup, mutationId)
+          else await client.current.createDefinition(wire, mutationId)
+        } catch (next) {
+          const reconciled = await client.current.listDefinitions(item.id)
+          if (!isPresetDuplicate(preset, reconciled)) throw next
+        }
+        const confirmed = await client.current.listDefinitions(item.id)
+        if (!isPresetDuplicate(preset, confirmed)) throw new Error(`${preset.name} was not confirmed after saving.`)
+        resetMutationAttemptState(attempt)
+      }
+    }, async () => {
+      setSelectedPresets([])
+      await load()
+      await onChanged?.()
+    })
+  }
+
   async function saveDefinition(event) {
     event.preventDefault()
-    const cadenceValues = [draft.miles, draft.hours, draft.cycles, draft.months]
+    const cadenceValues = [
+      item.measurements.includes('miles') ? draft.miles : '',
+      item.measurements.includes('hours') ? draft.hours : '',
+      item.measurements.includes('cycles') ? draft.cycles : '',
+      draft.months,
+    ]
     if (!draft.name.trim() || !cadenceValues.some(value => value !== '' && Number(value) > 0)) {
       setError('Enter a task name and at least one positive mileage, hours, cycles, or month interval.')
       return
@@ -188,16 +291,24 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
       name: draft.name,
       description: draft.description,
       serviceAction: draft.serviceAction,
-      usageProfile: item.usageProfile || 'normal',
-      intervals: { miles: draft.miles, hours: draft.hours, cycles: draft.cycles },
+      activeProfile:item.usage_profile || 'normal',
+      intervals: {
+        miles:item.measurements.includes('miles') ? draft.miles : null,
+        hours:item.measurements.includes('hours') ? draft.hours : null,
+        cycles:item.measurements.includes('cycles') ? draft.cycles : null,
+      },
       calendarMonths: draft.months,
       enabled: true,
     }
     const wire = editingId
       ? buildUpdateMaintenanceDefinitionV2WirePayload(values)
       : buildCreateMaintenanceDefinitionV2WirePayload(values)
+    if (editingId && integrityRollout.featureEnabled) delete wire.p_definition.enabled
     const setup = {
+      anchor_mode:draft.lastServiceKnown ? 'known' : 'unknown',
       current_mileage:item.currentUsage?.miles ?? null,
+      current_hours:item.currentUsage?.hours ?? null,
+      current_cycles:item.currentUsage?.cycles ?? null,
       ...(draft.lastServiceKnown ? {
         last_service_performed_on:draft.lastServiceDate || null,
         last_service_mileage:draft.lastServiceMiles === '' ? null : Number(draft.lastServiceMiles),
@@ -206,15 +317,35 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
       } : {}),
     }
     const attempt = editingId ? updateAttempt.current : createAttempt.current
-    const mutationId = mutationIdForPayload(attempt, integrityRollout.featureEnabled ? { definition:wire.p_definition, setup } : wire)
-    if (integrityRollout.featureEnabled && editingId) {
-      setError('Schedule editing remains unavailable during the V4 transition. Add a replacement schedule instead.')
-      return
-    }
+    const businessPayload = integrityRollout.featureEnabled
+      ? editingId ? { itemId:item.id, definitionId:editingId, patch:wire.p_definition } : { itemId:item.id, definition:wire.p_definition, setup }
+      : wire
+    const mutationId = mutationIdForPayload(attempt, businessPayload)
     await mutate(
-      () => integrityRollout.featureEnabled
-        ? integrityClient.current.setupDefinition(item.id, wire.p_definition, setup, mutationId)
-        : editingId ? client.current.updateDefinition(wire, mutationId) : client.current.createDefinition(wire, mutationId),
+      async () => {
+        const before = await client.current.listDefinitions(item.id)
+        try {
+          if (integrityRollout.featureEnabled) {
+            if (editingId) await integrityClient.current.updateDefinition(editingId, wire.p_definition, mutationId)
+            else await integrityClient.current.setupDefinition(item.id, wire.p_definition, setup, mutationId)
+          } else if (editingId) await client.current.updateDefinition(wire, mutationId)
+          else await client.current.createDefinition(wire, mutationId)
+        } catch (next) {
+          const reconciled = await client.current.listDefinitions(item.id)
+          const saved = editingId
+            ? reconciled.some(definition => definition.id === editingId && definitionPatchMatches(definition, wire.p_definition))
+            : reconciled.some(definition => !before.some(previous => previous.id === definition.id)
+              && activeDefinitionMatches(definition, wire.p_definition.name, wire.p_definition.service_action))
+          if (!saved) throw next
+        }
+        const confirmed = await client.current.listDefinitions(item.id)
+        const saved = editingId
+          ? confirmed.some(definition => definition.id === editingId && definitionPatchMatches(definition, wire.p_definition))
+          : confirmed.some(definition => !before.some(previous => previous.id === definition.id)
+            && activeDefinitionMatches(definition, wire.p_definition.name, wire.p_definition.service_action))
+        if (!saved) throw new Error('The maintenance schedule was not confirmed after saving.')
+        if (editingId) await reminderRuntime.current.cancelSchedule({ itemId:item.id, scheduleId:editingId })
+      },
       async () => {
         resetMutationAttemptState(attempt)
         setDraft(emptyDraft())
@@ -238,6 +369,10 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
   async function saveService(event) {
     event.preventDefault()
     if (!serviceTarget || !serviceDraft) return
+    if (integrityRollout.featureEnabled && integrityRollout.legacyRetired && (serviceTarget.recurrence_expected || recurringDefinition(serviceTarget)) && !serviceTarget.planned_occurrence_id) {
+      setError('Refresh maintenance before recording service. A recurring task must have an active planned occurrence.')
+      return
+    }
     let request
     try {
       const service = buildServicePayload({ occurrence: serviceTarget, ...serviceDraft })
@@ -282,6 +417,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
         : recordMyStuffServiceWithExpenseV3({ ...request, mutationId }),
       async () => {
         resetMutationAttemptState(attempt)
+        await reminderRuntime.current.cancelSchedule({ itemId:item.id, scheduleId:definitionId })
         setServiceTarget(null)
         setServiceDraft(null)
         await load()
@@ -337,6 +473,7 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
     const mutationId = mutationIdForPayload(attempt, descriptor)
     await mutate(() => integrityClient.current.editCompletion(correctionTarget, patch, correctionDraft.reason, mutationId), async () => {
       resetMutationAttemptState(attempt)
+      await reminderRuntime.current.cancelItem(item.id)
       setCorrectionTarget(null); setCorrectionDraft(null)
       await load(); await onChanged?.()
     })
@@ -369,39 +506,66 @@ export default function MyStuffMaintenancePanel({ item, onChanged, mode = 'maint
       </div>
       {error && <p className="field-error" role="alert">{error}</p>}
       {loading ? <p className="mystuff-help" role="status">Loading maintenance…</p> : activeTab === 'schedule'
-        ? <ScheduleView definitions={definitions} occurrencesByDefinition={occurrencesByDefinition} busy={busy} editDefinition={editDefinition} beginService={beginService} allowEdit={!integrityRollout.featureEnabled}/>
-        : <DueView groups={dueGroups} busy={busy} beginService={beginService} statusDrafts={statusDrafts} setStatusDrafts={setStatusDrafts} saveStatus={saveStatus} allowStatus={!integrityRollout.featureEnabled}/>
+        ? <ScheduleView definitions={integrityRollout.featureEnabled ? v2Schedules : definitions} occurrencesByDefinition={occurrencesByDefinition} busy={busy} editDefinition={editDefinition} beginService={beginService} allowEdit requirePlan={integrityRollout.featureEnabled && integrityRollout.legacyRetired}/>
+        : <DueView groups={dueGroups} busy={busy} beginService={beginService} statusDrafts={statusDrafts} setStatusDrafts={setStatusDrafts} saveStatus={saveStatus} allowStatus={!integrityRollout.featureEnabled} requirePlan={integrityRollout.featureEnabled && integrityRollout.legacyRetired}/>
       }
       {serviceTarget && serviceDraft && <ServiceForm item={item} target={serviceTarget} draft={serviceDraft} setDraft={setServiceDraft} onSubmit={saveService} onCancel={() => { setServiceTarget(null); setServiceDraft(null) }} busy={busy}/>}
-      {!editingId&&<section aria-label="Common maintenance starting points"><h3>Common maintenance</h3><p className="mystuff-help">{MAINTENANCE_PRESET_DISCLAIMER}</p><div className="mystuff-actions">{MAINTENANCE_PRESETS.map(preset=>{const duplicate=definitions.some(definition=>definition.enabled !== false&&definition.name.trim().toLowerCase()===preset.name.toLowerCase()&&definition.service_action===preset.persistedAction);return <button type="button" className="btn" key={preset.id} disabled={busy||duplicate} onClick={()=>setDraft({...emptyDraft(),name:preset.name,serviceAction:preset.persistedAction,miles:item.measurements.includes('miles')&&preset.miles!=null?String(preset.miles):'',months:String(preset.months)})}>{preset.name}{duplicate?' · Added':''}</button>})}</div></section>}
+      {!editingId&&<section aria-label="Common maintenance starting points">
+        <h3>Common maintenance</h3><p className="mystuff-help">{MAINTENANCE_PRESET_DISCLAIMER} Presets use whichever comes first, start from the last completion, and remain editable.</p>
+        {integrityRollout.featureEnabled&&<fieldset><legend>Preset starting point</legend>
+          <p className="mystuff-help">Choose what you know. Unknown values stay unknown and are never replaced with zero, today, or current mileage.</p>
+          <div className="mystuff-choices">
+            <label><input type="radio" name="preset-anchor" value="known" checked={presetSetup.anchorMode==='known'} onChange={event=>setPresetSetup(current=>({...current,anchorMode:event.target.value}))}/><span>Last service is known</span></label>
+            <label><input type="radio" name="preset-anchor" value="unknown" checked={presetSetup.anchorMode==='unknown'} onChange={event=>setPresetSetup(current=>({...current,anchorMode:event.target.value,lastServiceDate:'',lastServiceMiles:'',lastServiceHours:'',lastServiceCycles:''}))}/><span>Last service is unknown</span></label>
+            <label><input type="radio" name="preset-anchor" value="never" checked={presetSetup.anchorMode==='never'} onChange={event=>setPresetSetup(current=>({...current,anchorMode:event.target.value,lastServiceDate:'',lastServiceMiles:'',lastServiceHours:'',lastServiceCycles:''}))}/><span>Never serviced</span></label>
+          </div>
+          {presetSetup.anchorMode==='known'&&<><div className="mystuff-columns"><div className="form-group"><label htmlFor="preset-last-service-date">Last service date (leave blank if unknown)</label><input id="preset-last-service-date" type="date" value={presetSetup.lastServiceDate} onChange={event=>setPresetSetup(current=>({...current,lastServiceDate:event.target.value}))}/></div>{item.measurements.includes('miles')&&<div className="form-group"><label htmlFor="preset-last-service-mileage">Mileage at last service (leave blank if unknown)</label><input id="preset-last-service-mileage" type="number" min="0" step="any" value={presetSetup.lastServiceMiles} onChange={event=>setPresetSetup(current=>({...current,lastServiceMiles:event.target.value}))}/></div>}</div><div className="mystuff-columns">{item.measurements.includes('hours')&&<div className="form-group"><label htmlFor="preset-last-service-hours">Hours at last service (leave blank if unknown)</label><input id="preset-last-service-hours" type="number" min="0" step="any" value={presetSetup.lastServiceHours} onChange={event=>setPresetSetup(current=>({...current,lastServiceHours:event.target.value}))}/></div>}{item.measurements.includes('cycles')&&<div className="form-group"><label htmlFor="preset-last-service-cycles">Cycles at last service (leave blank if unknown)</label><input id="preset-last-service-cycles" type="number" min="0" step="1" value={presetSetup.lastServiceCycles} onChange={event=>setPresetSetup(current=>({...current,lastServiceCycles:event.target.value}))}/></div>}</div></>}
+          <div className="mystuff-columns">{item.measurements.includes('miles')&&<div className="form-group"><label htmlFor="preset-current-mileage">Current mileage (leave blank if unknown)</label><input id="preset-current-mileage" type="number" min="0" step="any" value={presetSetup.currentMileage} onChange={event=>setPresetSetup(current=>({...current,currentMileage:event.target.value}))}/></div>}{item.measurements.includes('hours')&&<div className="form-group"><label htmlFor="preset-current-hours">Current hours (leave blank if unknown)</label><input id="preset-current-hours" type="number" min="0" step="any" value={presetSetup.currentHours} onChange={event=>setPresetSetup(current=>({...current,currentHours:event.target.value}))}/></div>}{item.measurements.includes('cycles')&&<div className="form-group"><label htmlFor="preset-current-cycles">Current cycles (leave blank if unknown)</label><input id="preset-current-cycles" type="number" min="0" step="1" value={presetSetup.currentCycles} onChange={event=>setPresetSetup(current=>({...current,currentCycles:event.target.value}))}/></div>}</div>
+        </fieldset>}
+        <div className="mystuff-history">{MAINTENANCE_PRESETS.map(preset=>{const duplicate=isPresetDuplicate(preset);const selected=selectedPresets.includes(preset.id);return <div className="mystuff-history-row" key={preset.id}>
+          <label><input type="checkbox" checked={selected} disabled={busy||duplicate} onChange={event=>setSelectedPresets(current=>event.target.checked?[...current,preset.id]:current.filter(id=>id!==preset.id))}/><span><strong>{preset.name}</strong><small>{preset.catalogAction.replaceAll('_',' ')} · {preset.miles == null ? '' : `${preset.miles.toLocaleString()} miles or `}{preset.months} months{duplicate?' · Added':''}</small></span></label>
+          <button type="button" className="btn" disabled={busy||duplicate} onClick={()=>void addPresets([preset.id])}>Add</button>
+        </div>})}</div>
+        <button type="button" className="btn btn-primary" disabled={busy||selectedPresets.length===0} onClick={()=>void addPresets(selectedPresets)}>Add selected</button>
+      </section>}
       <form className="mystuff-detail-form mystuff-maintenance-form" onSubmit={saveDefinition}>
         <h3>{editingId ? 'Edit maintenance task' : 'Add maintenance task'}</h3>
         <label htmlFor="maintenance-name">Task name *</label><input id="maintenance-name" value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))}/>
         <label htmlFor="maintenance-description">Description</label><input id="maintenance-description" value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))}/>
         <label htmlFor="maintenance-action">Action</label><select id="maintenance-action" value={draft.serviceAction} onChange={event=>setDraft(current=>({...current,serviceAction:event.target.value}))}><option value="service">Service</option><option value="inspect">Inspect</option><option value="replace">Replace</option></select>
-        <div className="mystuff-columns"><MaintenanceNumber label="Every miles" name="miles" value={draft.miles} setDraft={setDraft}/><MaintenanceNumber label="Every hours" name="hours" value={draft.hours} setDraft={setDraft}/></div>
-        <div className="mystuff-columns"><MaintenanceNumber label="Every cycles" name="cycles" value={draft.cycles} setDraft={setDraft}/><MaintenanceNumber label="Every months" name="months" value={draft.months} setDraft={setDraft}/></div>
-        {integrityRollout.featureEnabled&&<fieldset><legend>Maintenance starting point</legend><label><input type="checkbox" checked={draft.lastServiceKnown} onChange={event=>setDraft(current=>({...current,lastServiceKnown:event.target.checked}))}/> I know when this service was last completed</label>{draft.lastServiceKnown&&<><p className="mystuff-help">Enter the values you know; leave an individual field blank when it is unknown.</p><div className="mystuff-columns"><div className="form-group"><label htmlFor="maintenance-last-date">Last service date</label><input id="maintenance-last-date" type="date" value={draft.lastServiceDate} onChange={event=>setDraft(current=>({...current,lastServiceDate:event.target.value}))}/></div>{item.measurements.includes('miles')&&<MaintenanceNumber label="Last service mileage" name="lastServiceMiles" value={draft.lastServiceMiles} setDraft={setDraft}/>}</div><div className="mystuff-columns">{item.measurements.includes('hours')&&<MaintenanceNumber label="Last service hours" name="lastServiceHours" value={draft.lastServiceHours} setDraft={setDraft}/>} {item.measurements.includes('cycles')&&<MaintenanceNumber label="Last service cycles" name="lastServiceCycles" value={draft.lastServiceCycles} setDraft={setDraft}/>}</div></>}</fieldset>}
+        <div className="mystuff-columns">{item.measurements.includes('miles')&&<MaintenanceNumber label="Every miles" name="miles" value={draft.miles} setDraft={setDraft}/>} {item.measurements.includes('hours')&&<MaintenanceNumber label="Every hours" name="hours" value={draft.hours} setDraft={setDraft}/>}</div>
+        <div className="mystuff-columns">{item.measurements.includes('cycles')&&<MaintenanceNumber label="Every cycles" name="cycles" value={draft.cycles} setDraft={setDraft}/>}<MaintenanceNumber label="Every months" name="months" value={draft.months} setDraft={setDraft}/></div>
+        {integrityRollout.featureEnabled&&!editingId&&<fieldset><legend>Maintenance starting point</legend><label><input type="checkbox" checked={draft.lastServiceKnown} onChange={event=>setDraft(current=>({...current,lastServiceKnown:event.target.checked}))}/> I know when this service was last completed</label>{draft.lastServiceKnown&&<><p className="mystuff-help">Enter the values you know; leave an individual field blank when it is unknown.</p><div className="mystuff-columns"><div className="form-group"><label htmlFor="maintenance-last-date">Last service date</label><input id="maintenance-last-date" type="date" value={draft.lastServiceDate} onChange={event=>setDraft(current=>({...current,lastServiceDate:event.target.value}))}/></div>{item.measurements.includes('miles')&&<MaintenanceNumber label="Last service mileage" name="lastServiceMiles" value={draft.lastServiceMiles} setDraft={setDraft}/>}</div><div className="mystuff-columns">{item.measurements.includes('hours')&&<MaintenanceNumber label="Last service hours" name="lastServiceHours" value={draft.lastServiceHours} setDraft={setDraft}/>} {item.measurements.includes('cycles')&&<MaintenanceNumber label="Last service cycles" name="lastServiceCycles" value={draft.lastServiceCycles} setDraft={setDraft}/>}</div></>}</fieldset>}
         <div className="mystuff-actions"><button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : editingId ? 'Save schedule' : 'Add schedule'}</button>{editingId && <button type="button" className="btn" onClick={() => { setEditingId(null); setDraft(emptyDraft()) }} disabled={busy}>Cancel</button>}</div>
       </form>
     </section>
-    <MaintenanceReminderPanel schedules={v2Schedules} item={item}/>
+    <MaintenanceReminderPanel schedules={v2Schedules} item={item} runtime={reminderRuntime.current}/>
   </>
 }
 
-function ScheduleView({ definitions, occurrencesByDefinition, busy, editDefinition, beginService, allowEdit }) {
+function ScheduleView({ definitions, occurrencesByDefinition, busy, editDefinition, beginService, allowEdit, requirePlan }) {
   if (!definitions.length) return <p className="mystuff-help">No maintenance schedule yet.</p>
-  return <div role="tabpanel"><ul className="mystuff-history">{definitions.map(definition => {
-    const rows = occurrencesByDefinition.get(definition.id) || []
-    return <li key={definition.id}>
-      <div className="mystuff-history-row"><span><strong>{definition.name}</strong><small>{definition.description || getMaintenanceDefinitionAxes(definition).join(', ') || 'Custom schedule'}</small></span><strong>{definition.enabled === false ? 'Disabled' : `${rows.length} planned`}</strong></div>
-      {rows.length > 0 && <ul className="mystuff-subhistory">{rows.map(row => <li key={row.planned_occurrence_id}><span>{statusText(row.due_status || row.status)}</span><small>{dueDetails(row)}</small></li>)}</ul>}
-      <div className="mystuff-actions">{allowEdit&&<button type="button" className="mystuff-link" onClick={() => editDefinition(definition)} disabled={busy}>Edit schedule</button>}{definition.enabled !== false && <button type="button" className="btn" onClick={() => beginService({ ...definition, definition_id: definition.id })} disabled={busy}>Record service</button>}</div>
-    </li>
-  })}</ul></div>
+  const grouped = new Map()
+  for (const definition of definitions) {
+    const source = definitionSourceGroup(definition)
+    grouped.set(source, [...(grouped.get(source) || []), definition])
+  }
+  return <div role="tabpanel">{[...grouped].map(([source, sourceDefinitions]) => <section key={source} aria-label={`${source} maintenance`}>
+    <h3>{source}</h3><ul className="mystuff-history">{sourceDefinitions.map(definition => {
+      const rows = occurrencesByDefinition.get(definition.id) || []
+      const recurrenceNeedsPlan = requirePlan && recurringDefinition(definition)
+      const completionTarget = { ...definition, definition_id:definition.id, recurrence_expected:recurringDefinition(definition) }
+      return <li key={definition.id}>
+        <div className="mystuff-history-row"><span><strong>{definition.name}</strong><small>{definition.description || getMaintenanceDefinitionAxes(definition).join(', ') || 'Custom schedule'}</small></span><strong>{definition.enabled === false ? 'Disabled' : `${rows.length} planned`}</strong></div>
+        {rows.length > 0 && <ul className="mystuff-subhistory">{rows.map(row => <li key={row.planned_occurrence_id}><span>{statusText(row.due_status || row.status)}</span><small>{dueDetails(row)}</small></li>)}</ul>}
+        {recurrenceNeedsPlan&&!definition.planned_occurrence_id&&<p className="mystuff-help" role="status">Refresh after the schedule is rematerialized before recording recurring service.</p>}
+        <div className="mystuff-actions">{allowEdit&&<button type="button" className="mystuff-link" onClick={() => editDefinition(definition)} disabled={busy}>Edit schedule</button>}{definition.enabled !== false && <button type="button" className="btn" onClick={() => beginService(completionTarget)} disabled={busy||(recurrenceNeedsPlan&&!definition.planned_occurrence_id)}>Record service</button>}</div>
+      </li>
+    })}</ul>
+  </section>)}</div>
 }
 
-function DueView({ groups, busy, beginService, statusDrafts, setStatusDrafts, saveStatus, allowStatus }) {
+function DueView({ groups, busy, beginService, statusDrafts, setStatusDrafts, saveStatus, allowStatus, requirePlan }) {
   const sections = [['Overdue', groups.overdue], ['Due soon', groups.dueSoon], ['Upcoming', groups.upcoming], ['Completed recently', groups.completedRecently]]
   if (!sections.some(([, rows]) => rows.length)) return <p className="mystuff-help">No due items have been planned.</p>
   return <div role="tabpanel">{sections.filter(([, rows]) => rows.length).map(([heading, rows]) => <section className="mystuff-due-group" key={heading} aria-labelledby={`due-${heading.replaceAll(' ', '-').toLowerCase()}`}><h3 id={`due-${heading.replaceAll(' ', '-').toLowerCase()}`}>{heading}</h3><ul className="mystuff-history">{rows.map(row => {
@@ -411,7 +575,8 @@ function DueView({ groups, busy, beginService, statusDrafts, setStatusDrafts, sa
     return <li key={rowKey}>
       <div className="mystuff-history-row"><span><strong>{row.name || 'Maintenance task'}</strong><small>{dueDetails(row)}</small></span><strong>{statusText(row.due_status || row.status)}</strong></div>
       {!completed && <>
-        <div className="mystuff-actions"><button type="button" className="btn btn-primary" onClick={() => beginService(row)} disabled={busy}>Record service</button></div>
+        <div className="mystuff-actions"><button type="button" className="btn btn-primary" onClick={() => beginService(row)} disabled={busy||(requirePlan&&row.recurrence_expected&&!row.planned_occurrence_id)}>Record service</button></div>
+        {requirePlan&&row.recurrence_expected&&!row.planned_occurrence_id&&<p className="mystuff-help" role="status">Refresh after this recurring task has an active planned occurrence.</p>}
         {allowStatus&&<div className="mystuff-status-form">
           <div className="form-group"><label htmlFor={`occurrence-status-${row.planned_occurrence_id}`}>Occurrence status</label><select id={`occurrence-status-${row.planned_occurrence_id}`} value={current.status} onChange={event => setStatusDrafts(value => ({ ...value, [row.planned_occurrence_id]: { ...current, status: event.target.value } }))}>{STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
           <div className="form-group"><label htmlFor={`occurrence-reason-${row.planned_occurrence_id}`}>Status reason *</label><input id={`occurrence-reason-${row.planned_occurrence_id}`} value={current.reason} onChange={event => setStatusDrafts(value => ({ ...value, [row.planned_occurrence_id]: { ...current, reason: event.target.value } }))}/></div>

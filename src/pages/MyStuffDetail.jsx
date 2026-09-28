@@ -27,6 +27,8 @@ import { buildRecordMyStuffReadingV2WirePayload, buildUpdateMyStuffItemV2WirePay
 import { buildExpenseDraft, EXPENSE_CATEGORIES, expenseRevision, reviseExpenseByLinkage } from '../myStuff/v3Model.js'
 import { createMutationAttemptState, isMyStuffItemLockedAfterProLoss, mutationIdForPayload, resetMutationAttemptState } from '../myStuff/mutation.js'
 import { createMyStuffIntegrityV4Client } from '../myStuff/integrityV4Client.js'
+import { createMaintenanceLoadGate } from '../myStuff/maintenanceClient.js'
+import { createBrowserMaintenanceReminderRuntime } from '../myStuff/reminders.js'
 import './myStuff.css'
 
 const AXES = [['miles', 'Miles'], ['hours', 'Hours'], ['cycles', 'Cycles']]
@@ -72,6 +74,7 @@ export default function MyStuffDetail() {
   const [deleteText, setDeleteText] = useState('')
   const [deletionRequestId, setDeletionRequestId] = useState(null)
   const [deletionNotice, setDeletionNotice] = useState('')
+  const [deletionNeedsManualRetry, setDeletionNeedsManualRetry] = useState(false)
   const itemAttempt = useRef(createMutationAttemptState())
   const readingAttempt = useRef(createMutationAttemptState())
   const expenseAttempt = useRef(createMutationAttemptState())
@@ -80,16 +83,21 @@ export default function MyStuffDetail() {
   const vinPersistAttempt = useRef(createMutationAttemptState())
   const deletionAttempt = useRef(createMutationAttemptState())
   const integrityClient = useRef(createMyStuffIntegrityV4Client(supabase))
+  const reminderRuntime = useRef(createBrowserMaintenanceReminderRuntime())
+  const loadGate = useRef(createMaintenanceLoadGate())
+  const rolloutGate = useRef(createMaintenanceLoadGate())
   const inFlight = useRef(false)
   const plan = getPlan(profile, entitlement)
 
   const load = useCallback(async () => {
     if (!user?.id || !id) return
+    const request = loadGate.current.begin(`${user.id}:${id}:${plan}`)
     setLoading(true)
     setAccessPlan(null)
     setError('')
     try {
       const allItems = await listMyStuffItemsV2(user.id, { includeArchived:true, excludeTransferred:true })
+      if (!loadGate.current.isCurrent(request)) return
       const listedItem = allItems.find(candidate => candidate.id === id)
       if (listedItem?.isLocked || isMyStuffItemLockedAfterProLoss(listedItem, allItems, plan)) {
         setItem(listedItem)
@@ -102,21 +110,25 @@ export default function MyStuffDetail() {
         return
       }
       setLocked(false)
-      const [core, expenseRows, financial, rollout] = await Promise.all([
+      const rolloutRequest = rolloutGate.current.begin(`${user.id}:${id}`)
+      const [core, expenseRows, financial, rolloutResult] = await Promise.all([
         getMyStuffItemV2(user.id, id),
         getMyStuffExpensesV3(id),
         getMyStuffFinancialSummaryV3(id),
-        integrityClient.current.getRollout(),
+        integrityClient.current.getRollout().then(value => ({ value }), error => ({ error })),
       ])
+      if (!loadGate.current.isCurrent(request)) return
+      if (rolloutGate.current.isCurrent(rolloutRequest) && rolloutResult.error) throw rolloutResult.error
       setItem(core.item)
       setReadings(core.readings)
       setExpenses(expenseRows)
       setSummary(financial)
-      setIntegrityRollout(rollout)
+      if (rolloutGate.current.isCurrent(rolloutRequest)) setIntegrityRollout(rolloutResult.value)
       setEdit(itemToDraft(core.item))
       setReading(current => ({ ...current, type: core.item.measurements.includes(current.type) ? current.type : (core.item.measurements[0] || 'miles') }))
       setAccessPlan(plan)
     } catch (next) {
+      if (!loadGate.current.isCurrent(request)) return
       setItem(null)
       setEdit(null)
       setReadings([])
@@ -126,32 +138,103 @@ export default function MyStuffDetail() {
       setAccessPlan(plan)
       setError(next.message || 'Could not load this item.')
     } finally {
-      setLoading(false)
+      if (loadGate.current.isCurrent(request)) setLoading(false)
     }
   }, [id, plan, user?.id])
 
-  useEffect(() => { void load() }, [load])
   useEffect(() => {
-    const refreshRollout = () => { if (document.visibilityState === 'visible') integrityClient.current.getRollout().then(setIntegrityRollout).catch(next => setError(next.message || 'Could not refresh maintenance rollout status.')) }
+    void load()
+    return () => loadGate.current.invalidate()
+  }, [load])
+  useEffect(() => {
+    const refreshRollout = async () => {
+      if (document.visibilityState !== 'visible') return
+      const request = rolloutGate.current.begin(`${user?.id || ''}:${id || ''}`)
+      try {
+        const rollout = await integrityClient.current.getRollout()
+        if (rolloutGate.current.isCurrent(request)) setIntegrityRollout(rollout)
+      } catch (next) {
+        if (rolloutGate.current.isCurrent(request)) setError(next.message || 'Could not refresh maintenance rollout status.')
+      }
+    }
     document.addEventListener('visibilitychange', refreshRollout)
-    return () => document.removeEventListener('visibilitychange', refreshRollout)
-  }, [])
+    return () => { rolloutGate.current.invalidate(); document.removeEventListener('visibilitychange', refreshRollout) }
+  }, [id, user?.id])
 
   useEffect(() => {
     if (!deletionRequestId) return undefined
     let active = true
+    let timer = null
+    let polls = 0
+    let cleanupAttempts = 0
+    const schedule = () => { if (active) timer = setTimeout(check, 5000) }
     const check = async () => {
+      if (!active) return
+      if (document.visibilityState !== 'visible') { schedule(); return }
+      polls += 1
+      if (polls > 60) {
+        setDeletionNeedsManualRetry(true)
+        setDeletionNotice('Automatic deletion checks paused. Check the status manually when you are ready.')
+        return
+      }
       try {
         const status = await integrityClient.current.getDeletionStatus(deletionRequestId)
         if (!active) return
-        if (status.status === 'complete') { setDeletionNotice('Deletion completed.'); navigate('/my-stuff', { replace:true }) }
-        else setDeletionNotice(status.status === 'failed' ? 'Deletion is waiting for an automatic retry.' : 'Deletion is queued. SideFlip will confirm when private media cleanup is complete.')
-      } catch (next) { if (active) setError(next.message || 'Could not check deletion status.') }
+        if (status.status === 'complete') {
+          const cleanup = await reminderRuntime.current.cancelItem(id)
+          if (!active) return
+          if (cleanup.status !== 'cancelled') {
+            cleanupAttempts += 1
+            if (cleanupAttempts >= 3) {
+              setDeletionNeedsManualRetry(true)
+              setDeletionNotice('Deletion completed, but browser reminder cleanup needs a manual retry.')
+              return
+            }
+            setDeletionNotice('Deletion completed. Retrying browser reminder cleanup.')
+            schedule()
+            return
+          }
+          setDeletionNotice('Deletion completed.')
+          navigate('/my-stuff', { replace:true })
+          return
+        }
+        setDeletionNotice(status.status === 'failed' ? 'Deletion is waiting for an automatic retry.' : 'Deletion is queued. SideFlip will confirm when private media cleanup is complete.')
+      } catch (next) {
+        if (active) setError(next.message || 'Could not check deletion status.')
+      }
+      schedule()
     }
     void check()
-    const timer = setInterval(check, 5000)
-    return () => { active = false; clearInterval(timer) }
-  }, [deletionRequestId, navigate])
+    return () => { active = false; if (timer) clearTimeout(timer) }
+  }, [deletionRequestId, id, navigate])
+
+  async function retryDeletionStatus() {
+    if (!deletionRequestId || saving) return
+    setSaving(true)
+    setError('')
+    setDeletionNeedsManualRetry(false)
+    try {
+      const status = await integrityClient.current.getDeletionStatus(deletionRequestId)
+      if (status.status !== 'complete') {
+        setDeletionNotice(status.status === 'failed' ? 'Deletion is waiting for an automatic retry.' : 'Deletion is still queued. Try checking again shortly.')
+        setDeletionNeedsManualRetry(true)
+        return
+      }
+      const cleanup = await reminderRuntime.current.cancelItem(id)
+      if (cleanup.status !== 'cancelled') {
+        setDeletionNotice('Deletion completed, but browser reminder cleanup is still unavailable. Try again.')
+        setDeletionNeedsManualRetry(true)
+        return
+      }
+      setDeletionNotice('Deletion completed.')
+      navigate('/my-stuff', { replace:true })
+    } catch (next) {
+      setError(next.message || 'Could not check deletion status.')
+      setDeletionNeedsManualRetry(true)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function run(action, after) {
     if (inFlight.current) return
@@ -301,12 +384,15 @@ export default function MyStuffDetail() {
       return
     }
     if (!window.confirm('Permanently delete this item and its history? This cannot be undone.')) return
-    await run(() => deleteMyStuffItem(user.id, id), () => navigate('/my-stuff', { replace: true }))
+    await run(() => deleteMyStuffItem(user.id, id), async () => {
+      await reminderRuntime.current.cancelItem(id)
+      navigate('/my-stuff', { replace: true })
+    })
   }
 
   async function printIntegrityReport() {
     try {
-      const report = await integrityClient.current.getReport(id)
+      const report = await integrityClient.current.getIntegrityExport(id)
       const reportWindow = window.open('', '_blank')
       if (!reportWindow) throw new Error('Allow pop-ups to print or save this report as a PDF.')
       reportWindow.opener = null
@@ -371,10 +457,7 @@ export default function MyStuffDetail() {
       </article>
     </section>
 
-    {supportsVinDecoder(item.itemType) && <>
-      <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>
-      <section className="mystuff-card" aria-label="Manufacturer maintenance research retired"><h2>Common maintenance</h2><p className="mystuff-help">Manufacturer maintenance research has been retired. Use the maintenance schedule below as a starting point and verify intervals in your owner’s manual.</p></section>
-    </>}
+    {supportsVinDecoder(item.itemType) && <MyStuffVinDecodePanel itemId={id} values={edit} onChange={setEdit} persistIdentity={persistVehicleIdentity} onIdentityConfirmed={load} operationLock={inFlight} disabled={saving}/>}
     <nav className="mystuff-tabs mystuff-primary-tabs" aria-label="Item record views">
       {['maintenance', 'expenses', 'history'].map(view => <button type="button" key={view} aria-current={detailView === view ? 'page' : undefined} onClick={() => setDetailView(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}
     </nav>
@@ -388,7 +471,7 @@ export default function MyStuffDetail() {
       {expenses.length ? <ul className="mystuff-history">{expenses.map(row => { const value = expenseRevision(row); return <li key={row.id}><div className="mystuff-history-row"><span><strong>{value.description}</strong><small>{value.incurred_on} · {value.category}{row.voided_at ? ' · Voided' : ''}</small></span><strong>{money(value.amount)}</strong></div>{!row.voided_at && <div className="mystuff-actions"><button type="button" className="mystuff-link" onClick={() => beginExpenseEdit(row)}>Revise</button><button type="button" className="mystuff-danger-link" onClick={() => void voidExpense(row)}>Void</button></div>}</li> })}</ul> : <p className="mystuff-help">No expenses recorded yet.</p>}
     </section>}
 
-    <section className="mystuff-card" aria-labelledby="item-actions"><h2 id="item-actions">Item actions</h2><p className="mystuff-help">Attachments are not available in My Stuff yet.</p>{deletionNotice&&<p role="status" className="mystuff-help">{deletionNotice}</p>}<div className="mystuff-actions"><button type="button" className="btn" onClick={toggleArchive} disabled={saving}>{item.archived_at ? 'Restore item' : 'Archive item'}</button>{!item.archived_at && <button type="button" className="btn" onClick={transferAndOpenProject} disabled={saving}>Move to Projects</button>}</div>{integrityRollout.featureEnabled?<div className="mystuff-detail-form"><p className="mystuff-help">Print or save your maintenance integrity report as a PDF before permanent deletion if you want a copy.</p><button type="button" className="btn" onClick={printIntegrityReport} disabled={saving}>Print / Save PDF</button><div className="form-group"><label htmlFor="delete-confirmation">Type DELETE</label><input id="delete-confirmation" value={deleteText} onChange={event=>setDeleteText(event.target.value)} autoCapitalize="characters"/></div><button type="button" className="btn mystuff-danger" onClick={removeItem} disabled={saving||deleteText!=='DELETE'||Boolean(deletionRequestId)}>Review permanent deletion</button></div>:<div className="mystuff-actions"><button type="button" className="btn mystuff-danger" onClick={removeItem} disabled={saving}>Delete permanently</button></div>}</section>
+    <section className="mystuff-card" aria-labelledby="item-actions"><h2 id="item-actions">Item actions</h2><p className="mystuff-help">Attachments are not available in My Stuff yet.</p>{deletionNotice&&<p role="status" className="mystuff-help">{deletionNotice}</p>}{deletionNeedsManualRetry&&<button type="button" className="btn" onClick={retryDeletionStatus} disabled={saving}>Check deletion status</button>}<div className="mystuff-actions">{!integrityRollout.legacyRetired&&<button type="button" className="btn" onClick={toggleArchive} disabled={saving}>{item.archived_at ? 'Restore item' : 'Archive item'}</button>}{!item.archived_at && <button type="button" className="btn" onClick={transferAndOpenProject} disabled={saving}>Move to Projects</button>}</div>{integrityRollout.featureEnabled?<div className="mystuff-detail-form"><p className="mystuff-help">Print or save your maintenance integrity report as a PDF before permanent deletion if you want a copy.</p><button type="button" className="btn" onClick={printIntegrityReport} disabled={saving}>Print / Save PDF</button><div className="form-group"><label htmlFor="delete-confirmation">Type DELETE</label><input id="delete-confirmation" value={deleteText} onChange={event=>setDeleteText(event.target.value)} autoCapitalize="characters"/></div><button type="button" className="btn mystuff-danger" onClick={removeItem} disabled={saving||deleteText!=='DELETE'||Boolean(deletionRequestId)}>Review permanent deletion</button></div>:<div className="mystuff-actions"><button type="button" className="btn mystuff-danger" onClick={removeItem} disabled={saving}>Delete permanently</button></div>}</section>
     <UpgradePrompt open={Boolean(upgradeMessage)} message={upgradeMessage} onDismiss={() => setUpgradeMessage('')} />
   </main>
 }
