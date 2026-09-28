@@ -1,5 +1,3 @@
-import posthog from 'posthog-js'
-
 export const ANALYTICS_EVENTS = new Set([
   'app_opened', 'signup_started', 'signup_completed', 'signin_completed',
   'onboarding_started', 'onboarding_completed', 'screen_viewed',
@@ -33,6 +31,11 @@ let initialized = false
 let runtimeReady = false
 let analyticsEnabled = false
 let activeUserId = null
+let posthog = null
+let analyticsLoadPromise = null
+let analyticsLoadGeneration = 0
+let pendingAnalyticsOperations = []
+const MAX_PENDING_ANALYTICS_OPERATIONS = 100
 
 function bounded(value, max = 80) {
   if (typeof value !== 'string') return null
@@ -112,41 +115,89 @@ function resetPostHogAndOptOut() {
   } catch { /* analytics must never break auth or settings */ }
 }
 
+function runAnalyticsOperation(operation) {
+  if (!initialized || !posthog || !canUseAnalytics()) return false
+  try { operation(posthog); return true } catch { return false }
+}
+
+function invalidatePendingAnalyticsOperations() {
+  analyticsLoadGeneration += 1
+  analyticsLoadPromise = null
+  pendingAnalyticsOperations = []
+}
+
+function queueAnalyticsOperation(operation, kind = 'event') {
+  if (kind === 'identity') {
+    pendingAnalyticsOperations = pendingAnalyticsOperations.filter(pending => pending.generation !== analyticsLoadGeneration || pending.kind !== 'identity')
+  } else if (kind === 'lifecycle' && pendingAnalyticsOperations.some(pending => pending.generation === analyticsLoadGeneration && pending.kind === 'lifecycle')) {
+    return true
+  }
+  if (pendingAnalyticsOperations.length >= MAX_PENDING_ANALYTICS_OPERATIONS) {
+    const disposable = pendingAnalyticsOperations.findIndex(pending => pending.kind === 'event')
+    if (disposable >= 0) pendingAnalyticsOperations.splice(disposable, 1)
+    else {
+      const lifecycle = pendingAnalyticsOperations.findIndex(pending => pending.kind === 'lifecycle')
+      if (lifecycle >= 0) pendingAnalyticsOperations.splice(lifecycle, 1)
+      else return false
+    }
+  }
+  pendingAnalyticsOperations.push({ generation:analyticsLoadGeneration, kind, operation })
+  return true
+}
+
 function initAnalytics() {
-  if (initialized || typeof window === 'undefined') return initialized
+  if (initialized || analyticsLoadPromise || typeof window === 'undefined') return initialized || Boolean(analyticsLoadPromise)
   if (!canUseAnalytics()) return false
   const key = import.meta.env?.VITE_POSTHOG_KEY
   if (!key) return false
-  posthog.init(key, {
-    api_host: import.meta.env?.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
-    autocapture: false,
-    capture_pageview: false,
-    capture_pageleave: false,
-    disable_session_recording: true,
-    capture_exceptions: false,
-    disable_surveys: true,
-    advanced_disable_feature_flags: true,
-    advanced_disable_feature_flags_on_first_load: true,
-    disable_external_dependency_loading: true,
-    // Never retain a browser-side request batch across opt-out or identity reset.
-    request_batching: false,
-    persistence: 'localStorage',
-    person_profiles: 'identified_only',
-    respect_dnt: true,
-    opt_out_capturing_by_default: true,
+  const generation = analyticsLoadGeneration
+  analyticsLoadPromise = import('posthog-js').then(module => {
+    if (generation !== analyticsLoadGeneration || !canUseAnalytics()) return false
+    posthog = module.default
+    posthog.init(key, {
+      api_host: import.meta.env?.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+      autocapture: false,
+      capture_pageview: false,
+      capture_pageleave: false,
+      disable_session_recording: true,
+      capture_exceptions: false,
+      disable_surveys: true,
+      advanced_disable_feature_flags: true,
+      advanced_disable_feature_flags_on_first_load: true,
+      disable_external_dependency_loading: true,
+      // Never retain a browser-side request batch across opt-out or identity reset.
+      request_batching: false,
+      persistence: 'localStorage',
+      person_profiles: 'identified_only',
+      respect_dnt: true,
+      opt_out_capturing_by_default: true,
+    })
+    initialized = true
+    posthog.opt_in_capturing()
+    const operations = pendingAnalyticsOperations
+    pendingAnalyticsOperations = []
+    for (const pending of operations) {
+      if (pending.generation === generation) runAnalyticsOperation(pending.operation)
+    }
+    return true
+  }).catch(() => {
+    if (generation === analyticsLoadGeneration) pendingAnalyticsOperations = []
+    return false
+  }).finally(() => {
+    if (generation === analyticsLoadGeneration) analyticsLoadPromise = null
   })
-  initialized = true
   return true
 }
 
 function applyRuntimePreference(enabled) {
   analyticsEnabled = Boolean(enabled)
   if (!analyticsEnabled) {
+    invalidatePendingAnalyticsOperations()
     clearAttribution()
     resetPostHogAndOptOut()
     return
   }
-  if (!initAnalytics()) return
+  if (!initAnalytics() || !initialized) return
   try { posthog.opt_in_capturing() } catch { /* analytics must not break auth or settings */ }
 }
 
@@ -254,6 +305,7 @@ export async function setAnalyticsEnabled(enabled, userId = activeUserId) {
 
 export async function reconcileAnalyticsPreference(userId = null) {
   const normalized = normalizedUserId(userId)
+  if (activeUserId !== normalized) invalidatePendingAnalyticsOperations()
   activeUserId = normalized
   runtimeReady = false
   analyticsEnabled = false
@@ -293,34 +345,37 @@ export async function reconcileAnalyticsPreference(userId = null) {
 
 export function captureEvent(event, properties = {}) {
   if (!canUseAnalytics() || !ANALYTICS_EVENTS.has(event)) return false
-  if (!initialized && !initAnalytics()) return false
-  try {
-    posthog.capture(event, {
-      platform: 'web',
-      ...sanitizeAnalyticsProperties(properties),
-      $geoip_disable: true,
-    })
-    return true
-  } catch { return false }
+  const payload = {
+    platform: 'web',
+    ...sanitizeAnalyticsProperties(properties),
+    $geoip_disable: true,
+  }
+  const operation = client => client.capture(event, payload)
+  if (initialized) return runAnalyticsOperation(operation)
+  if (!initAnalytics()) return false
+  return queueAnalyticsOperation(operation, event === 'app_opened' ? 'lifecycle' : 'event')
 }
 
 export function identifyAnalytics(userId, properties = {}) {
   if (!canUseAnalytics() || normalizedUserId(userId) !== activeUserId) return false
-  if (!initialized && !initAnalytics()) return false
-  try {
-    posthog.identify(userId, { platform: 'web', ...sanitizeAnalyticsProperties(properties), $geoip_disable: true })
-    const attribution = getStoredAttribution()
-    const first = attribution.first || {}
-    const last = attribution.last || {}
-    posthog.setPersonProperties({
-      ...Object.fromEntries(Object.entries(first).map(([key, value]) => [`first_${key}`, value])),
-      ...Object.fromEntries(Object.entries(last).map(([key, value]) => [`last_${key}`, value])),
-    })
-    return true
-  } catch { return false }
+  const attribution = getStoredAttribution()
+  const first = attribution.first || {}
+  const last = attribution.last || {}
+  const personProperties = {
+    ...Object.fromEntries(Object.entries(first).map(([key, value]) => [`first_${key}`, value])),
+    ...Object.fromEntries(Object.entries(last).map(([key, value]) => [`last_${key}`, value])),
+  }
+  const operation = client => {
+    client.identify(userId, { platform: 'web', ...sanitizeAnalyticsProperties(properties), $geoip_disable: true })
+    client.setPersonProperties(personProperties)
+  }
+  if (initialized) return runAnalyticsOperation(operation)
+  if (!initAnalytics()) return false
+  return queueAnalyticsOperation(operation, 'identity')
 }
 
 export function resetAnalytics() {
+  invalidatePendingAnalyticsOperations()
   runtimeReady = false
   analyticsEnabled = false
   activeUserId = null

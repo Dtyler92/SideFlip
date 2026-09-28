@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { gzipSync } from 'node:zlib'
+import { join } from 'node:path'
 
 const root = new URL('../', import.meta.url)
 const source = path => readFileSync(new URL(path, root), 'utf8')
@@ -53,6 +56,46 @@ test('page routes are lazy loaded instead of shipping one oversized initial bund
   assert.match(app, /const Analytics = lazy\(\(\) => import\('\.\/pages\/Analytics'\)\)/)
   assert.match(app, /<Suspense fallback=/)
   assert.doesNotMatch(app, /import ProjectDetail from '\.\/pages\/ProjectDetail'/)
+})
+
+test('PostHog is loaded after consent instead of blocking the initial app bundle', () => {
+  const analytics = source('src/analytics.js')
+  assert.doesNotMatch(analytics, /^import posthog from 'posthog-js'$/m)
+  assert.match(analytics, /import\('posthog-js'\)/)
+  assert.match(analytics, /analyticsLoadGeneration/)
+  assert.match(analytics, /pendingAnalyticsOperations/)
+})
+
+test('production manifest keeps PostHog outside the initial static bundle budget', () => {
+  const output = mkdtempSync(join(process.env.TMPDIR || '/tmp', 'sideflip-performance-'))
+  try {
+    execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--manifest', '--outDir', output], {
+      cwd:new URL('..', import.meta.url),
+      env:{ ...process.env, VITE_POSTHOG_KEY:'phc_bundle_acceptance_probe' },
+      stdio:'pipe',
+    })
+    const manifest = JSON.parse(readFileSync(join(output, '.vite/manifest.json'), 'utf8'))
+    const posthogKey = Object.keys(manifest).find(key => key.includes('node_modules/posthog-js/'))
+    assert.ok(posthogKey && manifest[posthogKey].isDynamicEntry, 'PostHog must remain an emitted dynamic entry')
+
+    const pending = ['index.html']
+    const staticKeys = new Set()
+    while (pending.length) {
+      const key = pending.pop()
+      if (staticKeys.has(key)) continue
+      staticKeys.add(key)
+      pending.push(...(manifest[key]?.imports || []))
+    }
+    assert.equal(staticKeys.has(posthogKey), false, 'PostHog must not enter the initial static dependency closure')
+    const html = readFileSync(join(output, 'index.html'), 'utf8')
+    assert.equal(html.includes(manifest[posthogKey].file), false, 'PostHog must not be module-preloaded')
+
+    const initialGzipBytes = [...staticKeys].reduce((sum, key) => {
+      const file = manifest[key]?.file
+      return file ? sum + gzipSync(readFileSync(join(output, file)), { level:9 }).length : sum
+    }, 0)
+    assert.ok(initialGzipBytes <= 145 * 1024, `initial static JavaScript exceeded 145 KiB gzip: ${initialGzipBytes}`)
+  } finally { rmSync(output, { recursive:true, force:true }) }
 })
 
 test('deployment applies baseline browser security headers to every route', () => {
